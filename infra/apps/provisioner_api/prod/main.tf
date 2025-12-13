@@ -257,3 +257,9 @@ module "api_gateway" {
     Service     = var.service_name
   }
 }
+
+module "cognito" {
+  source = "git::https://github.com/rafaelcmd/cloud-ops-manager.git//infra/modules/aws/cognito?ref=main"
+
+  user_pool_name = "${var.project}-${var.environment}-user-pool"
+}
