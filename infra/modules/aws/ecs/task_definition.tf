@@ -55,7 +55,7 @@ resource "aws_ecs_task_definition" "api" {
     {
       name      = "datadog-agent"
       image     = var.datadog_agent_image
-      essential = true
+      essential = false
       portMappings = [
         {
           containerPort = 8125
