@@ -20,11 +20,7 @@ data "terraform_remote_state" "cloudops_manager_ecr_repository" {
   config = {
     organization = "cloudops-manager-org"
     workspaces = {
-      name = "cloudops-manager-ecr-repository"
+      name = "cloudops-shared-ecr"
     }
-  }
-
-  defaults = {
-    repository_url = "471112701237.dkr.ecr.us-east-1.amazonaws.com/cloudops-manager"
   }
 }
