@@ -2,6 +2,13 @@ name: API - Create AWS Infrastructure
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'infra/apps/provisioner_api/prod/**'
+      - 'infra/modules/aws/**'
+      - 'infra/shared/datadog/**'
 
 permissions:
   contents: read
