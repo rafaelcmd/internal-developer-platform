@@ -1,5 +1,5 @@
 module "ecs" {
-  source = "git::https://github.com/rafaelcmd/cloud-ops-manager.git//infra/modules/aws/ecs?ref=main"
+  source = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/ecs?ref=main"
 
   # Infrastructure dependencies
   vpc_id             = data.terraform_remote_state.shared_vpc.outputs.vpc_id
@@ -60,7 +60,7 @@ module "ecs" {
 }
 
 module "nlb" {
-  source = "git::https://github.com/rafaelcmd/cloud-ops-manager.git//infra/modules/aws/nlb?ref=main"
+  source = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/nlb?ref=main"
 
   # NLB configuration
   nlb_name           = var.nlb_name
@@ -101,7 +101,7 @@ module "nlb" {
 }
 
 module "sqs" {
-  source = "git::https://github.com/rafaelcmd/cloud-ops-manager.git//infra/modules/aws/sqs?ref=main"
+  source = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/sqs?ref=main"
 
   # SQS configuration
   queue_name                = var.queue_name
@@ -124,7 +124,7 @@ module "sqs" {
 
 # Datadog Lambda Forwarder for collecting application logs (required for ECS Fargate)
 module "datadog_forwarder" {
-  source = "git::https://github.com/rafaelcmd/cloud-ops-manager.git//infra/modules/aws/lambda?ref=main"
+  source = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/lambda?ref=main"
 
   # Basic Lambda configuration
   function_name                  = var.lambda_function_name
@@ -212,7 +212,7 @@ module "datadog_forwarder" {
 }
 
 module "api_gateway" {
-  source = "git::https://github.com/rafaelcmd/cloud-ops-manager.git//infra/modules/aws/api_gateway?ref=main"
+  source = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/api_gateway?ref=main"
 
   # API Gateway configuration
   api_name        = var.api_gateway_name
@@ -259,7 +259,7 @@ module "api_gateway" {
 }
 
 module "cognito" {
-  source = "git::https://github.com/rafaelcmd/cloud-ops-manager.git//infra/modules/aws/cognito?ref=main"
+  source = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/cognito?ref=main"
 
   user_pool_name = "${var.project}-${var.environment}-user-pool"
 }
