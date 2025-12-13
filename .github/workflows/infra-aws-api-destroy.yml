@@ -1,4 +1,4 @@
-name: Destroy Infra - AWS
+name: API - Destroy AWS Infrastructure
 
 on:
   workflow_dispatch:

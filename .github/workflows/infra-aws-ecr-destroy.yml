@@ -1,4 +1,4 @@
-name: Destroy AWS ECR
+name: AWS ECR - Destroy
 
 on:
   workflow_dispatch:
