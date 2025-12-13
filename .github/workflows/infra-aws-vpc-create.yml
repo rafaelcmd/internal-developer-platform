@@ -2,6 +2,12 @@ name: AWS VPC - Create
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'infra/live/shared/vpc/**'
+      - 'infra/modules/aws/vpc/**'
 
 permissions:
   contents: read
@@ -12,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: infra/modules/aws/shared/vpc
+        working-directory: infra/live/shared/vpc
         shell: bash
 
     steps:

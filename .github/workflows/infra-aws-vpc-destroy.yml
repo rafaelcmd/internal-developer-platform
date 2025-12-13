@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: infra/modules/aws/shared/vpc
+        working-directory: infra/live/shared/vpc
         shell: bash
 
     steps:
