@@ -17,14 +17,14 @@ module "ecs" {
   app_version     = var.app_version
 
   # ECS-specific configuration
-  cluster_name        = var.cluster_name
-  task_family         = var.task_family
-  task_cpu            = var.task_cpu
-  task_memory         = var.task_memory
-  desired_count       = var.desired_count
-  container_port      = var.container_port
-  app_container_name  = var.service_name
-  datadog_site        = "datadoghq.com"
+  cluster_name       = var.cluster_name
+  task_family        = var.task_family
+  task_cpu           = var.task_cpu
+  task_memory        = var.task_memory
+  desired_count      = var.desired_count
+  container_port     = var.container_port
+  app_container_name = var.service_name
+  datadog_site       = "datadoghq.com"
 
   # IAM role names
   task_execution_role_name = "${var.project}-${var.environment}-ecsTaskExecutionRole"
