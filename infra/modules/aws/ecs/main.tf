@@ -72,6 +72,10 @@ resource "aws_iam_policy" "ecs_task_policy" {
           "ecs:DescribeServices",
           "ecs:ListServices",
           "ecs:DescribeClusters",
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage",
+          "ecr:GetAuthorizationToken",
           "logs:*",
           "cloudwatch:*",
         ]
