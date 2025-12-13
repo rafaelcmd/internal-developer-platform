@@ -1,4 +1,4 @@
-name: Deploy - API to AWS ECS
+name: API - Deploy to AWS ECS
 
 on:
   workflow_dispatch:
