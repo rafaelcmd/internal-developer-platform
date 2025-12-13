@@ -20,6 +20,13 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Debug AWS Connection
+        run: |
+          echo "Checking caller identity..."
+          aws sts get-caller-identity
+          echo "Checking repository existence..."
+          aws ecr describe-repositories --repository-names cloudops-manager-repo || echo "Repository check failed"
+
       - name: Log in to AWS ECR
         run: aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
 
