@@ -85,12 +85,6 @@ variable "container_port" {
   default     = 5000
 }
 
-variable "datadog_agent_image" {
-  description = "Datadog agent Docker image"
-  type        = string
-  default     = "public.ecr.aws/datadog/agent:latest"
-}
-
 variable "app_image_tag" {
   description = "Tag of the application Docker image"
   type        = string

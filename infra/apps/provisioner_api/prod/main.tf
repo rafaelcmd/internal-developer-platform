@@ -24,7 +24,6 @@ module "ecs" {
   desired_count       = var.desired_count
   container_port      = var.container_port
   app_container_name  = var.service_name
-  datadog_agent_image = var.datadog_agent_image
   datadog_site        = "datadoghq.com"
 
   # IAM role names
@@ -49,7 +48,8 @@ module "ecs" {
   security_group_description = "Security group for ${var.project} ECS API"
 
   # Application image configuration
-  app_image_uri = "${data.terraform_remote_state.cloudops_manager_ecr_repository.outputs.repository_url}:${var.app_image_tag}"
+  app_image_uri       = "${data.terraform_remote_state.cloudops_manager_ecr_repository.outputs.repository_url}:${var.app_image_tag}"
+  datadog_agent_image = "${data.terraform_remote_state.cloudops_manager_ecr_repository.outputs.repository_url}:datadog-agent"
 
   # Common tags
   tags = {
