@@ -25,11 +25,6 @@ resource "aws_ecs_service" "api_service" {
     var.lb_listener
   ]
 
-  # Force deployment when task definition changes
-  triggers = {
-    task_definition_arn = aws_ecs_task_definition.api.arn
-  }
-
   tags = merge(var.tags, {
     Datadog           = "monitored"
     "datadog:service" = var.service_name
