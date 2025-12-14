@@ -24,7 +24,7 @@ resource "aws_ecs_task_definition" "api" {
       dependsOn = [
         {
           containerName = "datadog-agent"
-          condition     = "START"
+          condition     = "HEALTHY"
         }
       ]
       portMappings = [{
