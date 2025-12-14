@@ -10,6 +10,23 @@ variable "aws_region" {
 }
 
 # =============================================================================
+# DATADOG API CONFIGURATION
+# Variables for Datadog API authentication and access
+# =============================================================================
+
+variable "datadog_api_key" {
+  description = "Datadog API key"
+  type        = string
+  sensitive   = true
+}
+
+variable "datadog_app_key" {
+  description = "Datadog application key"
+  type        = string
+  sensitive   = true
+}
+
+# =============================================================================
 # IAM ROLE CONFIGURATION
 # Variables for Datadog AWS integration IAM role setup
 # =============================================================================

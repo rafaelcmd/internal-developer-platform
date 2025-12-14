@@ -1,4 +1,4 @@
-name: API - Destroy AWS Infrastructure
+name: Shared - Destroy Datadog Infrastructure
 
 on:
   workflow_dispatch:
@@ -7,13 +7,13 @@ permissions:
   contents: read
 
 jobs:
-  destroy-infrastructure:
-    name: Destroy AWS Infrastructure
+  destroy-datadog-infrastructure:
+    name: Destroy Datadog Infrastructure
     runs-on: ubuntu-latest
 
     defaults:
       run:
-        working-directory: infra/apps/provisioner_api/prod
+        working-directory: infra/live/shared/datadog
         shell: bash
 
     steps:
@@ -36,7 +36,7 @@ jobs:
         run: terraform init
 
       - name: Terraform Plan Destroy
-        run: terraform plan -destroy -input=false
+        run: terraform plan -destroy -input=false -var="datadog_api_key=${{ secrets.DATADOG_API_KEY }}" -var="datadog_app_key=${{ secrets.DATADOG_APP_KEY_PROV_API }}"
 
       - name: Terraform Destroy
-        run: terraform destroy -auto-approve -input=false
+        run: terraform destroy -auto-approve -input=false -var="datadog_api_key=${{ secrets.DATADOG_API_KEY }}" -var="datadog_app_key=${{ secrets.DATADOG_APP_KEY_PROV_API }}"

@@ -34,17 +34,6 @@ variable "app_version" {
 }
 
 # =============================================================================
-# DATADOG CONFIGURATION
-# Variables for Datadog integration and monitoring
-# =============================================================================
-
-variable "datadog_api_key" {
-  description = "Datadog API key for Lambda forwarder"
-  type        = string
-  sensitive   = true
-}
-
-# =============================================================================
 # ECS CONFIGURATION
 # Variables for ECS cluster, service, and task configuration
 # =============================================================================

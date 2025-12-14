@@ -1,4 +1,4 @@
-name: API - Create AWS Infrastructure
+name: Shared - Create Datadog Infrastructure
 
 on:
   workflow_dispatch:
@@ -6,23 +6,21 @@ on:
     branches:
       - main
     paths:
-      - 'infra/apps/provisioner_api/prod/**'
-      - 'infra/modules/aws/**'
+      - 'infra/live/shared/datadog/**'
+      - 'infra/modules/datadog/**'
+      - 'infra/modules/aws/datadog_integration/**'
 
 permissions:
   contents: read
 
 jobs:
-  create-infrastructure:
-    name: Create AWS Infrastructure
+  create-datadog-infrastructure:
+    name: Create Datadog Infrastructure
     runs-on: ubuntu-latest
-
-    outputs:
-      datadog_forwarder_arn: ${{ steps.terraform_output.outputs.datadog_forwarder_arn }}
 
     defaults:
       run:
-        working-directory: infra/apps/provisioner_api/prod
+        working-directory: infra/live/shared/datadog
         shell: bash
 
     steps:
@@ -51,12 +49,7 @@ jobs:
         run: terraform validate
 
       - name: Terraform Plan
-        run: terraform plan -input=false
+        run: terraform plan -input=false -var="datadog_api_key=${{ secrets.DATADOG_API_KEY }}" -var="datadog_app_key=${{ secrets.DATADOG_APP_KEY_PROV_API }}"
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve -input=false
-
-      - name: Get Terraform Outputs
-        id: terraform_output
-        run: |
-          echo "datadog_forwarder_arn=$(terraform output -raw datadog_forwarder_arn)" >> $GITHUB_OUTPUT
+        run: terraform apply -auto-approve -input=false -var="datadog_api_key=${{ secrets.DATADOG_API_KEY }}" -var="datadog_app_key=${{ secrets.DATADOG_APP_KEY_PROV_API }}"
