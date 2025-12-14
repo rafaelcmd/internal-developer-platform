@@ -57,8 +57,11 @@ jobs:
           # Get ECR URL from Terraform output
           ECR_URL=$(terraform output -raw repository_url)
           
-          # Login to ECR
+          # Login to Private ECR
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin $ECR_URL
+
+          # Login to Public ECR (to avoid rate limits)
+          aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
           
           # Pull Datadog Agent
           docker pull public.ecr.aws/datadog/agent:latest
