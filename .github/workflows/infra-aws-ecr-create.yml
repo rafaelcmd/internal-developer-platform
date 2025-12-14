@@ -51,3 +51,20 @@ jobs:
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
+
+      - name: Push Datadog Agent Image
+        run: |
+          # Get ECR URL from Terraform output
+          ECR_URL=$(terraform output -raw repository_url)
+          
+          # Login to ECR
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin $ECR_URL
+          
+          # Pull Datadog Agent
+          docker pull public.ecr.aws/datadog/agent:latest
+          
+          # Tag for Private ECR
+          docker tag public.ecr.aws/datadog/agent:latest $ECR_URL:datadog-agent
+          
+          # Push to Private ECR
+          docker push $ECR_URL:datadog-agent
