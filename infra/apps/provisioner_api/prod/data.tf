@@ -24,3 +24,9 @@ data "terraform_remote_state" "cloudops_manager_ecr_repository" {
     }
   }
 }
+
+# Datadog API Key from SSM
+data "aws_ssm_parameter" "datadog_api_key" {
+  name            = "/${var.project}/${var.environment}/datadog/api_key"
+  with_decryption = true
+}

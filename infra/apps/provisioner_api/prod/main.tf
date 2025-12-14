@@ -9,7 +9,7 @@ module "ecs" {
   forwarder_arn      = module.datadog_forwarder.datadog_forwarder_arn
 
   # Basic configuration
-  datadog_api_key = var.datadog_api_key
+  datadog_api_key = data.aws_ssm_parameter.datadog_api_key.value
   aws_region      = var.aws_region
   environment     = var.environment
   project         = var.project
@@ -157,7 +157,7 @@ module "datadog_forwarder" {
 
   # Environment variables
   environment_variables = {
-    DD_API_KEY = var.datadog_api_key
+    DD_API_KEY = data.aws_ssm_parameter.datadog_api_key.value
     DD_SITE    = "datadoghq.com"
     DD_SOURCE  = "aws"
     DD_TAGS    = "env:${var.environment},project:${var.project},service:${var.service_name}"
