@@ -14,7 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/sirupsen/logrus"
-	"github.com/swaggo/http-swagger"
+	httpSwagger "github.com/swaggo/http-swagger"
 	httptrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/net/http"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 
@@ -139,7 +139,7 @@ func getQueueURL(ctx context.Context, cfg aws.Config) (string, error) {
 func getPort() string {
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "5000"
+		port = "8080"
 	}
 	return port
 }

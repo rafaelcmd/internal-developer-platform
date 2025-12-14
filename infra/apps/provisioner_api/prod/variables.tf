@@ -71,7 +71,7 @@ variable "desired_count" {
 variable "container_port" {
   description = "Port on which the application container listens"
   type        = number
-  default     = 5000
+  default     = 8080
 }
 
 variable "app_image_tag" {
