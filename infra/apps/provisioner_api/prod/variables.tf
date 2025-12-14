@@ -136,7 +136,7 @@ variable "load_balancer_type" {
 variable "target_group_name" {
   description = "Name of the NLB target group"
   type        = string
-  default     = "cloudops-manager-tg"
+  default     = "cloudops-manager-tg-8080"
 }
 
 variable "target_group_protocol" {

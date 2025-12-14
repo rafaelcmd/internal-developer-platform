@@ -26,6 +26,10 @@ resource "aws_lb_target_group" "this" {
     unhealthy_threshold = var.unhealthy_threshold
   }
 
+  lifecycle {
+    create_before_destroy = true
+  }
+
   tags = merge(var.tags, {
     Name = "${var.project}-${var.environment}-${var.target_group_name}"
   })
