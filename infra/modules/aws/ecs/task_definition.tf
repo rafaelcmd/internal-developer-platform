@@ -21,6 +21,12 @@ resource "aws_ecs_task_definition" "api" {
       name      = var.app_container_name
       image     = var.app_image_uri
       essential = true
+      dependsOn = [
+        {
+          containerName = "datadog-agent"
+          condition     = "START"
+        }
+      ]
       portMappings = [{
         containerPort = var.container_port
         protocol      = "tcp"
@@ -56,6 +62,13 @@ resource "aws_ecs_task_definition" "api" {
       name      = "datadog-agent"
       image     = var.datadog_agent_image
       essential = false
+      healthCheck = {
+        command     = ["CMD-SHELL", "agent health"]
+        interval    = 30
+        retries     = 3
+        startPeriod = 15
+        timeout     = 5
+      }
       portMappings = [
         {
           containerPort = 8125
