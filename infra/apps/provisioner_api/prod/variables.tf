@@ -53,13 +53,13 @@ variable "task_family" {
 variable "task_cpu" {
   description = "CPU units for the ECS task"
   type        = number
-  default     = 256
+  default     = 512
 }
 
 variable "task_memory" {
   description = "Memory (in MiB) for the ECS task"
   type        = number
-  default     = 512
+  default     = 1024
 }
 
 variable "desired_count" {
