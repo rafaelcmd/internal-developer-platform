@@ -3,6 +3,7 @@ module "ecs" {
 
   # Infrastructure dependencies
   vpc_id             = data.terraform_remote_state.shared_vpc.outputs.vpc_id
+  vpc_cidr_block     = data.terraform_remote_state.shared_vpc.outputs.vpc_cidr_block
   private_subnet_ids = data.terraform_remote_state.shared_vpc.outputs.private_subnet_ids
   target_group_arn   = module.nlb.target_group_arn
   lb_listener        = module.nlb.lb_listener
