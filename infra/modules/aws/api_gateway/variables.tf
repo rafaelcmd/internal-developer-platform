@@ -49,6 +49,11 @@ variable "nlb_dns_name" {
   type        = string
 }
 
+variable "nlb_listener_arn" {
+  description = "ARN of the NLB Listener"
+  type        = string
+}
+
 # =============================================================================
 # STAGE CONFIGURATION
 # Variables for API Gateway stage and deployment
