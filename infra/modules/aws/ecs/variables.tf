@@ -95,6 +95,12 @@ variable "cluster_name" {
   type        = string
 }
 
+variable "vpc_link_security_group_id" {
+  description = "ID of the VPC Link Security Group to allow ingress from"
+  type        = string
+  default     = null
+}
+
 variable "desired_count" {
   description = "Desired number of tasks for the ECS service"
   type        = number

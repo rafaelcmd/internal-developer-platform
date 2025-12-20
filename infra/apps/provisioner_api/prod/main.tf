@@ -46,6 +46,7 @@ module "ecs" {
   # Security group configuration
   security_group_name        = "${var.project}-${var.environment}-api-ecs-sg"
   security_group_description = "Security group for ${var.project} ECS API"
+  vpc_link_security_group_id = module.api_gateway.vpc_link_security_group_id
 
   # Application image configuration
   app_image_uri       = "${data.terraform_remote_state.cloudops_manager_ecr_repository.outputs.repository_url}:${var.app_image_tag}"
