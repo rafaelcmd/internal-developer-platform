@@ -31,10 +31,10 @@ paths:
       x-amazon-apigateway-integration:
         type: http_proxy
         httpMethod: GET
-        uri: http://${nlb_dns_name}/health
+        uri: ${nlb_listener_arn}
         connectionType: VPC_LINK
         connectionId: ${vpc_link_id}
-        timeoutInMillis: ${integration_timeout_ms}
+        timeoutInMillis: 29000
         payloadFormatVersion: "1.0"
 
   /provision:

@@ -225,6 +225,7 @@ module "api_gateway" {
   vpc_link_subnet_ids = data.terraform_remote_state.shared_vpc.outputs.private_subnet_ids
   nlb_arn             = module.nlb.nlb_arn
   nlb_dns_name        = module.nlb.nlb_dns_name
+  nlb_listener_arn    = module.nlb.lb_listener
 
   # Stage configuration
   stage_name  = var.api_gateway_stage_name
