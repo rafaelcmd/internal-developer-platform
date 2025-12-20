@@ -14,6 +14,8 @@ resource "aws_apigatewayv2_api" "this" {
     integration_timeout_ms = var.integration_timeout_ms
   })
 
+  fail_on_warnings = true
+
   cors_configuration {
     allow_credentials = var.cors_allow_credentials
     allow_headers     = var.cors_allow_headers
