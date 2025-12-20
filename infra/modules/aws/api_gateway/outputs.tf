@@ -38,9 +38,9 @@ output "vpc_link_id" {
   value       = aws_apigatewayv2_vpc_link.this.id
 }
 
-output "vpc_link_arn" {
-  description = "ARN of the VPC Link"
-  value       = aws_apigatewayv2_vpc_link.this.arn
+output "vpc_link_security_group_id" {
+  description = "ID of the VPC Link Security Group"
+  value       = length(aws_security_group.vpc_link) > 0 ? aws_security_group.vpc_link[0].id : null
 }
 
 # =============================================================================
