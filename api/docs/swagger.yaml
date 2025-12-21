@@ -52,9 +52,9 @@ paths:
       x-amazon-apigateway-integration:
         type: http_proxy
         httpMethod: POST
-        uri: ${nlb_listener_arn}
+        uri: "${nlb_listener_arn}"
         connectionType: VPC_LINK
-        connectionId: ${vpc_link_id}
+        connectionId: "${vpc_link_id}"
         payloadFormatVersion: "1.0"
   /auth/signup:
     post:
@@ -89,9 +89,9 @@ paths:
       x-amazon-apigateway-integration:
         type: http_proxy
         httpMethod: POST
-        uri: ${nlb_listener_arn}
+        uri: "${nlb_listener_arn}"
         connectionType: VPC_LINK
-        connectionId: ${vpc_link_id}
+        connectionId: "${vpc_link_id}"
         payloadFormatVersion: "1.0"
   /health:
     get:
@@ -109,9 +109,9 @@ paths:
       x-amazon-apigateway-integration:
         type: http_proxy
         httpMethod: GET
-        uri: ${nlb_listener_arn}
+        uri: "${nlb_listener_arn}"
         connectionType: VPC_LINK
-        connectionId: ${vpc_link_id}
+        connectionId: "${vpc_link_id}"
         payloadFormatVersion: "1.0"
   /provision:
     post:
@@ -146,9 +146,9 @@ paths:
       x-amazon-apigateway-integration:
         type: http_proxy
         httpMethod: POST
-        uri: ${nlb_listener_arn}
+        uri: "${nlb_listener_arn}"
         connectionType: VPC_LINK
-        connectionId: ${vpc_link_id}
+        connectionId: "${vpc_link_id}"
         payloadFormatVersion: "1.0"
   /swagger/{proxy+}:
     x-amazon-apigateway-any-method:
@@ -160,9 +160,9 @@ paths:
       x-amazon-apigateway-integration:
         type: http_proxy
         httpMethod: ANY
-        uri: ${nlb_listener_arn}
+        uri: "${nlb_listener_arn}"
         connectionType: VPC_LINK
-        connectionId: ${vpc_link_id}
+        connectionId: "${vpc_link_id}"
         payloadFormatVersion: "1.0"
 definitions:
   model.AuthResponse:
