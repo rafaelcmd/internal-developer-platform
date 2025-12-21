@@ -52,7 +52,7 @@ paths:
       x-amazon-apigateway-integration:
         type: http_proxy
         httpMethod: POST
-        uri: "${nlb_listener_arn}"
+        uri: "http://${nlb_dns_name}:8080/auth/signin"
         connectionType: VPC_LINK
         connectionId: "${vpc_link_id}"
         payloadFormatVersion: "1.0"
@@ -91,7 +91,7 @@ paths:
       x-amazon-apigateway-integration:
         type: http_proxy
         httpMethod: POST
-        uri: "${nlb_listener_arn}"
+        uri: "http://${nlb_dns_name}:8080/auth/signup"
         connectionType: VPC_LINK
         connectionId: "${vpc_link_id}"
         payloadFormatVersion: "1.0"
@@ -111,7 +111,7 @@ paths:
       x-amazon-apigateway-integration:
         type: http_proxy
         httpMethod: GET
-        uri: "${nlb_listener_arn}"
+        uri: "http://${nlb_dns_name}:8080/health"
         connectionType: VPC_LINK
         connectionId: "${vpc_link_id}"
         payloadFormatVersion: "1.0"
@@ -150,7 +150,7 @@ paths:
       x-amazon-apigateway-integration:
         type: http_proxy
         httpMethod: POST
-        uri: "${nlb_listener_arn}"
+        uri: "http://${nlb_dns_name}:8080/provision"
         connectionType: VPC_LINK
         connectionId: "${vpc_link_id}"
         payloadFormatVersion: "1.0"
@@ -165,7 +165,7 @@ paths:
       x-amazon-apigateway-integration:
         type: http_proxy
         httpMethod: ANY
-        uri: "${nlb_listener_arn}"
+        uri: "http://${nlb_dns_name}:8080/swagger/{proxy}"
         connectionType: VPC_LINK
         connectionId: "${vpc_link_id}"
         payloadFormatVersion: "1.0"
