@@ -1,3 +1,4 @@
+swagger: "2.0"
 basePath: /
 definitions:
   model.AuthResponse:
@@ -101,6 +102,13 @@ info:
 paths:
   /auth/signin:
     post:
+      x-amazon-apigateway-integration:
+        type: "http_proxy"
+        httpMethod: "POST"
+        uri: "${nlb_listener_arn}"
+        connectionType: "VPC_LINK"
+        connectionId: "${vpc_link_id}"
+        payloadFormatVersion: "1.0"
       consumes:
       - application/json
       description: Authenticates a user and returns tokens
@@ -135,6 +143,13 @@ paths:
       - auth
   /auth/signup:
     post:
+      x-amazon-apigateway-integration:
+        type: "http_proxy"
+        httpMethod: "POST"
+        uri: "${nlb_listener_arn}"
+        connectionType: "VPC_LINK"
+        connectionId: "${vpc_link_id}"
+        payloadFormatVersion: "1.0"
       consumes:
       - application/json
       description: Registers a new user with email and password
@@ -165,6 +180,13 @@ paths:
       - auth
   /health:
     get:
+      x-amazon-apigateway-integration:
+        type: "http_proxy"
+        httpMethod: "GET"
+        uri: "${nlb_listener_arn}"
+        connectionType: "VPC_LINK"
+        connectionId: "${vpc_link_id}"
+        payloadFormatVersion: "1.0"
       description: Returns the health status of the API. Used for load balancer health
         checks and monitoring purposes.
       produces:
@@ -179,6 +201,13 @@ paths:
       - health
   /provision:
     post:
+      x-amazon-apigateway-integration:
+        type: "http_proxy"
+        httpMethod: "POST"
+        uri: "${nlb_listener_arn}"
+        connectionType: "VPC_LINK"
+        connectionId: "${vpc_link_id}"
+        payloadFormatVersion: "1.0"
       consumes:
       - application/json
       description: Submits a new resource provisioning request to be processed asynchronously.
@@ -208,10 +237,23 @@ paths:
       summary: Submit a resource provisioning request
       tags:
       - resources
+  /swagger/{proxy+}:
+    x-amazon-apigateway-any-method:
+      x-amazon-apigateway-integration:
+        type: "http_proxy"
+        httpMethod: "ANY"
+        uri: "${nlb_listener_arn}"
+        connectionType: "VPC_LINK"
+        connectionId: "${vpc_link_id}"
+        payloadFormatVersion: "1.0"
+      parameters:
+      - name: "proxy"
+        in: "path"
+        required: true
+        type: "string"
 schemes:
 - http
 - https
-swagger: "2.0"
 tags:
 - description: Resource provisioning operations
   name: resources
