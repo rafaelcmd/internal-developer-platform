@@ -77,7 +77,20 @@ func main() {
 	// Setup HTTP server with Datadog tracing
 	router := httpmod.NewRouter(resourceHandler, healthHandler)
 	mux := httptrace.NewServeMux(httptrace.WithServiceName("cloud-ops-manager.api"))
-	mux.Handle("/", router)
+
+	// Add logging middleware
+	loggingMiddleware := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			log.WithFields(logrus.Fields{
+				"method": r.Method,
+				"path":   r.URL.Path,
+				"remote": r.RemoteAddr,
+			}).Info("Received request")
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	mux.Handle("/", loggingMiddleware(router))
 	mux.Handle("/swagger/", httpSwagger.WrapHandler)
 
 	port := getPort()
