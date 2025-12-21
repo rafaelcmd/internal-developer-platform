@@ -43,3 +43,8 @@ jobs:
             --service resource-provisioner-api-service \
             --force-new-deployment \
             --region ${{ secrets.AWS_REGION }}
+          
+          aws ecs wait services-stable \
+            --cluster cloudops-manager-cluster \
+            --services resource-provisioner-api-service \
+            --region ${{ secrets.AWS_REGION }}
