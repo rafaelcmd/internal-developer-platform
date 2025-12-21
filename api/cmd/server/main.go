@@ -83,7 +83,8 @@ func main() {
 		env = "dev"
 	}
 	basePath := fmt.Sprintf("/%s/", env)
-	mux.Handle(basePath, http.StripPrefix(basePath, router))
+	stripPath := fmt.Sprintf("/%s", env)
+	mux.Handle(basePath, http.StripPrefix(stripPath, router))
 	mux.Handle("/swagger/", httpSwagger.WrapHandler)
 
 	port := getPort()
