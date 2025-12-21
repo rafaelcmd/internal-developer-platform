@@ -2,12 +2,6 @@ name: AWS ECR - Create
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - 'infra/live/shared/ecr/**'
-      - 'infra/modules/aws/ecr/**'
 
 permissions:
   contents: read

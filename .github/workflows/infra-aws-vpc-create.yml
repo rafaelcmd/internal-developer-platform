@@ -2,12 +2,6 @@ name: AWS VPC - Create
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - 'infra/live/shared/vpc/**'
-      - 'infra/modules/aws/vpc/**'
 
 permissions:
   contents: read

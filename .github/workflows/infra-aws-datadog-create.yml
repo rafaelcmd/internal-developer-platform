@@ -2,13 +2,6 @@ name: Shared - Create Datadog Infrastructure
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - 'infra/live/shared/datadog/**'
-      - 'infra/modules/datadog/**'
-      - 'infra/modules/aws/datadog_integration/**'
 
 permissions:
   contents: read
