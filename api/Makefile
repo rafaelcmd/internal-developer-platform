@@ -22,7 +22,7 @@ test:
 
 # Generate OpenAPI documentation from Swagger annotations
 swagger-gen:
-	swag init -g cmd/server/main.go
+	swag init -g cmd/server/main.go --outputTypes go,yaml
 
 # Install swag CLI tool
 swagger-install:
@@ -35,7 +35,7 @@ run: build
 # Clean build artifacts
 clean:
 	rm -rf bin/
-	rm -rf docs/docs.go docs/swagger.json docs/swagger.yaml
+	rm -rf docs/docs.go docs/swagger.yaml
 
 # Development workflow: regenerate docs and build
 dev: swagger-gen build
