@@ -103,14 +103,28 @@ func main() {
 	stripPath := fmt.Sprintf("/%s", env)
 	mux.Handle(basePath, http.StripPrefix(stripPath, router))
 
+	// Serve the swagger.yaml file
+	// If running in prod, the path will be /prod/swagger/swagger.yaml
+	swaggerFile := fmt.Sprintf("/%s/swagger/swagger.yaml", env)
+	mux.HandleFunc(swaggerFile, func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./docs/swagger.yaml")
+	})
+
 	// Handle Swagger UI
 	// If running in prod, the path will be /prod/swagger/
 	// If running locally, the path will be /swagger/
 	swaggerPath := fmt.Sprintf("/%s/swagger/", env)
-	mux.Handle(swaggerPath, http.StripPrefix(swaggerPath, httpSwagger.WrapHandler))
+	mux.Handle(swaggerPath, http.StripPrefix(swaggerPath, httpSwagger.Handler(
+		httpSwagger.URL("swagger.yaml"), // Point to the file relative to the UI
+	)))
 
-	// Also handle root /swagger/ for local dev convenience or if stage is stripped
-	mux.Handle("/swagger/", httpSwagger.WrapHandler)
+	// Also handle root /swagger/ for local dev convenience
+	mux.HandleFunc("/swagger/swagger.yaml", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./docs/swagger.yaml")
+	})
+	mux.Handle("/swagger/", httpSwagger.Handler(
+		httpSwagger.URL("swagger.yaml"),
+	))
 
 	port := getPort()
 	server := &http.Server{
