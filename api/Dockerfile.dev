@@ -28,6 +28,8 @@ RUN mkdir -p /app/logs && chown -R appuser:appgroup /app/logs
 COPY --from=builder /app/cloud-ops-manager-api .
 COPY --from=builder /app/docs ./docs
 
+RUN chown -R appuser:appgroup ./docs
+
 USER appuser
 
 ENTRYPOINT ["/app/cloud-ops-manager-api"]

@@ -122,9 +122,9 @@ func main() {
 	mux.HandleFunc("/swagger/swagger.yaml", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./docs/swagger.yaml")
 	})
-	mux.Handle("/swagger/", httpSwagger.Handler(
+	mux.Handle("/swagger/", http.StripPrefix("/swagger/", httpSwagger.Handler(
 		httpSwagger.URL("swagger.yaml"),
-	))
+	)))
 
 	port := getPort()
 	server := &http.Server{
