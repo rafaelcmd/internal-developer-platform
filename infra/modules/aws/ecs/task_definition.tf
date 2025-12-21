@@ -33,6 +33,7 @@ resource "aws_ecs_task_definition" "api" {
       }]
       environment = [
         { name = "PORT", value = tostring(var.container_port) },
+        { name = "ENVIRONMENT", value = var.environment },
         { name = "DD_SERVICE", value = var.service_name },
         { name = "DD_ENV", value = var.environment },
         { name = "DD_VERSION", value = var.app_version },

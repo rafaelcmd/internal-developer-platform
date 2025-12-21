@@ -78,19 +78,12 @@ func main() {
 	router := httpmod.NewRouter(resourceHandler, healthHandler)
 	mux := httptrace.NewServeMux(httptrace.WithServiceName("cloud-ops-manager.api"))
 
-	// Add logging middleware
-	loggingMiddleware := func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			log.WithFields(logrus.Fields{
-				"method": r.Method,
-				"path":   r.URL.Path,
-				"remote": r.RemoteAddr,
-			}).Info("Received request")
-			next.ServeHTTP(w, r)
-		})
+	env := os.Getenv("ENVIRONMENT")
+	if env == "" {
+		env = "dev"
 	}
-
-	mux.Handle("/", loggingMiddleware(router))
+	basePath := fmt.Sprintf("/%s/", env)
+	mux.Handle(basePath, http.StripPrefix(basePath, router))
 	mux.Handle("/swagger/", httpSwagger.WrapHandler)
 
 	port := getPort()
