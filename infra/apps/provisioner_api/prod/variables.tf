@@ -83,7 +83,7 @@ variable "app_image_tag" {
 variable "deployment_maximum_percent" {
   description = "Maximum percentage of tasks that can be running during a deployment"
   type        = number
-  default     = 150
+  default     = 200
 }
 
 variable "deployment_minimum_healthy_percent" {
