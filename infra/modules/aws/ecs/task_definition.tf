@@ -22,10 +22,10 @@ resource "aws_ecs_task_definition" "api" {
       image     = var.app_image_uri
       essential = true
       healthCheck = {
-        command     = ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:${var.container_port}/${var.environment}/health || exit 1"]
-        interval    = 30
+        command     = ["CMD-SHELL", "wget -q --spider http://localhost:${var.container_port}/${var.environment}/health || exit 1"]
+        interval    = 10
         retries     = 3
-        startPeriod = 60
+        startPeriod = 10
         timeout     = 5
       }
       dependsOn = [
