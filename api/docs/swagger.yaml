@@ -1,126 +1,37 @@
 swagger: "2.0"
-basePath: /
-definitions:
-  model.AuthResponse:
-    properties:
-      access_token:
-        type: string
-      expires_in:
-        type: integer
-      id_token:
-        type: string
-      refresh_token:
-        type: string
-      token_type:
-        type: string
-    type: object
-  model.Resource:
-    description: Cloud resource provisioning request
-    properties:
-      cloud_provider:
-        description: Cloud provider where the resource will be provisioned
-        enum:
-        - AWS
-        - Azure
-        - GCP
-        example: AWS
-        type: string
-      id:
-        description: Unique identifier for the resource
-        example: vm-001
-        maxLength: 100
-        minLength: 1
-        type: string
-      requested_by:
-        description: Username or identifier of the person who requested the resource
-        example: rafael
-        maxLength: 100
-        minLength: 1
-        type: string
-      resource_type:
-        description: Type of cloud resource to provision
-        enum:
-        - VM
-        - RDS
-        - S3
-        - Lambda
-        - VPC
-        - ELB
-        example: VM
-        type: string
-      specification:
-        description: Detailed specification of the resource configuration
-        example: t2.micro
-        maxLength: 1000
-        minLength: 1
-        type: string
-      status:
-        description: Current status of the resource provisioning request
-        enum:
-        - pending
-        - in_progress
-        - completed
-        - failed
-        example: pending
-        type: string
-    required:
-    - cloud_provider
-    - id
-    - requested_by
-    - resource_type
-    - specification
-    - status
-    type: object
-  model.SignInRequest:
-    properties:
-      email:
-        type: string
-      password:
-        type: string
-    type: object
-  model.SignUpRequest:
-    properties:
-      email:
-        type: string
-      password:
-        type: string
-    type: object
-host: localhost:5000
 info:
+  description: The Cloud Ops Manager Provisioner API provides endpoints for managing cloud resource provisioning requests.
+  version: 1.0.0
+  title: Cloud Ops Manager - Provisioner API
+  termsOfService: https://cloudopsmanager.com/terms/
   contact:
-    email: team@cloudopsmanager.com
     name: Cloud Ops Manager Team
-  description: The Cloud Ops Manager Provisioner API provides endpoints for managing
-    cloud resource provisioning requests. This API accepts provisioning requests and
-    queues them for asynchronous processing via SQS.
+    email: team@cloudopsmanager.com
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
-  termsOfService: https://cloudopsmanager.com/terms/
-  title: Cloud Ops Manager - Provisioner API
-  version: 1.0.0
+basePath: /
+schemes:
+- http
+- https
 paths:
   /auth/signin:
     post:
-      x-amazon-apigateway-integration:
-        type: "http_proxy"
-        httpMethod: "POST"
-        uri: "${nlb_listener_arn}"
-        connectionType: "VPC_LINK"
-        connectionId: "${vpc_link_id}"
-        payloadFormatVersion: "1.0"
+      summary: Sign in
+      description: Authenticates a user and returns tokens
+      tags:
+      - auth
       consumes:
       - application/json
-      description: Authenticates a user and returns tokens
+      produces:
+      - application/json
       parameters:
-      - description: Sign in request
-        in: body
+      - in: body
         name: request
+        description: Sign in request
         required: true
         schema:
           $ref: '#/definitions/model.SignInRequest'
-      produces:
-      - application/json
       responses:
         "200":
           description: OK
@@ -138,30 +49,30 @@ paths:
           description: Internal server error
           schema:
             type: string
-      summary: Sign in
-      tags:
-      - auth
+      x-amazon-apigateway-integration:
+        type: http_proxy
+        httpMethod: POST
+        uri: ${nlb_listener_arn}
+        connectionType: VPC_LINK
+        connectionId: ${vpc_link_id}
+        payloadFormatVersion: "1.0"
   /auth/signup:
     post:
-      x-amazon-apigateway-integration:
-        type: "http_proxy"
-        httpMethod: "POST"
-        uri: "${nlb_listener_arn}"
-        connectionType: "VPC_LINK"
-        connectionId: "${vpc_link_id}"
-        payloadFormatVersion: "1.0"
+      summary: Sign up a new user
+      description: Registers a new user with email and password
+      tags:
+      - auth
       consumes:
       - application/json
-      description: Registers a new user with email and password
+      produces:
+      - application/json
       parameters:
-      - description: Sign up request
-        in: body
+      - in: body
         name: request
+        description: Sign up request
         required: true
         schema:
           $ref: '#/definitions/model.SignUpRequest'
-      produces:
-      - application/json
       responses:
         "201":
           description: User created successfully
@@ -175,20 +86,19 @@ paths:
           description: Internal server error
           schema:
             type: string
-      summary: Sign up a new user
-      tags:
-      - auth
+      x-amazon-apigateway-integration:
+        type: http_proxy
+        httpMethod: POST
+        uri: ${nlb_listener_arn}
+        connectionType: VPC_LINK
+        connectionId: ${vpc_link_id}
+        payloadFormatVersion: "1.0"
   /health:
     get:
-      x-amazon-apigateway-integration:
-        type: "http_proxy"
-        httpMethod: "GET"
-        uri: "${nlb_listener_arn}"
-        connectionType: "VPC_LINK"
-        connectionId: "${vpc_link_id}"
-        payloadFormatVersion: "1.0"
-      description: Returns the health status of the API. Used for load balancer health
-        checks and monitoring purposes.
+      summary: Health check endpoint
+      description: Returns the health status of the API.
+      tags:
+      - health
       produces:
       - text/plain
       responses:
@@ -196,31 +106,30 @@ paths:
           description: Service is healthy and operational
           schema:
             type: string
-      summary: Health check endpoint
-      tags:
-      - health
+      x-amazon-apigateway-integration:
+        type: http_proxy
+        httpMethod: GET
+        uri: ${nlb_listener_arn}
+        connectionType: VPC_LINK
+        connectionId: ${vpc_link_id}
+        payloadFormatVersion: "1.0"
   /provision:
     post:
-      x-amazon-apigateway-integration:
-        type: "http_proxy"
-        httpMethod: "POST"
-        uri: "${nlb_listener_arn}"
-        connectionType: "VPC_LINK"
-        connectionId: "${vpc_link_id}"
-        payloadFormatVersion: "1.0"
+      summary: Submit a resource provisioning request
+      description: Submits a new resource provisioning request.
+      tags:
+      - resources
       consumes:
       - application/json
-      description: Submits a new resource provisioning request to be processed asynchronously.
-        The request is validated and queued for processing via SQS.
+      produces:
+      - text/plain
       parameters:
-      - description: Resource provisioning request
-        in: body
+      - in: body
         name: resource
+        description: Resource provisioning request
         required: true
         schema:
           $ref: '#/definitions/model.Resource'
-      produces:
-      - text/plain
       responses:
         "202":
           description: Request accepted for processing
@@ -234,30 +143,96 @@ paths:
           description: Failed to process request
           schema:
             type: string
-      summary: Submit a resource provisioning request
-      tags:
-      - resources
+      x-amazon-apigateway-integration:
+        type: http_proxy
+        httpMethod: POST
+        uri: ${nlb_listener_arn}
+        connectionType: VPC_LINK
+        connectionId: ${vpc_link_id}
+        payloadFormatVersion: "1.0"
   /swagger/{proxy+}:
     x-amazon-apigateway-any-method:
-      x-amazon-apigateway-integration:
-        type: "http_proxy"
-        httpMethod: "ANY"
-        uri: "${nlb_listener_arn}"
-        connectionType: "VPC_LINK"
-        connectionId: "${vpc_link_id}"
-        payloadFormatVersion: "1.0"
       parameters:
-      - name: "proxy"
-        in: "path"
+      - name: proxy
+        in: path
         required: true
-        type: "string"
-schemes:
-- http
-- https
-tags:
-- description: Resource provisioning operations
-  name: resources
-- description: Health check operations
-  name: health
-- description: Authentication operations
-  name: auth
+        type: string
+      x-amazon-apigateway-integration:
+        type: http_proxy
+        httpMethod: ANY
+        uri: ${nlb_listener_arn}
+        connectionType: VPC_LINK
+        connectionId: ${vpc_link_id}
+        payloadFormatVersion: "1.0"
+definitions:
+  model.AuthResponse:
+    type: object
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+      id_token:
+        type: string
+      refresh_token:
+        type: string
+      token_type:
+        type: string
+  model.Resource:
+    type: object
+    required:
+    - cloud_provider
+    - id
+    - requested_by
+    - resource_type
+    - specification
+    - status
+    properties:
+      cloud_provider:
+        type: string
+        enum:
+        - AWS
+        - Azure
+        - GCP
+        example: AWS
+      id:
+        type: string
+        example: vm-001
+      requested_by:
+        type: string
+        example: rafael
+      resource_type:
+        type: string
+        enum:
+        - VM
+        - RDS
+        - S3
+        - Lambda
+        - VPC
+        - ELB
+        example: VM
+      specification:
+        type: string
+        example: t2.micro
+      status:
+        type: string
+        enum:
+        - pending
+        - in_progress
+        - completed
+        - failed
+        example: pending
+  model.SignInRequest:
+    type: object
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+  model.SignUpRequest:
+    type: object
+    properties:
+      email:
+        type: string
+      password:
+        type: string
