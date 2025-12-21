@@ -38,8 +38,19 @@ jobs:
 
       - name: Update ECS Service
         run: |
+          # Get the latest task definition revision
+          TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition resource-provisioner-api-task --query "taskDefinition.taskDefinitionArn" --output text)
+          
+          echo "Updating service to use task definition: $TASK_DEFINITION"
+
           aws ecs update-service \
             --cluster cloudops-manager-cluster \
             --service resource-provisioner-api-service \
+            --task-definition $TASK_DEFINITION \
             --force-new-deployment \
+            --region ${{ secrets.AWS_REGION }}
+            
+          aws ecs wait services-stable \
+            --cluster cloudops-manager-cluster \
+            --services resource-provisioner-api-service \
             --region ${{ secrets.AWS_REGION }}
