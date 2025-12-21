@@ -11,7 +11,6 @@ resource "aws_apigatewayv2_api" "this" {
   body = templatefile("${path.module}/../../../../api/docs/swagger.yaml", {
     nlb_listener_arn       = var.nlb_listener_arn
     vpc_link_id            = aws_apigatewayv2_vpc_link.this.id
-    nlb_dns_name           = var.nlb_dns_name
   })
 
   fail_on_warnings = true
