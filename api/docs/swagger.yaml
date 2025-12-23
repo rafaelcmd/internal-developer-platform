@@ -207,6 +207,27 @@ paths:
       summary: Submit a resource provisioning request
       tags:
       - resources
+  /swagger/{proxy+}:
+    get:
+      description: Swagger UI static files
+      parameters:
+      - description: Proxy path for Swagger UI files
+        in: path
+        name: proxy
+        required: true
+        type: string
+      responses:
+        "200":
+          description: Swagger UI file
+        "404":
+          description: File not found
+      x-amazon-apigateway-integration:
+        type: http_proxy
+        httpMethod: GET
+        uri: "${nlb_listener_arn}"
+        connectionType: VPC_LINK
+        connectionId: "${vpc_link_id}"
+        payloadFormatVersion: "1.0"
 schemes:
 - http
 - https
