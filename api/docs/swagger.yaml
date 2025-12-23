@@ -1,4 +1,4 @@
-basePath: /dev/
+basePath: /prod/
 definitions:
   model.AuthResponse:
     properties:

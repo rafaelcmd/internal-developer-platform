@@ -321,7 +321,7 @@ const docTemplate = `{
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0.0",
 	Host:             "localhost:8080",
-	BasePath:         "/dev/",
+	BasePath:         "/prod/",
 	Schemes:          []string{"http", "https"},
 	Title:            "Cloud Ops Manager - Provisioner API",
 	Description:      "The Cloud Ops Manager Provisioner API provides endpoints for managing cloud resource provisioning requests. This API accepts provisioning requests and queues them for asynchronous processing via SQS.",
