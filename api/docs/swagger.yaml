@@ -1,4 +1,4 @@
-basePath: /prod/
+openapi: 3.0.1
 definitions:
   model.AuthResponse:
     properties:
@@ -97,6 +97,9 @@ info:
   termsOfService: https://cloudopsmanager.com/terms/
   title: Cloud Ops Manager - Provisioner API
   version: 1.0.0
+servers:
+- url: https://ll2xvy4w20.execute-api.us-east-1.amazonaws.com/prod
+  description: Production API Gateway
 paths:
   /auth/signin:
     post:
@@ -207,9 +210,6 @@ paths:
       summary: Submit a resource provisioning request
       tags:
       - resources
-schemes:
-- http
-- https
 tags:
 - description: Resource provisioning operations
   name: resources
