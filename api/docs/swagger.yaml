@@ -231,7 +231,6 @@ paths:
 schemes:
 - http
 - https
-swagger: "2.0"
 tags:
 - description: Resource provisioning operations
   name: resources
