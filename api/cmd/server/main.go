@@ -35,7 +35,7 @@ import (
 // @license.name MIT
 // @license.url https://opensource.org/licenses/MIT
 // @host localhost:8080
-// @BasePath /dev/
+// @BasePath /prod/
 // @schemes http https
 // @tag.name resources
 // @tag.description Resource provisioning operations
