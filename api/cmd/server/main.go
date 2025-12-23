@@ -34,7 +34,6 @@ import (
 // @contact.email team@cloudopsmanager.com
 // @license.name MIT
 // @license.url https://opensource.org/licenses/MIT
-// @host localhost:8080
 // @BasePath /prod/
 // @schemes http https
 // @tag.name resources
@@ -104,28 +103,14 @@ func main() {
 	mux.Handle(basePath, http.StripPrefix(stripPath, router))
 
 	// Serve the swagger.yaml file
-	// If running in prod, the path will be /prod/swagger/swagger.yaml
-	swaggerFile := fmt.Sprintf("/%s/swagger/swagger.yaml", env)
-	mux.HandleFunc(swaggerFile, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/swagger/swagger.yaml", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/yaml")
 		http.ServeFile(w, r, "./docs/swagger.yaml")
 	})
 
 	// Handle Swagger UI
-	// If running in prod, the path will be /prod/swagger/
-	// If running locally, the path will be /swagger/
-	swaggerPath := fmt.Sprintf("/%s/swagger/", env)
-	mux.Handle(swaggerPath, http.StripPrefix(swaggerPath, httpSwagger.Handler(
-		httpSwagger.URL(fmt.Sprintf("/%s/swagger/swagger.yaml", env)), // Point to the file with absolute URL
-	)))
-
-	// Also handle root /swagger/ for local dev convenience
-	mux.HandleFunc("/swagger/swagger.yaml", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/yaml")
-		http.ServeFile(w, r, "./docs/swagger.yaml")
-	})
 	mux.Handle("/swagger/", http.StripPrefix("/swagger/", httpSwagger.Handler(
-		httpSwagger.URL("/swagger/swagger.yaml"),
+		httpSwagger.URL("/swagger/swagger.yaml"), // Point to the file with absolute URL
 	)))
 
 	port := getPort()
