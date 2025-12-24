@@ -247,7 +247,7 @@ variable "api_gateway_stage_name" {
 variable "api_gateway_auto_deploy" {
   description = "Whether to automatically deploy API changes"
   type        = bool
-  default     = false
+  default     = true
 }
 
 # =============================================================================

@@ -68,7 +68,7 @@ variable "stage_name" {
 variable "auto_deploy" {
   description = "Whether to automatically deploy API changes"
   type        = bool
-  default     = false
+  default     = true
 }
 
 # =============================================================================
