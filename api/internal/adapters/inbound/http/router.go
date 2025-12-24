@@ -25,7 +25,9 @@ func NewRouter(resourceHandler *ResourceHandler, healthHandler *HealthHandler, a
 
 	// Handle Swagger UI - must be registered before other /swagger routes
 	// The httpSwagger.Handler expects to receive requests with /swagger/ prefix in RequestURI
-	mux.Handle("GET /swagger/", swaggerHandler.SwaggerUI())
+	swaggerUI := swaggerHandler.SwaggerUI()
+	mux.Handle("GET /swagger", swaggerUI)
+	mux.Handle("GET /swagger/", swaggerUI)
 
 	return mux
 }
