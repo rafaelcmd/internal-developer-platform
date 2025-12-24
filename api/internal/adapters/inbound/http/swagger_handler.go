@@ -38,6 +38,11 @@ func (h *SwaggerHandler) SwaggerUI() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("SwaggerUI handler: URL.Path=%s, RequestURI=%s", r.URL.Path, r.RequestURI)
 
+		if r.URL.Path == "/swagger" {
+			r.URL.Path = "/swagger/"
+			r.RequestURI = "/swagger/"
+		}
+
 		// Serve swagger.yaml from our file
 		if strings.HasSuffix(r.URL.Path, "swagger.yaml") || strings.HasSuffix(r.RequestURI, "swagger.yaml") {
 			log.Printf("Serving swagger.yaml from %s", h.swaggerFilePath)
