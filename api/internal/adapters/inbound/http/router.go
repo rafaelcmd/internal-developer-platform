@@ -25,7 +25,7 @@ func NewRouter(resourceHandler *ResourceHandler, healthHandler *HealthHandler, a
 
 	// Handle Swagger UI and swagger.yaml
 	mux.HandleFunc("GET /swagger/swagger.yaml", swaggerHandler.ServeSwaggerFile)
-	mux.Handle("/swagger/", swaggerHandler.SwaggerUI())
+	mux.Handle("GET /swagger/{file...}", swaggerHandler.SwaggerUI())
 
 	return mux
 }
