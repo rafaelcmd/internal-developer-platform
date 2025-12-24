@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"os"
 
 	httpSwagger "github.com/swaggo/http-swagger"
 )
@@ -24,7 +25,12 @@ func (h *SwaggerHandler) ServeSwaggerFile(w http.ResponseWriter, r *http.Request
 
 // SwaggerUI returns the Swagger UI handler
 func (h *SwaggerHandler) SwaggerUI() http.Handler {
+	env := os.Getenv("ENVIRONMENT")
+	if env == "" {
+		env = "dev"
+	}
+	swaggerYamlURL := "/" + env + "/swagger/swagger.yaml"
 	return http.StripPrefix("/swagger/", httpSwagger.Handler(
-		httpSwagger.URL("/swagger/swagger.yaml"),
+		httpSwagger.URL(swaggerYamlURL),
 	))
 }
