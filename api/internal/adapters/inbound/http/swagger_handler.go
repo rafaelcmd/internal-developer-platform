@@ -1,7 +1,9 @@
 package http
 
 import (
+	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	httpSwagger "github.com/swaggo/http-swagger"
@@ -12,6 +14,10 @@ type SwaggerHandler struct {
 }
 
 func NewSwaggerHandler(swaggerFilePath string) *SwaggerHandler {
+	// Verify the file exists at startup
+	if _, err := os.Stat(swaggerFilePath); os.IsNotExist(err) {
+		log.Printf("WARNING: swagger file not found at %s", swaggerFilePath)
+	}
 	return &SwaggerHandler{
 		swaggerFilePath: swaggerFilePath,
 	}
@@ -30,10 +36,12 @@ func (h *SwaggerHandler) SwaggerUI() http.Handler {
 	)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("SwaggerUI handler: URL.Path=%s, RequestURI=%s", r.URL.Path, r.RequestURI)
+
 		// Serve swagger.yaml from our file
 		if strings.HasSuffix(r.URL.Path, "swagger.yaml") || strings.HasSuffix(r.RequestURI, "swagger.yaml") {
-			w.Header().Set("Content-Type", "application/yaml")
-			http.ServeFile(w, r, h.swaggerFilePath)
+			log.Printf("Serving swagger.yaml from %s", h.swaggerFilePath)
+			h.ServeSwaggerFile(w, r)
 			return
 		}
 		// Let httpSwagger handle everything else

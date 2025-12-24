@@ -9,8 +9,8 @@ resource "aws_apigatewayv2_api" "this" {
   protocol_type = "HTTP"
 
   body = templatefile("${path.module}/../../../../api/docs/swagger.yaml", {
-    nlb_listener_arn       = var.nlb_listener_arn
-    vpc_link_id            = aws_apigatewayv2_vpc_link.this.id
+    nlb_uri     = "http://${var.nlb_dns_name}"
+    vpc_link_id = aws_apigatewayv2_vpc_link.this.id
   })
 
   fail_on_warnings = false
