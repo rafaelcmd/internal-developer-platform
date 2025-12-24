@@ -46,26 +46,29 @@ jobs:
           jq --arg image "$IMAGE_URI" '
             .containerDefinitions[0].image = $image |
             {
-              family,
-              taskRoleArn,
-              executionRoleArn,
-              networkMode,
-              containerDefinitions,
-              volumes,
-              placementConstraints,
-              requiresCompatibilities,
-              cpu,
-              memory,
-              tags,
-              pidMode,
-              ipcMode,
-              proxyConfiguration,
-              inferenceAccelerators,
-              ephemeralStorage,
-              runtimePlatform,
-              enableFaultInjection
+              family: .family,
+              taskRoleArn: .taskRoleArn,
+              executionRoleArn: .executionRoleArn,
+              networkMode: .networkMode,
+              containerDefinitions: .containerDefinitions,
+              volumes: .volumes,
+              placementConstraints: .placementConstraints,
+              requiresCompatibilities: .requiresCompatibilities,
+              cpu: .cpu,
+              memory: .memory,
+              pidMode: .pidMode,
+              ipcMode: .ipcMode,
+              proxyConfiguration: .proxyConfiguration,
+              inferenceAccelerators: .inferenceAccelerators,
+              ephemeralStorage: .ephemeralStorage,
+              runtimePlatform: .runtimePlatform
             } | with_entries(select(.value != null))
           ' task-definition.json > updated-task-definition.json
+          
+          # Debug: Show the cleaned task definition
+          echo "=== Updated task definition ==="
+          cat updated-task-definition.json
+          echo "=== End of task definition ==="
           
           # Register the new task definition
           NEW_TASK_DEFINITION_ARN=$(aws ecs register-task-definition --cli-input-json file://updated-task-definition.json --query "taskDefinition.taskDefinitionArn" --output text)
