@@ -38,18 +38,32 @@ func (h *SwaggerHandler) SwaggerUI() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("SwaggerUI handler: URL.Path=%s, RequestURI=%s", r.URL.Path, r.RequestURI)
 
-		if r.URL.Path == "/swagger" {
-			r.URL.Path = "/swagger/"
-			r.RequestURI = "/swagger/"
+		path := r.URL.Path
+		if path == "/swagger" {
+			path = "/swagger/"
+		}
+		if strings.HasPrefix(path, "/swagger") {
+			trimmed := strings.TrimPrefix(path, "/swagger")
+			if trimmed == "" {
+				trimmed = "/"
+			}
+			path = trimmed
 		}
 
-		// Serve swagger.yaml from our file
-		if strings.HasSuffix(r.URL.Path, "swagger.yaml") || strings.HasSuffix(r.RequestURI, "swagger.yaml") {
+		if path == "/" {
+			path = "/index.html"
+		}
+
+		if strings.HasSuffix(path, "swagger.yaml") {
 			log.Printf("Serving swagger.yaml from %s", h.swaggerFilePath)
 			h.ServeSwaggerFile(w, r)
 			return
 		}
-		// Let httpSwagger handle everything else
-		swaggerUIHandler.ServeHTTP(w, r)
+
+		r2 := r.Clone(r.Context())
+		r2.URL.Path = path
+		r2.RequestURI = path
+
+		swaggerUIHandler.ServeHTTP(w, r2)
 	})
 }
