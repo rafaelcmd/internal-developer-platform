@@ -15,7 +15,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/sirupsen/logrus"
-	httpSwagger "github.com/swaggo/http-swagger"
 	httptrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/net/http"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 
@@ -102,16 +101,9 @@ func main() {
 	stripPath := fmt.Sprintf("/%s", env)
 	mux.Handle(basePath, http.StripPrefix(stripPath, router))
 
-	// Serve the swagger.yaml file
-	mux.HandleFunc("/swagger/swagger.yaml", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/yaml")
-		http.ServeFile(w, r, "./docs/swagger.yaml")
-	})
-
-	// Handle Swagger UI
-	mux.Handle("/swagger/", http.StripPrefix("/swagger/", httpSwagger.Handler(
-		httpSwagger.URL("/swagger/swagger.yaml"), // Point to the file with absolute URL
-	)))
+	// Register Swagger routes
+	swaggerHandler := httpmod.NewSwaggerHandler("./docs/swagger.yaml")
+	httpmod.RegisterSwaggerRoutes(mux, swaggerHandler)
 
 	port := getPort()
 	server := &http.Server{
