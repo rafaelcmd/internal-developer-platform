@@ -51,6 +51,13 @@ paths:
       summary: Sign in
       tags:
       - auth
+      x-amazon-apigateway-integration:
+        type: http_proxy
+        httpMethod: POST
+        uri: "${nlb_listener_arn}"
+        connectionType: VPC_LINK
+        connectionId: "${vpc_link_id}"
+        payloadFormatVersion: "1.0"
   /auth/signup:
     post:
       description: Registers a new user with email and password
@@ -83,6 +90,13 @@ paths:
       summary: Sign up a new user
       tags:
       - auth
+      x-amazon-apigateway-integration:
+        type: http_proxy
+        httpMethod: POST
+        uri: "${nlb_listener_arn}"
+        connectionType: VPC_LINK
+        connectionId: "${vpc_link_id}"
+        payloadFormatVersion: "1.0"
   /health:
     get:
       description: Returns the health status of the API. Used for load balancer health
@@ -97,6 +111,13 @@ paths:
       summary: Health check endpoint
       tags:
       - health
+      x-amazon-apigateway-integration:
+        type: http_proxy
+        httpMethod: GET
+        uri: "${nlb_listener_arn}"
+        connectionType: VPC_LINK
+        connectionId: "${vpc_link_id}"
+        payloadFormatVersion: "1.0"
   /provision:
     post:
       description: Submits a new resource provisioning request to be processed asynchronously.
@@ -130,6 +151,13 @@ paths:
       summary: Submit a resource provisioning request
       tags:
       - resources
+      x-amazon-apigateway-integration:
+        type: http_proxy
+        httpMethod: POST
+        uri: "${nlb_listener_arn}"
+        connectionType: VPC_LINK
+        connectionId: "${vpc_link_id}"
+        payloadFormatVersion: "1.0"
   /swagger/{path}:
     get:
       parameters:
