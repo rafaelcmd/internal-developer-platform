@@ -98,9 +98,14 @@ func main() {
 	if env == "" {
 		env = "dev"
 	}
+
+	// Handle routes with environment prefix (for local development)
 	basePath := fmt.Sprintf("/%s/", env)
 	stripPath := fmt.Sprintf("/%s", env)
 	mux.Handle(basePath, http.StripPrefix(stripPath, router))
+
+	// Handle routes without prefix (API Gateway HTTP API strips the stage prefix)
+	mux.Handle("/", router)
 
 	port := getPort()
 	server := &http.Server{
