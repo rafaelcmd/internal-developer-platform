@@ -108,34 +108,6 @@ resource "aws_apigatewayv2_stage" "this" {
 }
 
 # =============================================================================
-# SWAGGER UI INTEGRATION AND ROUTE
-# Integration and route for serving Swagger UI static files
-# =============================================================================
-
-resource "aws_apigatewayv2_integration" "swagger" {
-  api_id             = aws_apigatewayv2_api.this.id
-  integration_type   = "HTTP_PROXY"
-  integration_method = "GET"
-  integration_uri    = var.nlb_listener_arn
-  connection_type    = "VPC_LINK"
-  connection_id      = aws_apigatewayv2_vpc_link.this.id
-
-  request_parameters = {
-    "append:header.Accept" = "$request.header.Accept"
-    "append:header.User-Agent" = "$request.header.User-Agent"
-  }
-
-  timeout_milliseconds = var.integration_timeout_ms
-}
-
-resource "aws_apigatewayv2_route" "swagger" {
-  api_id    = aws_apigatewayv2_api.this.id
-  route_key = "GET /swagger/{proxy+}"
-
-  target = "integrations/${aws_apigatewayv2_integration.swagger.id}"
-}
-
-# =============================================================================
 # CLOUDWATCH LOGS
 # CloudWatch log group for API Gateway access logs
 # =============================================================================

@@ -210,15 +210,17 @@ paths:
       summary: Submit a resource provisioning request
       tags:
       - resources
-  /swagger/swagger.yaml:
+  /swagger/{path}:
     get:
+      parameters:
+      - name: path
+        in: path
+        required: true
+        schema:
+          type: string
       responses:
         "200":
-          description: Swagger specification file
-          content:
-            application/yaml:
-              schema:
-                type: string
+          description: Swagger UI file
       x-amazon-apigateway-integration:
         type: http_proxy
         httpMethod: GET
