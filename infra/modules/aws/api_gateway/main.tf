@@ -13,7 +13,7 @@ resource "aws_apigatewayv2_api" "this" {
     vpc_link_id = aws_apigatewayv2_vpc_link.this.id
   })
 
-  fail_on_warnings = false
+  fail_on_warnings = true
 
   cors_configuration {
     allow_credentials = var.cors_allow_credentials
