@@ -8,7 +8,7 @@ type ServeMuxAdapter interface {
 	HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request))
 }
 
-func NewRouter(resourceHandler *ResourceHandler, healthHandler *HealthHandler, authHandler *AuthHandler) http.Handler {
+func NewRouter(resourceHandler *ResourceHandler, healthHandler *HealthHandler, authHandler *AuthHandler, swaggerHandler *SwaggerHandler) http.Handler {
 	mux := http.NewServeMux()
 
 	// Handle POST /provision
@@ -23,11 +23,9 @@ func NewRouter(resourceHandler *ResourceHandler, healthHandler *HealthHandler, a
 	// Handle POST /auth/signin
 	mux.HandleFunc("POST /auth/signin", authHandler.SignIn)
 
-	return mux
-}
-
-// RegisterSwaggerRoutes registers swagger routes on the given mux
-func RegisterSwaggerRoutes(mux ServeMuxAdapter, swaggerHandler *SwaggerHandler) {
+	// Handle Swagger UI and swagger.yaml
 	mux.HandleFunc("GET /swagger/swagger.yaml", swaggerHandler.ServeSwaggerFile)
 	mux.Handle("/swagger/", swaggerHandler.SwaggerUI())
+
+	return mux
 }
