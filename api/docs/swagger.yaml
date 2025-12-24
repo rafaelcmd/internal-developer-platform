@@ -210,6 +210,22 @@ paths:
       summary: Submit a resource provisioning request
       tags:
       - resources
+  /swagger/swagger.yaml:
+    get:
+      responses:
+        "200":
+          description: Swagger specification file
+          content:
+            application/yaml:
+              schema:
+                type: string
+      x-amazon-apigateway-integration:
+        type: http_proxy
+        httpMethod: GET
+        uri: "${nlb_listener_arn}"
+        connectionType: VPC_LINK
+        connectionId: "${vpc_link_id}"
+        payloadFormatVersion: "1.0"
 tags:
 - description: Resource provisioning operations
   name: resources
