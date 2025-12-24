@@ -52,12 +52,11 @@ paths:
       tags:
       - auth
       x-amazon-apigateway-integration:
-        type: http_proxy
+        type: HTTP_PROXY
         httpMethod: POST
         uri: "${nlb_uri}/auth/signin"
         connectionType: VPC_LINK
         connectionId: "${vpc_link_id}"
-        payloadFormatVersion: "1.0"
   /auth/signup:
     post:
       description: Registers a new user with email and password
@@ -91,12 +90,11 @@ paths:
       tags:
       - auth
       x-amazon-apigateway-integration:
-        type: http_proxy
+        type: HTTP_PROXY
         httpMethod: POST
         uri: "${nlb_uri}/auth/signup"
         connectionType: VPC_LINK
         connectionId: "${vpc_link_id}"
-        payloadFormatVersion: "1.0"
   /health:
     get:
       description: Returns the health status of the API. Used for load balancer health
@@ -112,12 +110,11 @@ paths:
       tags:
       - health
       x-amazon-apigateway-integration:
-        type: http_proxy
+        type: HTTP_PROXY
         httpMethod: GET
         uri: "${nlb_uri}/health"
         connectionType: VPC_LINK
         connectionId: "${vpc_link_id}"
-        payloadFormatVersion: "1.0"
   /provision:
     post:
       description: Submits a new resource provisioning request to be processed asynchronously.
@@ -152,12 +149,11 @@ paths:
       tags:
       - resources
       x-amazon-apigateway-integration:
-        type: http_proxy
+        type: HTTP_PROXY
         httpMethod: POST
         uri: "${nlb_uri}/provision"
         connectionType: VPC_LINK
         connectionId: "${vpc_link_id}"
-        payloadFormatVersion: "1.0"
   /swagger/{proxy+}:
     get:
       parameters:
@@ -183,14 +179,11 @@ paths:
               schema:
                 type: string
       x-amazon-apigateway-integration:
-        type: http_proxy
+        type: HTTP_PROXY
         httpMethod: GET
         uri: "${nlb_uri}/swagger/{proxy}"
         connectionType: VPC_LINK
         connectionId: "${vpc_link_id}"
-        payloadFormatVersion: "1.0"
-        requestParameters:
-          integration.request.path.proxy: method.request.path.proxy
   /swagger/:
     get:
       responses:
@@ -201,12 +194,11 @@ paths:
               schema:
                 type: string
       x-amazon-apigateway-integration:
-        type: http_proxy
+        type: HTTP_PROXY
         httpMethod: GET
         uri: "${nlb_uri}/swagger/"
         connectionType: VPC_LINK
         connectionId: "${vpc_link_id}"
-        payloadFormatVersion: "1.0"
 tags:
 - description: Resource provisioning operations
   name: resources
