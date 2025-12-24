@@ -158,10 +158,10 @@ paths:
         connectionType: VPC_LINK
         connectionId: "${vpc_link_id}"
         payloadFormatVersion: "1.0"
-  /swagger/{path}:
+  /swagger/{proxy+}:
     get:
       parameters:
-      - name: path
+      - name: proxy
         in: path
         required: true
         schema:
@@ -174,6 +174,28 @@ paths:
               schema:
                 type: string
             application/yaml:
+              schema:
+                type: string
+            application/javascript:
+              schema:
+                type: string
+            text/css:
+              schema:
+                type: string
+      x-amazon-apigateway-integration:
+        type: http_proxy
+        httpMethod: GET
+        uri: "${nlb_listener_arn}"
+        connectionType: VPC_LINK
+        connectionId: "${vpc_link_id}"
+        payloadFormatVersion: "1.0"
+  /swagger/:
+    get:
+      responses:
+        "200":
+          description: Swagger UI index
+          content:
+            text/html:
               schema:
                 type: string
       x-amazon-apigateway-integration:
