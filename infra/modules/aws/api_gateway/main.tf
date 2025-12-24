@@ -3,12 +3,16 @@
 # Main API Gateway configuration using existing OpenAPI specification
 # =============================================================================
 
+locals {
+  openapi_spec_path = "${path.module}/../../../../api/docs/swagger.yaml"
+}
+
 resource "aws_apigatewayv2_api" "this" {
   name          = var.api_name
   description   = var.api_description
   protocol_type = "HTTP"
 
-  body = templatefile("${path.module}/../../../../api/docs/swagger.yaml", {
+  body = templatefile(local.openapi_spec_path, {
     nlb_uri     = "http://${var.nlb_dns_name}"
     vpc_link_id = aws_apigatewayv2_vpc_link.this.id
   })
@@ -29,6 +33,23 @@ resource "aws_apigatewayv2_api" "this" {
     Project     = var.project
     Environment = var.environment
   })
+}
+
+resource "aws_apigatewayv2_deployment" "this" {
+  api_id = aws_apigatewayv2_api.this.id
+
+  triggers = {
+    redeploy_hash = sha1(templatefile(local.openapi_spec_path, {
+      nlb_uri     = "http://${var.nlb_dns_name}"
+      vpc_link_id = aws_apigatewayv2_vpc_link.this.id
+    }))
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  depends_on = [aws_apigatewayv2_api.this]
 }
 
 # =============================================================================
@@ -78,6 +99,7 @@ resource "aws_apigatewayv2_stage" "this" {
   api_id      = aws_apigatewayv2_api.this.id
   name        = var.stage_name
   auto_deploy = var.auto_deploy
+  deployment_id = var.auto_deploy ? null : aws_apigatewayv2_deployment.this.id
 
   access_log_settings {
     destination_arn = aws_cloudwatch_log_group.api_gateway_logs.arn
