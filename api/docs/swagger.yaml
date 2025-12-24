@@ -53,7 +53,7 @@ paths:
       - auth
       x-amazon-apigateway-integration:
         payloadFormatVersion: "1.0"
-        type: http_proxy
+        type: HTTP_PROXY
         httpMethod: POST
         uri: "${nlb_uri}/auth/signin"
         connectionType: VPC_LINK
@@ -92,7 +92,7 @@ paths:
       - auth
       x-amazon-apigateway-integration:
         payloadFormatVersion: "1.0"
-        type: http_proxy
+        type: HTTP_PROXY
         httpMethod: POST
         uri: "${nlb_uri}/auth/signup"
         connectionType: VPC_LINK
@@ -113,7 +113,7 @@ paths:
       - health
       x-amazon-apigateway-integration:
         payloadFormatVersion: "1.0"
-        type: http_proxy
+        type: HTTP_PROXY
         httpMethod: GET
         uri: "${nlb_uri}/health"
         connectionType: VPC_LINK
@@ -153,7 +153,7 @@ paths:
       - resources
       x-amazon-apigateway-integration:
         payloadFormatVersion: "1.0"
-        type: http_proxy
+        type: HTTP_PROXY
         httpMethod: POST
         uri: "${nlb_uri}/provision"
         connectionType: VPC_LINK
@@ -184,7 +184,7 @@ paths:
                 type: string
       x-amazon-apigateway-integration:
         payloadFormatVersion: "1.0"
-        type: http_proxy
+        type: HTTP_PROXY
         httpMethod: GET
         uri: "${nlb_uri}/swagger/{proxy}"
         connectionType: VPC_LINK
@@ -200,7 +200,7 @@ paths:
                 type: string
       x-amazon-apigateway-integration:
         payloadFormatVersion: "1.0"
-        type: http_proxy
+        type: HTTP_PROXY
         httpMethod: GET
         uri: "${nlb_uri}/swagger/"
         connectionType: VPC_LINK
