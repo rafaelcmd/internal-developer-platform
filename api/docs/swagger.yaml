@@ -3,9 +3,7 @@ info:
   contact:
     email: team@cloudopsmanager.com
     name: Cloud Ops Manager Team
-  description: The Cloud Ops Manager Provisioner API provides endpoints for managing
-    cloud resource provisioning requests. This API accepts provisioning requests and
-    queues them for asynchronous processing via SQS.
+  description: The Cloud Ops Manager Provisioner API provides endpoints for managing cloud resource provisioning requests. This API accepts provisioning requests and queues them for asynchronous processing via SQS.
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
@@ -55,7 +53,7 @@ paths:
         payloadFormatVersion: "1.0"
         type: http_proxy
         httpMethod: POST
-        uri: "${nlb_uri}/auth/signin"
+        uri: "${nlb_listener_arn}"
         connectionType: VPC_LINK
         connectionId: "${vpc_link_id}"
   /auth/signup:
@@ -94,13 +92,12 @@ paths:
         payloadFormatVersion: "1.0"
         type: http_proxy
         httpMethod: POST
-        uri: "${nlb_uri}/auth/signup"
+        uri: "${nlb_listener_arn}"
         connectionType: VPC_LINK
         connectionId: "${vpc_link_id}"
   /health:
     get:
-      description: Returns the health status of the API. Used for load balancer health
-        checks and monitoring purposes.
+      description: Returns the health status of the API. Used for load balancer health checks and monitoring purposes.
       responses:
         "200":
           description: Service is healthy and operational
@@ -115,13 +112,12 @@ paths:
         payloadFormatVersion: "1.0"
         type: http_proxy
         httpMethod: GET
-        uri: "${nlb_uri}/health"
+        uri: "${nlb_listener_arn}"
         connectionType: VPC_LINK
         connectionId: "${vpc_link_id}"
   /provision:
     post:
-      description: Submits a new resource provisioning request to be processed asynchronously.
-        The request is validated and queued for processing via SQS.
+      description: Submits a new resource provisioning request to be processed asynchronously. The request is validated and queued for processing via SQS.
       requestBody:
         description: Resource provisioning request
         required: true
@@ -155,7 +151,7 @@ paths:
         payloadFormatVersion: "1.0"
         type: http_proxy
         httpMethod: POST
-        uri: "${nlb_uri}/provision"
+        uri: "${nlb_listener_arn}"
         connectionType: VPC_LINK
         connectionId: "${vpc_link_id}"
   /swagger/{proxy+}:
@@ -186,10 +182,10 @@ paths:
         payloadFormatVersion: "1.0"
         type: http_proxy
         httpMethod: GET
-        uri: "${nlb_uri}/swagger/{proxy}"
+        uri: "${nlb_listener_arn}"
         connectionType: VPC_LINK
         connectionId: "${vpc_link_id}"
-  /swagger/:
+  /swagger:
     get:
       responses:
         "200":
@@ -202,7 +198,7 @@ paths:
         payloadFormatVersion: "1.0"
         type: http_proxy
         httpMethod: GET
-        uri: "${nlb_uri}/swagger/"
+        uri: "${nlb_listener_arn}"
         connectionType: VPC_LINK
         connectionId: "${vpc_link_id}"
 tags:
