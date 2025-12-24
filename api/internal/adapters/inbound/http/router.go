@@ -23,9 +23,9 @@ func NewRouter(resourceHandler *ResourceHandler, healthHandler *HealthHandler, a
 	// Handle POST /auth/signin
 	mux.HandleFunc("POST /auth/signin", authHandler.SignIn)
 
-	// Handle Swagger UI and swagger.yaml
-	mux.HandleFunc("GET /swagger/swagger.yaml", swaggerHandler.ServeSwaggerFile)
-	mux.Handle("GET /swagger/{file...}", swaggerHandler.SwaggerUI())
+	// Handle Swagger UI - must be registered before other /swagger routes
+	// The httpSwagger.Handler expects to receive requests with /swagger/ prefix in RequestURI
+	mux.Handle("GET /swagger/", swaggerHandler.SwaggerUI())
 
 	return mux
 }
