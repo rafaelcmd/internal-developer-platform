@@ -83,6 +83,7 @@ func main() {
 	resourceService := service.NewResourceService(publisher)
 	resourceHandler := httpmod.NewResourceHandler(resourceService)
 	healthHandler := httpmod.NewHealthHandler()
+	swaggerHandler := httpmod.NewSwaggerHandler("./docs/swagger.yaml")
 
 	cognitoClient := cognitoidentityprovider.NewFromConfig(cfg)
 	authProvider := cognito.NewCognitoAuthProvider(cognitoClient, cognitoClientID)
@@ -90,7 +91,7 @@ func main() {
 	authHandler := httpmod.NewAuthHandler(authService)
 
 	// Setup HTTP server with Datadog tracing
-	router := httpmod.NewRouter(resourceHandler, healthHandler, authHandler)
+	router := httpmod.NewRouter(resourceHandler, healthHandler, authHandler, swaggerHandler)
 	mux := httptrace.NewServeMux(httptrace.WithServiceName("cloud-ops-manager.api"))
 
 	env := os.Getenv("ENVIRONMENT")
@@ -100,12 +101,6 @@ func main() {
 	basePath := fmt.Sprintf("/%s/", env)
 	stripPath := fmt.Sprintf("/%s", env)
 	mux.Handle(basePath, http.StripPrefix(stripPath, router))
-
-	// Register Swagger routes under the environment prefix
-	swaggerHandler := httpmod.NewSwaggerHandler("./docs/swagger.yaml")
-	swaggerBasePath := fmt.Sprintf("/%s/swagger/", env)
-	mux.HandleFunc(fmt.Sprintf("GET /%s/swagger/swagger.yaml", env), swaggerHandler.ServeSwaggerFile)
-	mux.Handle(swaggerBasePath, http.StripPrefix(fmt.Sprintf("/%s", env), swaggerHandler.SwaggerUI()))
 
 	port := getPort()
 	server := &http.Server{
