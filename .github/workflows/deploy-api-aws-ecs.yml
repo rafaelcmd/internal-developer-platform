@@ -41,11 +41,30 @@ jobs:
           # Get the current task definition
           aws ecs describe-task-definition --task-definition resource-provisioner-api-task --query "taskDefinition" --output json > task-definition.json
           
-          # Update the image URI and remove read-only fields that can't be used in register-task-definition
+          # Update the image URI and keep only allowed fields for register-task-definition
           IMAGE_URI="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/cloudops-manager-repo:latest"
           jq --arg image "$IMAGE_URI" '
             .containerDefinitions[0].image = $image |
-            del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)
+            {
+              family,
+              taskRoleArn,
+              executionRoleArn,
+              networkMode,
+              containerDefinitions,
+              volumes,
+              placementConstraints,
+              requiresCompatibilities,
+              cpu,
+              memory,
+              tags,
+              pidMode,
+              ipcMode,
+              proxyConfiguration,
+              inferenceAccelerators,
+              ephemeralStorage,
+              runtimePlatform,
+              enableFaultInjection
+            } | with_entries(select(.value != null))
           ' task-definition.json > updated-task-definition.json
           
           # Register the new task definition
