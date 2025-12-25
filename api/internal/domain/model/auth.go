@@ -10,6 +10,11 @@ type SignInRequest struct {
 	Password string `json:"password"`
 }
 
+type ConfirmSignUpRequest struct {
+	Email            string `json:"email"`
+	ConfirmationCode string `json:"confirmation_code"`
+}
+
 type AuthResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token,omitempty"`

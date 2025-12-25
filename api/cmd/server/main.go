@@ -88,7 +88,7 @@ func main() {
 	cognitoClient := cognitoidentityprovider.NewFromConfig(cfg)
 	authProvider := cognito.NewCognitoAuthProvider(cognitoClient, cognitoClientID)
 	authService := service.NewAuthService(authProvider)
-	authHandler := httpmod.NewAuthHandler(authService)
+	authHandler := httpmod.NewAuthHandler(authService, log.WithField("component", "auth_handler"))
 
 	// Setup HTTP server with Datadog tracing
 	router := httpmod.NewRouter(resourceHandler, healthHandler, authHandler, swaggerHandler)

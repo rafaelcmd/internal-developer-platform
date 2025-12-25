@@ -23,6 +23,9 @@ func NewRouter(resourceHandler *ResourceHandler, healthHandler *HealthHandler, a
 	// Handle POST /auth/signin
 	mux.HandleFunc("POST /auth/signin", authHandler.SignIn)
 
+	// Handle POST /auth/confirm
+	mux.HandleFunc("POST /auth/confirm", authHandler.ConfirmSignUp)
+
 	// Handle Swagger UI - must be registered before other /swagger routes
 	// The httpSwagger.Handler expects to receive requests with /swagger/ prefix in RequestURI
 	swaggerUI := swaggerHandler.SwaggerUI()

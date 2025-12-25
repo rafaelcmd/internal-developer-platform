@@ -24,3 +24,7 @@ func (s *AuthService) SignUp(ctx context.Context, req model.SignUpRequest) error
 func (s *AuthService) SignIn(ctx context.Context, req model.SignInRequest) (*model.AuthResponse, error) {
 	return s.authProvider.SignIn(ctx, req.Email, req.Password)
 }
+
+func (s *AuthService) ConfirmSignUp(ctx context.Context, req model.ConfirmSignUpRequest) error {
+	return s.authProvider.ConfirmSignUp(ctx, req.Email, req.ConfirmationCode)
+}
