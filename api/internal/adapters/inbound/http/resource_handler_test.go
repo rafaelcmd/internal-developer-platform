@@ -3,8 +3,8 @@ package http
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/rafaelcmd/cloud-ops-manager/api/internal/domain/model"
-	"github.com/rafaelcmd/cloud-ops-manager/api/internal/test/mocks"
+	"github.com/rafaelcmd/internal-developer-platform/api/internal/domain/model"
+	"github.com/rafaelcmd/internal-developer-platform/api/internal/test/mocks"
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"

@@ -3,7 +3,7 @@ package inbound
 import (
 	"context"
 
-	"github.com/rafaelcmd/cloud-ops-manager/api/internal/domain/model"
+	"github.com/rafaelcmd/internal-developer-platform/api/internal/domain/model"
 )
 
 type AuthService interface {

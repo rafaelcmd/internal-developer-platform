@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 
-	"github.com/rafaelcmd/cloud-ops-manager/api/internal/domain/model"
-	"github.com/rafaelcmd/cloud-ops-manager/api/internal/domain/ports/outbound"
+	"github.com/rafaelcmd/internal-developer-platform/api/internal/domain/model"
+	"github.com/rafaelcmd/internal-developer-platform/api/internal/domain/ports/outbound"
 )
 
 type AuthService struct {

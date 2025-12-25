@@ -1,7 +1,7 @@
 variable "repository_name" {
   description = "The name of the repository"
   type        = string
-  default     = "cloudops-manager-repo"
+  default     = "internal-developer-platform-repo"
 }
 
 variable "image_tag_mutability" {

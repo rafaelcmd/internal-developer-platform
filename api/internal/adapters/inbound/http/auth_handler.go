@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/rafaelcmd/cloud-ops-manager/api/internal/domain/model"
-	"github.com/rafaelcmd/cloud-ops-manager/api/internal/domain/ports/inbound"
+	"github.com/rafaelcmd/internal-developer-platform/api/internal/domain/model"
+	"github.com/rafaelcmd/internal-developer-platform/api/internal/domain/ports/inbound"
 )
 
 type AuthHandler struct {

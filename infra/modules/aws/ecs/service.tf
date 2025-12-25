@@ -1,6 +1,6 @@
 resource "aws_ecs_service" "api_service" {
   name                               = "${var.service_name}-service"
-  cluster                            = aws_ecs_cluster.cloudops_cluster.id
+  cluster                            = aws_ecs_cluster.internal_developer_platform_cluster.id
   task_definition                    = aws_ecs_task_definition.api.arn
   desired_count                      = var.desired_count
   deployment_maximum_percent         = var.deployment_maximum_percent

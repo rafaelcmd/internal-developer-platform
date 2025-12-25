@@ -1,5 +1,5 @@
 module "ecs" {
-  source = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/ecs?ref=main"
+  source = "../../modules/aws/ecs"
 
   # Infrastructure dependencies
   vpc_id             = data.terraform_remote_state.shared_vpc.outputs.vpc_id
@@ -50,19 +50,15 @@ module "ecs" {
   vpc_link_security_group_id = module.api_gateway.vpc_link_security_group_id
 
   # Application image configuration
-  app_image_uri       = "${data.terraform_remote_state.cloudops_manager_ecr_repository.outputs.repository_url}:${var.app_image_tag}"
-  datadog_agent_image = "${data.terraform_remote_state.cloudops_manager_ecr_repository.outputs.repository_url}:datadog-agent"
+  app_image_uri       = "${data.terraform_remote_state.internal_developer_platform_ecr_repository.outputs.repository_url}:${var.app_image_tag}"
+  datadog_agent_image = "${data.terraform_remote_state.internal_developer_platform_ecr_repository.outputs.repository_url}:datadog-agent"
 
   # Common tags
-  tags = {
-    Environment = var.environment
-    Project     = var.project
-    Service     = var.service_name
-  }
+  tags = local.tags
 }
 
 module "nlb" {
-  source = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/nlb?ref=main"
+  source = "../../modules/aws/nlb"
 
   # NLB configuration
   nlb_name           = var.nlb_name
@@ -95,15 +91,11 @@ module "nlb" {
   project     = var.project
   environment = var.environment
 
-  tags = {
-    Environment = var.environment
-    Project     = var.project
-    Service     = var.service_name
-  }
+  tags = local.tags
 }
 
 module "sqs" {
-  source = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/sqs?ref=main"
+  source = "../../modules/aws/sqs"
 
   # SQS configuration
   queue_name                = var.queue_name
@@ -117,16 +109,12 @@ module "sqs" {
   ssm_parameter_type = var.ssm_parameter_type
 
   # Common tags
-  tags = {
-    Environment = var.environment
-    Project     = var.project
-    Service     = var.service_name
-  }
+  tags = local.tags
 }
 
 # Datadog Lambda Forwarder for collecting application logs (required for ECS Fargate)
 module "datadog_forwarder" {
-  source = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/lambda?ref=main"
+  source = "../../modules/aws/lambda"
 
   # Basic Lambda configuration
   function_name                  = var.lambda_function_name
@@ -166,11 +154,7 @@ module "datadog_forwarder" {
   }
 
   # Tags
-  tags = {
-    Environment = var.environment
-    Project     = var.project
-    Service     = var.service_name
-  }
+  tags = local.tags
 
   # Additional IAM policy for Datadog forwarder
   additional_inline_policy = jsonencode({
@@ -214,7 +198,7 @@ module "datadog_forwarder" {
 }
 
 module "api_gateway" {
-  source = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/api_gateway?ref=main"
+  source = "../../modules/aws/api_gateway"
 
   # API Gateway configuration
   api_name        = var.api_gateway_name
@@ -254,15 +238,11 @@ module "api_gateway" {
   project     = var.project
   environment = var.environment
 
-  tags = {
-    Environment = var.environment
-    Project     = var.project
-    Service     = var.service_name
-  }
+  tags = local.tags
 }
 
 module "cognito" {
-  source = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/cognito?ref=main"
+  source = "../../modules/aws/cognito"
 
   user_pool_name = "${var.project}-${var.environment}-user-pool"
 }

@@ -34,13 +34,13 @@ variable "external_id" {
 variable "environment" {
   description = "Environment name"
   type        = string
-  default     = "prod"
+  default     = "dev"
 }
 
 variable "project" {
   description = "Project name"
   type        = string
-  default     = "cloudops"
+  default     = "internal-developer-platform"
 }
 
 # =============================================================================
