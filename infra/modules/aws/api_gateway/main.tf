@@ -96,9 +96,9 @@ resource "aws_apigatewayv2_vpc_link" "this" {
 # =============================================================================
 
 resource "aws_apigatewayv2_stage" "this" {
-  api_id      = aws_apigatewayv2_api.this.id
-  name        = var.stage_name
-  auto_deploy = var.auto_deploy
+  api_id        = aws_apigatewayv2_api.this.id
+  name          = var.stage_name
+  auto_deploy   = var.auto_deploy
   deployment_id = var.auto_deploy ? null : aws_apigatewayv2_deployment.this.id
 
   access_log_settings {
