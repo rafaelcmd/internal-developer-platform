@@ -17,10 +17,10 @@ platform_version                   = "1.4.0"
 force_new_deployment               = true
 assign_public_ip                   = false
 
-nlb_name              = "internal-developer-platform-nlb"
+nlb_name              = "idp-nlb"
 internal              = true
 load_balancer_type    = "network"
-target_group_name     = "internal-developer-platform-tg-8080"
+target_group_name     = "idp-tg-8080"
 target_group_protocol = "TCP"
 target_type           = "ip"
 health_check_enabled  = true
