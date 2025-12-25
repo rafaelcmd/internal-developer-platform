@@ -1,5 +1,5 @@
 module "datadog" {
-  source = "../../modules/datadog"
+  source = "../../../modules/datadog"
 
   aws_region            = var.aws_region
   role_name             = var.role_name
