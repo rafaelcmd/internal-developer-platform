@@ -15,6 +15,8 @@ resource "aws_apigatewayv2_api" "this" {
   body = templatefile(local.openapi_spec_path, {
     nlb_listener_arn = var.nlb_listener_arn
     vpc_link_id      = aws_apigatewayv2_vpc_link.this.id
+    jwt_issuer       = var.jwt_issuer
+    jwt_audience     = jsonencode(var.jwt_audience)
   })
 
   fail_on_warnings = true
@@ -42,6 +44,8 @@ resource "aws_apigatewayv2_deployment" "this" {
     redeploy_hash = sha1(templatefile(local.openapi_spec_path, {
       nlb_listener_arn = var.nlb_listener_arn
       vpc_link_id      = aws_apigatewayv2_vpc_link.this.id
+      jwt_issuer       = var.jwt_issuer
+      jwt_audience     = jsonencode(var.jwt_audience)
     }))
   }
 
