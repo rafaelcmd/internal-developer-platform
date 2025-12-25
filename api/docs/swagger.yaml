@@ -56,6 +56,45 @@ paths:
         uri: "${nlb_listener_arn}"
         connectionType: VPC_LINK
         connectionId: "${vpc_link_id}"
+  /auth/confirm:
+    post:
+      description: Confirms a user's sign up using the code sent by email
+      requestBody:
+        description: Confirm sign up request
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmSignUpRequest'
+      responses:
+        "200":
+          description: User confirmed successfully
+          content:
+            application/json:
+              schema:
+                type: string
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                type: string
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: string
+      summary: Confirm sign up
+      tags:
+      - auth
+      x-amazon-apigateway-integration:
+        payloadFormatVersion: "1.0"
+        type: http_proxy
+        httpMethod: POST
+        uri: "${nlb_listener_arn}"
+        connectionType: VPC_LINK
+        connectionId: "${vpc_link_id}"
   /auth/signup:
     post:
       description: Registers a new user with email and password
@@ -307,4 +346,12 @@ components:
         email:
           type: string
         password:
+          type: string
+
+    ConfirmSignUpRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        confirmation_code:
           type: string

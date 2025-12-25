@@ -9,4 +9,5 @@ import (
 type AuthProvider interface {
 	SignUp(ctx context.Context, email, password string) error
 	SignIn(ctx context.Context, email, password string) (*model.AuthResponse, error)
+	ConfirmSignUp(ctx context.Context, email, confirmationCode string) error
 }

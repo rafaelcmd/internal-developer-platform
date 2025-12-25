@@ -62,3 +62,12 @@ func (p *CognitoAuthProvider) SignIn(ctx context.Context, email, password string
 		TokenType:    aws.ToString(output.AuthenticationResult.TokenType),
 	}, nil
 }
+
+func (p *CognitoAuthProvider) ConfirmSignUp(ctx context.Context, email, confirmationCode string) error {
+	_, err := p.client.ConfirmSignUp(ctx, &cognitoidentityprovider.ConfirmSignUpInput{
+		ClientId:         aws.String(p.clientID),
+		Username:         aws.String(email),
+		ConfirmationCode: aws.String(confirmationCode),
+	})
+	return err
+}
