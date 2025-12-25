@@ -212,6 +212,10 @@ module "api_gateway" {
   nlb_dns_name        = module.nlb.nlb_dns_name
   nlb_listener_arn    = module.nlb.lb_listener
 
+  # JWT authorizer configuration
+  jwt_issuer   = "https://cognito-idp.${var.aws_region}.amazonaws.com/${module.cognito.user_pool_id}"
+  jwt_audience = [module.cognito.user_pool_client_id]
+
   # Stage configuration
   stage_name  = var.api_gateway_stage_name
   auto_deploy = var.api_gateway_auto_deploy

@@ -118,6 +118,8 @@ paths:
   /provision:
     post:
       description: Submits a new resource provisioning request to be processed asynchronously. The request is validated and queued for processing via SQS.
+      security:
+      - CognitoAuthorizer: []
       requestBody:
         description: Resource provisioning request
         required: true
@@ -210,6 +212,17 @@ tags:
   name: auth
 
 components:
+  securitySchemes:
+    CognitoAuthorizer:
+      type: apiKey
+      name: Authorization
+      in: header
+      x-amazon-apigateway-authorizer:
+        type: jwt
+        identitySource: "$request.header.Authorization"
+        jwtConfiguration:
+          audience: ${jwt_audience}
+          issuer: "${jwt_issuer}"
   schemas:
     AuthResponse:
       type: object

@@ -171,3 +171,14 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+
+variable "jwt_issuer" {
+  description = "JWT issuer URL (e.g., Cognito user pool issuer) used by API Gateway authorizer"
+  type        = string
+}
+
+variable "jwt_audience" {
+  description = "JWT audience values (e.g., Cognito app client IDs)"
+  type        = list(string)
+}
