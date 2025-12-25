@@ -1,5 +1,5 @@
 module "datadog" {
-  source = "../../../modules/datadog"
+  source = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/datadog?ref=main"
 
   aws_region            = var.aws_region
   role_name             = var.role_name

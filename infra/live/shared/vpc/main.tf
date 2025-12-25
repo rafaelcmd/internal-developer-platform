@@ -1,5 +1,5 @@
 module "vpc" {
-  source = "../../../modules/aws/vpc"
+  source = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/vpc?ref=main"
 
   aws_region           = "us-east-1"
   vpc_cidr             = "10.0.0.0/16"
