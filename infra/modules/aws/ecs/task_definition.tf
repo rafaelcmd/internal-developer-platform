@@ -148,7 +148,7 @@ resource "aws_security_group" "api_ecs_task_sg" {
   }
 
   tags = merge(var.tags, {
-    Name        = "cloudops-api-ecs-sg"
+    Name        = "internal-developer-platform-api-ecs-sg"
     Project     = var.project
     Environment = var.environment
   })

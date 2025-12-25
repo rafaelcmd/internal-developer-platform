@@ -25,16 +25,16 @@ jobs:
           echo "Checking caller identity..."
           aws sts get-caller-identity
           echo "Checking repository existence..."
-          aws ecr describe-repositories --repository-names cloudops-manager-repo || echo "Repository check failed"
+          aws ecr describe-repositories --repository-names internal-developer-platform-repo || echo "Repository check failed"
 
       - name: Log in to AWS ECR
         run: aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
 
       - name: Build and Push Docker image
         run: |
-          docker build -f api/Dockerfile.dev -t cloud-ops-manager-api api
-          docker tag cloud-ops-manager-api:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/cloudops-manager-repo:latest
-          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/cloudops-manager-repo:latest
+          docker build -f api/Dockerfile.dev -t internal-developer-platform-api api
+          docker tag internal-developer-platform-api:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/internal-developer-platform-repo:latest
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/internal-developer-platform-repo:latest
 
       - name: Update ECS Service
         run: |
@@ -42,7 +42,7 @@ jobs:
           aws ecs describe-task-definition --task-definition resource-provisioner-api-task --query "taskDefinition" --output json > task-definition.json
           
           # Update the image URI and keep only allowed fields for register-task-definition
-          IMAGE_URI="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/cloudops-manager-repo:latest"
+          IMAGE_URI="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/internal-developer-platform-repo:latest"
           jq --arg image "$IMAGE_URI" '
             .containerDefinitions[0].image = $image |
             {
@@ -71,13 +71,13 @@ jobs:
           echo "New task definition ARN: $NEW_TASK_DEFINITION_ARN"
 
           aws ecs update-service \
-            --cluster cloudops-manager-cluster \
+            --cluster internal-developer-platform-cluster \
             --service resource-provisioner-api-service \
             --task-definition $NEW_TASK_DEFINITION_ARN \
             --force-new-deployment \
             --region ${{ secrets.AWS_REGION }}
             
           aws ecs wait services-stable \
-            --cluster cloudops-manager-cluster \
+            --cluster internal-developer-platform-cluster \
             --services resource-provisioner-api-service \
             --region ${{ secrets.AWS_REGION }}

@@ -1,6 +1,6 @@
 services:
-  cloud-ops-manager-api:
-    container_name: cloud-ops-manager-api
+  internal-developer-platform-api:
+    container_name: internal-developer-platform-api
     build:
       args:
         - GO_VERSION=${GO_VERSION:-1.24}

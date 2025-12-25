@@ -62,7 +62,7 @@ variable "nlb_listener_arn" {
 variable "stage_name" {
   description = "Name of the API Gateway stage"
   type        = string
-  default     = "prod"
+  default     = "dev"
 }
 
 variable "auto_deploy" {

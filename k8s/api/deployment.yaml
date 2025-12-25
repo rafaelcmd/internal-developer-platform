@@ -1,24 +1,24 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: cloud-ops-manager-api-deployment
+  name: internal-developer-platform-api-deployment
   labels:
-    app: cloud-ops-manager-api
+    app: internal-developer-platform-api
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: cloud-ops-manager-api
+      app: internal-developer-platform-api
   strategy: {}
   template:
     metadata:
-      name: cloud-ops-manager-api-deployment
+      name: internal-developer-platform-api-deployment
       labels:
-        app: cloud-ops-manager-api
+        app: internal-developer-platform-api
     spec:
       containers:
-        - name: cloud-ops-manager-api
-          image: rafaelcmd/cloud-ops-manager-api:v2
+        - name: internal-developer-platform-api
+          image: rafaelcmd/internal-developer-platform-api:v2
           volumeMounts:
             - mountPath: "/.aws"
               name: aws-credentials

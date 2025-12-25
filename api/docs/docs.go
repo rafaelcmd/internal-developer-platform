@@ -9,10 +9,10 @@ const docTemplate = `{
     "info": {
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
-        "termsOfService": "https://cloudopsmanager.com/terms/",
+        "termsOfService": "https://internal-developer-platform.com/terms/",
         "contact": {
-            "name": "Cloud Ops Manager Team",
-            "email": "team@cloudopsmanager.com"
+            "name": "Internal Developer Platform Team",
+            "email": "team@internal-developer-platform.com"
         },
         "license": {
             "name": "MIT",
@@ -321,10 +321,10 @@ const docTemplate = `{
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0.0",
 	Host:             "",
-	BasePath:         "/prod/",
+	BasePath:         "/dev/",
 	Schemes:          []string{"http", "https"},
-	Title:            "Cloud Ops Manager - Provisioner API",
-	Description:      "The Cloud Ops Manager Provisioner API provides endpoints for managing cloud resource provisioning requests. This API accepts provisioning requests and queues them for asynchronous processing via SQS.",
+	Title:            "Internal Developer Platform - Provisioner API",
+	Description:      "The Internal Developer Platform Provisioner API provides endpoints for managing cloud resource provisioning requests. This API accepts provisioning requests and queues them for asynchronous processing via SQS.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

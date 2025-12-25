@@ -1,4 +1,4 @@
-resource "aws_ecs_cluster" "cloudops_cluster" {
+resource "aws_ecs_cluster" "internal_developer_platform_cluster" {
   name = var.cluster_name
 
   tags = merge(var.tags, {

@@ -7,20 +7,20 @@
 data "terraform_remote_state" "shared_vpc" {
   backend = "remote"
   config = {
-    organization = "cloudops-manager-org"
+    organization = "internal-developer-platform-org"
     workspaces = {
-      name = "cloudops-shared-vpc"
+      name = "internal-developer-platform-shared-vpc"
     }
   }
 }
 
 # ECR repository for application images
-data "terraform_remote_state" "cloudops_manager_ecr_repository" {
+data "terraform_remote_state" "internal_developer_platform_ecr_repository" {
   backend = "remote"
   config = {
-    organization = "cloudops-manager-org"
+    organization = "internal-developer-platform-org"
     workspaces = {
-      name = "cloudops-shared-ecr"
+      name = "internal-developer-platform-shared-ecr"
     }
   }
 }

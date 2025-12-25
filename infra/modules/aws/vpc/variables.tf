@@ -46,13 +46,13 @@ variable "availability_zones" {
 variable "project" {
   description = "Name of the project"
   type        = string
-  default     = "cloudops"
+  default     = "internal-developer-platform"
 }
 
 variable "environment" {
   description = "Deployment environment (e.g. dev, staging, prod)"
   type        = string
-  default     = "prod"
+  default     = "dev"
 }
 
 # =============================================================================

@@ -1,4 +1,4 @@
-module github.com/rafaelcmd/cloud-ops-manager/api
+module github.com/rafaelcmd/internal-developer-platform/api
 
 go 1.23.0
 

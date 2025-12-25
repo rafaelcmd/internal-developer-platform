@@ -1,10 +1,10 @@
 terraform {
   cloud {
 
-    organization = "cloudops-manager-org"
+    organization = "internal-developer-platform-org"
 
     workspaces {
-      name = "cloudops-shared-vpc"
+      name = "internal-developer-platform-shared-vpc"
     }
   }
 }

@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
-	"github.com/rafaelcmd/cloud-ops-manager/api/internal/domain/model"
-	"github.com/rafaelcmd/cloud-ops-manager/api/internal/domain/ports/outbound"
+	"github.com/rafaelcmd/internal-developer-platform/api/internal/domain/model"
+	"github.com/rafaelcmd/internal-developer-platform/api/internal/domain/ports/outbound"
 	"log"
 )
 

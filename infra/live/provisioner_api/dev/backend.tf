@@ -1,10 +1,9 @@
 terraform {
   cloud {
-
     organization = "internal-developer-platform-org"
 
     workspaces {
-      name = "internal-developer-platform-shared-datadog"
+      name = "internal-developer-platform-provisioner-api-dev"
     }
   }
 }

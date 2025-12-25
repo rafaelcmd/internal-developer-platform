@@ -1,10 +1,10 @@
 terraform {
   cloud {
 
-    organization = "cloudops-manager-org"
+    organization = "internal-developer-platform-org"
 
     workspaces {
-      name = "cloudops-shared-ecr"
+      name = "internal-developer-platform-shared-ecr"
     }
   }
 }

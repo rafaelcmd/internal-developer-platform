@@ -13,7 +13,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: infra/apps/provisioner_api/prod
+        working-directory: infra/apps/provisioner_api/dev
         shell: bash
 
     steps:

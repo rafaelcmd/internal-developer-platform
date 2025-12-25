@@ -30,7 +30,7 @@ resource "aws_cognito_user_pool_client" "this" {
 }
 
 resource "aws_ssm_parameter" "cognito_client_id" {
-  name  = "/CLOUD_OPS_MANAGER/COGNITO_CLIENT_ID"
+  name  = "/INTERNAL_DEVELOPER_PLATFORM/COGNITO_CLIENT_ID"
   type  = "String"
   value = aws_cognito_user_pool_client.this.id
 }

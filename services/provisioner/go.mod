@@ -1,4 +1,4 @@
-module github.com/rafaelcmd/cloud-ops-manager/resource-provisioner-service
+module github.com/rafaelcmd/internal-developer-platform/resource-provisioner-service
 
 go 1.22
 

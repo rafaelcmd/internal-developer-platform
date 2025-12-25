@@ -1,4 +1,4 @@
-# Cloud Ops Manager API Makefile
+# Internal Developer Platform API Makefile
 
 .PHONY: help build test swagger-gen swagger-install clean run
 

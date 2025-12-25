@@ -2,13 +2,14 @@ package main
 
 import (
 	"context"
+	"log"
+	"net/http"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-xray-sdk-go/xray"
-	"log"
-	"net/http"
 )
 
 func main() {
@@ -26,7 +27,7 @@ func main() {
 
 	ssmCtx, seg := xray.BeginSegment(ctx, "GetSQSQueueURL")
 	param, err := ssmClient.GetParameter(ssmCtx, &ssm.GetParameterInput{
-		Name: aws.String("/CLOUD_OPS_MANAGER/SQS_QUEUE_URL"),
+		Name: aws.String("/INTERNAL_DEVELOPER_PLATFORM/SQS_QUEUE_URL"),
 	})
 	seg.Close(err)
 	if err != nil {
