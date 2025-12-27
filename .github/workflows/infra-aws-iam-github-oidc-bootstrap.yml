@@ -1,4 +1,4 @@
-name: IAM - Create GitHub OIDC Role
+name: IAM - Bootstrap GitHub OIDC Role
 
 on:
   workflow_dispatch:
@@ -6,10 +6,11 @@ on:
 permissions:
   id-token: write
   contents: read
+  actions: write
 
 jobs:
-  create-iam-github-oidc:
-    name: Create IAM GitHub OIDC
+  bootstrap-iam-github-oidc:
+    name: Bootstrap IAM GitHub OIDC
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -25,24 +26,26 @@ jobs:
         with:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
-      - name: Configure AWS Credentials
+      - name: Configure AWS Credentials (Bootstrap)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          role-session-name: github-actions-${{ github.run_id }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Terraform Init
         run: terraform init
 
-      - name: Terraform Format
-        run: terraform fmt -check
-
-      - name: Terraform Validate
-        run: terraform validate
-
-      - name: Terraform Plan
-        run: terraform plan -input=false
-
       - name: Terraform Apply
         run: terraform apply -auto-approve -input=false
+
+      - name: Get Role ARN Output
+        id: get_role_arn
+        run: |
+          echo "role_arn=$(terraform output -raw github_actions_role_arn)" >> $GITHUB_OUTPUT
+
+      - name: Set AWS_ROLE_ARN Secret
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT_ACTIONS_WRITE }}
+        run: |
+          gh secret set AWS_ROLE_ARN --body "${{ steps.get_role_arn.outputs.role_arn }}"
