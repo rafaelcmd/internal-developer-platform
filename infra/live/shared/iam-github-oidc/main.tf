@@ -47,7 +47,3 @@ resource "aws_iam_role_policy_attachment" "github_actions" {
   policy_arn = var.github_actions_policy_arns[count.index]
 }
 
-output "github_actions_role_arn" {
-  description = "ARN of the IAM role assumed by GitHub Actions"
-  value       = aws_iam_role.github_actions.arn
-}
