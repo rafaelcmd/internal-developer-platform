@@ -1,4 +1,4 @@
-name: AWS VPC - Destroy
+name: IAM - Create GitHub OIDC Role
 
 on:
   workflow_dispatch:
@@ -8,12 +8,12 @@ permissions:
   contents: read
 
 jobs:
-  destroy-vpc:
-    name: Destroy VPC
+  create-iam-github-oidc:
+    name: Create IAM GitHub OIDC
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: infra/live/shared/vpc
+        working-directory: infra/live/shared/iam-github-oidc
         shell: bash
 
     steps:
@@ -35,8 +35,14 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
-      - name: Terraform Plan Destroy
-        run: terraform plan -destroy
+      - name: Terraform Format
+        run: terraform fmt -check
 
-      - name: Terraform Destroy
-        run: terraform destroy -auto-approve
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan -input=false
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve -input=false
