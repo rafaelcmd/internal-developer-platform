@@ -1,6 +1,7 @@
 variable "aws_region" {
   description = "AWS region where the IAM resources will be managed"
   type        = string
+  default     = "us-east-1"
 }
 
 variable "github_org" {
@@ -18,7 +19,7 @@ variable "github_repo" {
 variable "github_allowed_refs" {
   description = "List of Git refs (e.g., refs/heads/main) allowed to assume the role"
   type        = list(string)
-  default     = [
+  default = [
     "refs/heads/main"
   ]
 }
@@ -32,7 +33,7 @@ variable "github_actions_role_name" {
 variable "github_actions_policy_arns" {
   description = "Policy ARNs to attach to the GitHub Actions role (use least privilege)"
   type        = list(string)
-  default     = [
+  default = [
     "arn:aws:iam::aws:policy/AdministratorAccess"
   ]
 }
