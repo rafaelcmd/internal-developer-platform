@@ -25,13 +25,6 @@ jobs:
         with:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          role-session-name: github-actions-${{ github.run_id }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
       - name: Terraform Init
         run: terraform init
 
@@ -53,7 +46,7 @@ jobs:
           ECR_URL=$(terraform output -raw repository_url)
           
           # Login to Private ECR
-          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin $ECR_URL
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin $ECR_URL
 
           # Login to Public ECR (to avoid rate limits)
           aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
