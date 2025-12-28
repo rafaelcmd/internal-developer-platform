@@ -1,5 +1,5 @@
 module "github_actions_oidc" {
-  source         = "../../../modules/aws/oidc"
+  source         = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/oidc?ref=main"
   url            = "https://token.actions.githubusercontent.com"
   client_id_list = ["sts.amazonaws.com"]
   thumbprint     = var.github_thumbprint
