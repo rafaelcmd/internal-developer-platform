@@ -1,6 +1,6 @@
 
 module "tfc_oidc" {
-  source         = "../../modules/aws/oidc"
+  source         = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/oidc?ref=main"
   url            = "https://app.terraform.io"
   client_id_list = ["aws.workload.identity"]
   thumbprint     = var.tfc_thumbprint
