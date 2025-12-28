@@ -22,9 +22,11 @@ variable "tfc_role_name" {
 }
 
 variable "tfc_allowed_subs" {
-  description = "List of allowed OIDC subject claims for Terraform Cloud (e.g., org/workspace/user)"
+  description = "List of allowed OIDC subject claims for Terraform Cloud (e.g., organization:org:project:project:workspace:workspace)"
   type        = list(string)
-  default     = ["repo:rafaelcmd/internal-developer-platform:ref:refs/heads/main"]
+  default     = [
+    "organization:internal-developer-platform-org:project:default:workspace:internal-developer-platform-shared-vpc"
+  ]
 }
 
 variable "tfc_policy_arns" {
