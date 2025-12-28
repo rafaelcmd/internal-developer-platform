@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 jobs:
-  build-and-deploy:
+  build-api-application:
     runs-on: ubuntu-latest
 
     steps:
@@ -17,36 +17,34 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           role-session-name: github-actions-${{ github.run_id }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      - name: Debug AWS Connection
-        run: |
-          echo "Checking caller identity..."
-          aws sts get-caller-identity
-          echo "Checking repository existence..."
-          aws ecr describe-repositories --repository-names internal-developer-platform-repo || echo "Repository check failed"
-
       - name: Log in to AWS ECR
-        run: aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+        run: aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
 
       - name: Build and Push Docker image
         run: |
           docker build -f api/Dockerfile.dev -t internal-developer-platform-api api
-          docker tag internal-developer-platform-api:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/internal-developer-platform-repo:latest
-          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/internal-developer-platform-repo:latest
+          docker tag internal-developer-platform-api:latest ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/internal-developer-platform-repo:latest
+          docker push ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/internal-developer-platform-repo:latest
 
+  deploy-api-application-to-ecs:
+    needs: build-api-application
+    runs-on: ubuntu-latest
+
+    steps:
       - name: Update ECS Service
         run: |
           # Get the current task definition
           aws ecs describe-task-definition --task-definition resource-provisioner-api-task --query "taskDefinition" --output json > task-definition.json
           
           # Update the image URI and keep only allowed fields for register-task-definition
-          IMAGE_URI="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/internal-developer-platform-repo:latest"
+          IMAGE_URI="${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/internal-developer-platform-repo:latest"
           jq --arg image "$IMAGE_URI" '
             .containerDefinitions[0].image = $image |
             {
@@ -79,9 +77,9 @@ jobs:
             --service resource-provisioner-api-service \
             --task-definition $NEW_TASK_DEFINITION_ARN \
             --force-new-deployment \
-            --region ${{ secrets.AWS_REGION }}
+            --region ${{ env.AWS_REGION }}
             
           aws ecs wait services-stable \
             --cluster internal-developer-platform-cluster \
             --services resource-provisioner-api-service \
-            --region ${{ secrets.AWS_REGION }}
+            --region ${{ env.AWS_REGION }}

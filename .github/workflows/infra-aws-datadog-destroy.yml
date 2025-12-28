@@ -26,13 +26,6 @@ jobs:
         with:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          role-session-name: github-actions-${{ github.run_id }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
       - name: Terraform Init
         run: terraform init
 
