@@ -25,7 +25,7 @@ variable "tfc_allowed_subs" {
   description = "List of allowed OIDC subject claims for Terraform Cloud"
   type        = list(string)
   default = [
-    "organization:internal-developer-platform-org:project:default:workspace:*:run_phase:*"
+    "organization:internal-developer-platform-org:project:Default Project:workspace:*:run_phase:*"
   ]
 }
 
