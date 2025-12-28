@@ -8,13 +8,13 @@ module "tfc_oidc" {
   client_id_list = ["aws.workload.identity"]
   thumbprint     = data.tls_certificate.tfc_oidc.certificates[0].sha1_fingerprint
   role_name      = var.tfc_role_name
-  string_equals  = {
+  string_equals = {
     "app.terraform.io:aud" = "aws.workload.identity"
   }
-  string_like    = {
+  string_like = {
     "app.terraform.io:sub" = var.tfc_allowed_subs
   }
-  policy_arns    = var.tfc_policy_arns
-  tags           = local.tags
+  policy_arns = var.tfc_policy_arns
+  tags        = local.tags
 }
 

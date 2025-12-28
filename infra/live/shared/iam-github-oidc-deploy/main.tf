@@ -8,12 +8,12 @@ module "github_actions_oidc" {
   client_id_list = ["sts.amazonaws.com"]
   thumbprint     = data.tls_certificate.github_oidc.certificates[0].sha1_fingerprint
   role_name      = var.github_role_name
-  string_equals  = {
+  string_equals = {
     "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
   }
-  string_like    = {
+  string_like = {
     "token.actions.githubusercontent.com:sub" = var.github_allowed_subs
   }
-  policy_arns    = var.github_policy_arns
-  tags           = local.tags
+  policy_arns = var.github_policy_arns
+  tags        = local.tags
 }
