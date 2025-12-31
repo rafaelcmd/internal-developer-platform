@@ -29,6 +29,12 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Debug AWS environment variables
+        run: |
+          echo "AWS_REGION=$AWS_REGION"
+          echo "AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID"
+          echo "AWS_ROLE_ARN=$AWS_ROLE_ARN"
+
       - name: Log in to AWS ECR
         run: aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
 
