@@ -45,6 +45,13 @@ jobs:
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
 
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          role-session-name: github-actions-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
       - name: Push Datadog Agent Image
         run: |
           # Get ECR URL from Terraform output
