@@ -33,5 +33,5 @@ variable "github_allowed_subs" {
 variable "github_policy_arns" {
   description = "Policy ARNs to attach to the GitHub Actions OIDC role (use least privilege)"
   type        = list(string)
-  default     = ["arn:aws:iam::aws:policy/AdministratorAccess"]
+  default     = ["arn:aws:iam::aws:policy/AdministratorAccess", "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"]
 }
