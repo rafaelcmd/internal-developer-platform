@@ -27,7 +27,8 @@ variable "github_allowed_subs" {
   type        = list(string)
   default     = [
     "organization:internal-developer-platform-org:project:Default Project:workspace:internal-developer-platform-provisioner-api-dev:run_phase:*",
-    "organization:internal-developer-platform-org:project:Default Project:workspace:internal-developer-platform-shared-ecr:run_phase:*"
+    "organization:internal-developer-platform-org:project:Default Project:workspace:internal-developer-platform-shared-ecr:run_phase:*",
+    "repo:rafaelcmd/internal-developer-platform:ref:refs/heads/main"
   ]
 }
 
