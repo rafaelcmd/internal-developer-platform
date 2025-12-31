@@ -3,6 +3,7 @@ variable "environment" {
   type        = string
   default     = "dev"
 }
+
 variable "project" {
   description = "Project name used for tagging"
   type        = string
@@ -25,7 +26,12 @@ variable "tfc_allowed_subs" {
   description = "List of allowed OIDC subject claims for Terraform Cloud"
   type        = list(string)
   default = [
-    "organization:internal-developer-platform-org:project:Default Project:workspace:*:run_phase:*"
+    "organization:internal-developer-platform-org:project:Default Project:workspace:internal-developer-platform-iam-tfc-oidc:run_phase:*",
+    "organization:internal-developer-platform-org:project:Default Project:workspace:internal-developer-platform-iam-github-oidc:run_phase:*",
+    "organization:internal-developer-platform-org:project:Default Project:workspace:internal-developer-platform-shared-vpc:run_phase:*",
+    "organization:internal-developer-platform-org:project:Default Project:workspace:internal-developer-platform-shared-ecr:run_phase:*",
+    "organization:internal-developer-platform-org:project:Default Project:workspace:internal-developer-platform-shared-datadog:run_phase:*",
+    "organization:internal-developer-platform-org:project:Default Project:workspace:internal-developer-platform-provisioner-api-dev:run_phase:*"
   ]
 }
 

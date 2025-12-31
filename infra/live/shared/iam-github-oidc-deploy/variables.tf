@@ -3,6 +3,7 @@ variable "environment" {
   type        = string
   default     = "dev"
 }
+
 variable "project" {
   description = "Project name used for tagging"
   type        = string
@@ -24,7 +25,9 @@ variable "github_role_name" {
 variable "github_allowed_subs" {
   description = "List of allowed OIDC subject claims for GitHub Actions (e.g., repo:org/repo:ref:branch)"
   type        = list(string)
-  default     = ["repo:rafaelcmd/internal-developer-platform:ref:refs/heads/main"]
+  default     = [
+    "organization:internal-developer-platform-org:project:Default Project:workspace:internal-developer-platform-provisioner-api-dev:run_phase:*"
+  ]
 }
 
 variable "github_policy_arns" {
