@@ -38,5 +38,5 @@ variable "tfc_allowed_subs" {
 variable "tfc_policy_arns" {
   description = "Policy ARNs to attach to the TFC OIDC role (use least privilege)"
   type        = list(string)
-  default     = ["arn:aws:iam::aws:policy/AdministratorAccess"]
+  default     = []
 }
