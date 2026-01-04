@@ -34,6 +34,27 @@ resource "aws_iam_policy" "vpc_management" {
         }
       },
       {
+        Sid    = "VpcActionsRequiringParent"
+        Effect = "Allow"
+        Action = [
+          "ec2:CreateSubnet",
+          "ec2:CreateRouteTable",
+          "ec2:CreateSecurityGroup",
+          "ec2:CreateVpcEndpoint"
+        ]
+        Resource = [
+          "arn:aws:ec2:*:*:vpc/*",
+          "arn:aws:ec2:*:*:subnet/*",
+          "arn:aws:ec2:*:*:security-group/*",
+          "arn:aws:ec2:*:*:route-table/*"
+        ]
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/Project" = var.project
+          }
+        }
+      },
+      {
         Sid    = "ManageProjectResources"
         Effect = "Allow"
         Action = [
