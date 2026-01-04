@@ -40,13 +40,15 @@ resource "aws_iam_policy" "vpc_management" {
           "ec2:CreateSubnet",
           "ec2:CreateRouteTable",
           "ec2:CreateSecurityGroup",
-          "ec2:CreateVpcEndpoint"
+          "ec2:CreateVpcEndpoint",
+          "ec2:CreateNatGateway"
         ]
         Resource = [
           "arn:aws:ec2:*:*:vpc/*",
           "arn:aws:ec2:*:*:subnet/*",
           "arn:aws:ec2:*:*:security-group/*",
-          "arn:aws:ec2:*:*:route-table/*"
+          "arn:aws:ec2:*:*:route-table/*",
+          "arn:aws:ec2:*:*:elastic-ip/*"
         ]
         Condition = {
           StringEquals = {
