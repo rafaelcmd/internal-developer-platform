@@ -14,7 +14,7 @@ module "tfc_oidc" {
   string_like = {
     "app.terraform.io:sub" = var.tfc_allowed_subs
   }
-  policy_arns = var.tfc_policy_arns
+  policy_arns = concat(var.tfc_policy_arns, [aws_iam_policy.vpc_management.arn])
   tags        = local.tags
 }
 
