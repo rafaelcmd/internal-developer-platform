@@ -74,6 +74,7 @@ resource "aws_iam_policy" "vpc_management" {
           "ec2:AssociateRouteTable",
           "ec2:DisassociateRouteTable",
           "ec2:ReleaseAddress",
+          "ec2:DisassociateAddress",
           "ec2:DeleteNatGateway",
           "ec2:DeleteSecurityGroup",
           "ec2:AuthorizeSecurityGroupIngress",
@@ -81,6 +82,7 @@ resource "aws_iam_policy" "vpc_management" {
           "ec2:AuthorizeSecurityGroupEgress",
           "ec2:RevokeSecurityGroupEgress",
           "ec2:DeleteVpcEndpoint",
+          "ec2:DeleteVpcEndpoints",
           "ec2:ModifyVpcEndpoint",
           "ec2:CreateTags",
           "ec2:DeleteTags"
