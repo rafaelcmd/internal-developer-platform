@@ -23,7 +23,8 @@ resource "aws_iam_policy" "vpc_management" {
           "ec2:CreateRouteTable",
           "ec2:CreateSecurityGroup",
           "ec2:CreateVpcEndpoint",
-          "ec2:AllocateAddress"
+          "ec2:AllocateAddress",
+          "ec2:CreateTags"
         ]
         Resource = "*"
         Condition = {

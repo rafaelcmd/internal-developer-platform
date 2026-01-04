@@ -5,6 +5,11 @@ locals {
   az_count             = length(var.availability_zones)
   public_subnet_count  = length(var.public_subnet_cidrs)
   private_subnet_count = length(var.private_subnet_cidrs)
+
+  common_tags = {
+    Project     = var.project
+    Environment = var.environment
+  }
 }
 
 ########################################
@@ -15,7 +20,7 @@ resource "aws_vpc" "this" {
   enable_dns_support   = true
   enable_dns_hostnames = true
 
-  tags = merge(var.tags, {
+  tags = merge(var.tags, local.common_tags, {
     Name = "${var.project}-${var.environment}-vpc"
   })
 }
@@ -26,7 +31,7 @@ resource "aws_vpc" "this" {
 resource "aws_internet_gateway" "this" {
   vpc_id = aws_vpc.this.id
 
-  tags = merge(var.tags, {
+  tags = merge(var.tags, local.common_tags, {
     Name = "${var.project}-${var.environment}-igw"
   })
 }
@@ -41,7 +46,7 @@ resource "aws_subnet" "public" {
   map_public_ip_on_launch = true
   availability_zone       = var.availability_zones[count.index % local.az_count]
 
-  tags = merge(var.tags, {
+  tags = merge(var.tags, local.common_tags, {
     Name = "${var.project}-${var.environment}-public-${count.index + 1}"
   })
 }
@@ -52,7 +57,7 @@ resource "aws_subnet" "public" {
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.this.id
 
-  tags = merge(var.tags, {
+  tags = merge(var.tags, local.common_tags, {
     Name = "${var.project}-${var.environment}-public-rt"
   })
 }
@@ -78,7 +83,7 @@ resource "aws_subnet" "private" {
   cidr_block        = var.private_subnet_cidrs[count.index]
   availability_zone = var.availability_zones[count.index % local.az_count]
 
-  tags = merge(var.tags, {
+  tags = merge(var.tags, local.common_tags, {
     Name = "${var.project}-${var.environment}-private-${count.index + 1}"
   })
 }
@@ -89,7 +94,7 @@ resource "aws_subnet" "private" {
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.this.id
 
-  tags = merge(var.tags, {
+  tags = merge(var.tags, local.common_tags, {
     Name = "${var.project}-${var.environment}-private-rt"
   })
 }
@@ -106,7 +111,7 @@ resource "aws_route_table_association" "private_subnets" {
 resource "aws_eip" "nat" {
   domain = "vpc"
 
-  tags = merge(var.tags, {
+  tags = merge(var.tags, local.common_tags, {
     Name = "${var.project}-${var.environment}-nat-eip"
   })
 }
@@ -115,7 +120,7 @@ resource "aws_nat_gateway" "this" {
   allocation_id = aws_eip.nat.id
   subnet_id     = aws_subnet.public[0].id
 
-  tags = merge(var.tags, {
+  tags = merge(var.tags, local.common_tags, {
     Name = "${var.project}-${var.environment}-nat"
   })
 
@@ -152,7 +157,7 @@ resource "aws_security_group" "endpoints" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = merge(var.tags, {
+  tags = merge(var.tags, local.common_tags, {
     Name = "${var.project}-${var.environment}-vpce-sg"
   })
 }
@@ -168,7 +173,7 @@ resource "aws_vpc_endpoint" "sqs" {
   security_group_ids  = [aws_security_group.endpoints.id]
   private_dns_enabled = true
 
-  tags = merge(var.tags, {
+  tags = merge(var.tags, local.common_tags, {
     Name = "${var.project}-${var.environment}-vpce-sqs"
   })
 }
@@ -184,7 +189,7 @@ resource "aws_vpc_endpoint" "ecr_api" {
   security_group_ids  = [aws_security_group.endpoints.id]
   private_dns_enabled = true
 
-  tags = merge(var.tags, {
+  tags = merge(var.tags, local.common_tags, {
     Name = "${var.project}-${var.environment}-vpce-ecr-api"
   })
 }
@@ -200,7 +205,7 @@ resource "aws_vpc_endpoint" "ecr_dkr" {
   security_group_ids  = [aws_security_group.endpoints.id]
   private_dns_enabled = true
 
-  tags = merge(var.tags, {
+  tags = merge(var.tags, local.common_tags, {
     Name = "${var.project}-${var.environment}-vpce-ecr-dkr"
   })
 }
@@ -216,7 +221,7 @@ resource "aws_vpc_endpoint" "logs" {
   security_group_ids  = [aws_security_group.endpoints.id]
   private_dns_enabled = true
 
-  tags = merge(var.tags, {
+  tags = merge(var.tags, local.common_tags, {
     Name = "${var.project}-${var.environment}-vpce-logs"
   })
 }
@@ -232,7 +237,7 @@ resource "aws_vpc_endpoint" "ssm" {
   security_group_ids  = [aws_security_group.endpoints.id]
   private_dns_enabled = true
 
-  tags = merge(var.tags, {
+  tags = merge(var.tags, local.common_tags, {
     Name = "${var.project}-${var.environment}-vpce-ssm"
   })
 }
@@ -246,7 +251,7 @@ resource "aws_vpc_endpoint" "s3" {
   vpc_endpoint_type = "Gateway"
   route_table_ids   = [aws_route_table.private.id]
 
-  tags = merge(var.tags, {
+  tags = merge(var.tags, local.common_tags, {
     Name = "${var.project}-${var.environment}-vpce-s3"
   })
 }
