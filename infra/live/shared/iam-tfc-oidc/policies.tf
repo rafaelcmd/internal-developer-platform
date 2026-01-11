@@ -1,11 +1,12 @@
-resource "aws_iam_policy" "vpc_management" {
-  name        = "${var.project}-${var.environment}-vpc-management-policy"
-  description = "Least privilege policy for managing VPC resources"
+resource "aws_iam_policy" "provisioner_api_infra_policy" {
+  name        = "${var.project}-${var.environment}-provisioner-api-infra-policy"
+  description = "Least privilege policy for managing Infrastructure resources (VPC, NLB, ECR)"
   policy      = jsonencode({
     Version = "2012-10-17"
     Statement = [
+      # VPC Statements
       {
-        Sid    = "ViewOnly"
+        Sid    = "ViewOnlyVPC"
         Effect = "Allow"
         Action = [
           "ec2:Describe*"
@@ -13,7 +14,7 @@ resource "aws_iam_policy" "vpc_management" {
         Resource = "*"
       },
       {
-        Sid    = "CreateTaggedResources"
+        Sid    = "CreateTaggedVPCResources"
         Effect = "Allow"
         Action = [
           "ec2:CreateVpc",
@@ -57,7 +58,7 @@ resource "aws_iam_policy" "vpc_management" {
         }
       },
       {
-        Sid    = "ManageProjectResources"
+        Sid    = "ManageProjectVPCResources"
         Effect = "Allow"
         Action = [
           "ec2:DeleteVpc",
@@ -93,17 +94,121 @@ resource "aws_iam_policy" "vpc_management" {
             "aws:ResourceTag/Project" = var.project
           }
         }
+      },
+      # NLB Statements
+      {
+        Sid    = "NLBRead"
+        Effect = "Allow"
+        Action = [
+          "elasticloadbalancing:Describe*"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "NLBCreateTagged"
+        Effect = "Allow"
+        Action = [
+          "elasticloadbalancing:CreateLoadBalancer",
+          "elasticloadbalancing:CreateTargetGroup",
+          "elasticloadbalancing:AddTags"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/Project" = var.project
+          }
+        }
+      },
+      {
+        Sid    = "NLBManageProjectResources"
+        Effect = "Allow"
+        Action = [
+          "elasticloadbalancing:DeleteLoadBalancer",
+          "elasticloadbalancing:ModifyLoadBalancerAttributes",
+          "elasticloadbalancing:DeleteTargetGroup",
+          "elasticloadbalancing:ModifyTargetGroupAttributes",
+          "elasticloadbalancing:ModifyTargetGroup",
+          "elasticloadbalancing:CreateListener",
+          "elasticloadbalancing:DeleteListener",
+          "elasticloadbalancing:ModifyListener",
+          "elasticloadbalancing:CreateRule",
+          "elasticloadbalancing:DeleteRule",
+          "elasticloadbalancing:ModifyRule",
+          "elasticloadbalancing:RemoveTags",
+          "elasticloadbalancing:RegisterTargets",
+          "elasticloadbalancing:DeregisterTargets",
+          "elasticloadbalancing:SetIpAddressType",
+          "elasticloadbalancing:SetSubnets",
+          "elasticloadbalancing:SetSecurityGroups"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/Project" = var.project
+          }
+        }
+      },
+      # ECR Statements
+      {
+        Sid    = "ECRRead"
+        Effect = "Allow"
+        Action = [
+          "ecr:DescribeRepositories",
+          "ecr:ListTagsForResource",
+          "ecr:GetLifecyclePolicy",
+          "ecr:GetRepositoryPolicy",
+          "ecr:GetLifecyclePolicyPreview",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage",
+          "ecr:BatchCheckLayerAvailability"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "CreateTaggedRepository"
+        Effect = "Allow"
+        Action = [
+          "ecr:CreateRepository",
+          "ecr:TagResource"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/Project" = var.project
+          }
+        }
+      },
+      {
+        Sid    = "ManageProjectRepository"
+        Effect = "Allow"
+        Action = [
+          "ecr:DeleteRepository",
+          "ecr:PutLifecyclePolicy",
+          "ecr:DeleteLifecyclePolicy",
+          "ecr:StartLifecyclePolicyPreview",
+          "ecr:SetRepositoryPolicy",
+          "ecr:DeleteRepositoryPolicy",
+          "ecr:PutImageScanningConfiguration",
+          "ecr:UntagResource"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/Project" = var.project
+          }
+        }
       }
     ]
   })
 }
 
-resource "aws_iam_policy" "iam_management" {
-  name        = "${var.project}-${var.environment}-iam-management-policy"
-  description = "Least privilege policy for managing IAM resources"
+resource "aws_iam_policy" "provisioner_api_security_policy" {
+  name        = "${var.project}-${var.environment}-provisioner-api-security-policy"
+  description = "Least privilege policy for managing Security resources (IAM, Cognito, SSM)"
   policy      = jsonencode({
     Version = "2012-10-17"
     Statement = [
+      # IAM Statements
       {
         Sid    = "IAMRead"
         Effect = "Allow"
@@ -183,76 +288,8 @@ resource "aws_iam_policy" "iam_management" {
             "aws:ResourceTag/Project" = var.project
           }
         }
-      }
-    ]
-  })
-}
-
-resource "aws_iam_policy" "ecr_management" {
-  name        = "${var.project}-${var.environment}-ecr-management-policy"
-  description = "Least privilege policy for managing ECR resources"
-  policy      = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "ECRRead"
-        Effect = "Allow"
-        Action = [
-          "ecr:DescribeRepositories",
-          "ecr:ListTagsForResource",
-          "ecr:GetLifecyclePolicy",
-          "ecr:GetRepositoryPolicy",
-          "ecr:GetLifecyclePolicyPreview",
-          "ecr:GetDownloadUrlForLayer",
-          "ecr:BatchGetImage",
-          "ecr:BatchCheckLayerAvailability"
-        ]
-        Resource = "*"
       },
-      {
-        Sid    = "CreateTaggedRepository"
-        Effect = "Allow"
-        Action = [
-          "ecr:CreateRepository",
-          "ecr:TagResource"
-        ]
-        Resource = "*"
-        Condition = {
-          StringEquals = {
-            "aws:RequestTag/Project" = var.project
-          }
-        }
-      },
-      {
-        Sid    = "ManageProjectRepository"
-        Effect = "Allow"
-        Action = [
-          "ecr:DeleteRepository",
-          "ecr:PutLifecyclePolicy",
-          "ecr:DeleteLifecyclePolicy",
-          "ecr:StartLifecyclePolicyPreview",
-          "ecr:SetRepositoryPolicy",
-          "ecr:DeleteRepositoryPolicy",
-          "ecr:PutImageScanningConfiguration",
-          "ecr:UntagResource"
-        ]
-        Resource = "*"
-        Condition = {
-          StringEquals = {
-            "aws:ResourceTag/Project" = var.project
-          }
-        }
-      }
-    ]
-  })
-}
-
-resource "aws_iam_policy" "cognito_management" {
-  name        = "${var.project}-${var.environment}-cognito-management-policy"
-  description = "Least privilege policy for managing Cognito resources"
-  policy      = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
+      # Cognito Statements
       {
         Sid    = "CognitoRead"
         Effect = "Allow"
@@ -302,35 +339,47 @@ resource "aws_iam_policy" "cognito_management" {
           }
         }
       },
+      # SSM Statements
       {
-         Sid = "SSMParameterManagement"
-         Effect = "Allow"
-         Action = [
-            "ssm:PutParameter",
-            "ssm:DeleteParameter",
-            "ssm:GetParameter",
-            "ssm:GetParameters",
-            "ssm:AddTagsToResource",
-            "ssm:RemoveTagsFromResource"
-         ]
-         Resource = "arn:aws:ssm:*:*:parameter/*"
-         Condition = {
-            StringEquals = {
-               "aws:ResourceTag/Project" = var.project
-            }
-         }
+        Sid    = "SSMRead"
+        Effect = "Allow"
+        Action = [
+          "ssm:DescribeParameters",
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:GetParameterHistory",
+          "ssm:GetParametersByPath"
+        ]
+        Resource = "*"
       },
       {
-        Sid = "SSMParameterCreate"
+        Sid    = "SSMCreateTagged"
         Effect = "Allow"
         Action = [
           "ssm:PutParameter",
           "ssm:AddTagsToResource"
         ]
-        Resource = "arn:aws:ssm:*:*:parameter/*"
+        Resource = "*"
         Condition = {
           StringEquals = {
             "aws:RequestTag/Project" = var.project
+          }
+        }
+      },
+      {
+        Sid    = "SSMManageProjectResources"
+        Effect = "Allow"
+        Action = [
+          "ssm:PutParameter",
+          "ssm:DeleteParameter",
+          "ssm:DeleteParameters",
+          "ssm:RemoveTagsFromResource",
+          "ssm:AddTagsToResource" 
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/Project" = var.project
           }
         }
       }
@@ -338,12 +387,13 @@ resource "aws_iam_policy" "cognito_management" {
   })
 }
 
-resource "aws_iam_policy" "ecs_management" {
-  name        = "${var.project}-${var.environment}-ecs-management-policy"
-  description = "Least privilege policy for managing ECS resources"
+resource "aws_iam_policy" "provisioner_api_app_policy" {
+  name        = "${var.project}-${var.environment}-provisioner-api-app-policy"
+  description = "Least privilege policy for managing Application resources (ECS, Lambda, API Gateway, SQS)"
   policy      = jsonencode({
     Version = "2012-10-17"
     Statement = [
+      # ECS Statements
       {
         Sid    = "ECSRead"
         Effect = "Allow"
@@ -392,7 +442,7 @@ resource "aws_iam_policy" "ecs_management" {
         }
       },
       {
-        Sid    = "IAMPassRole"
+        Sid    = "IAMPassRoleECS"
         Effect = "Allow"
         Action = "iam:PassRole"
         Resource = "*"
@@ -401,65 +451,8 @@ resource "aws_iam_policy" "ecs_management" {
             "aws:ResourceTag/Project" = var.project
           }
         }
-      }
-    ]
-  })
-}
-
-resource "aws_iam_policy" "api_gateway_management" {
-  name        = "${var.project}-${var.environment}-api-gateway-management-policy"
-  description = "Least privilege policy for managing API Gateway resources"
-  policy      = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "APIGatewayRead"
-        Effect = "Allow"
-        Action = [
-          "apigateway:GET"
-        ]
-        Resource = "*"
       },
-      {
-        Sid    = "APIGatewayCreateTagged"
-        Effect = "Allow"
-        Action = [
-          "apigateway:POST",
-          "apigateway:TagResource"
-        ]
-        Resource = "*"
-        Condition = {
-          StringEquals = {
-            "aws:RequestTag/Project" = var.project
-          }
-        }
-      },
-      {
-        Sid    = "APIGatewayManageProjectResources"
-        Effect = "Allow"
-        Action = [
-          "apigateway:DELETE",
-          "apigateway:PUT",
-          "apigateway:PATCH",
-          "apigateway:UntagResource"
-        ]
-        Resource = "*"
-        Condition = {
-          StringEquals = {
-            "aws:ResourceTag/Project" = var.project
-          }
-        }
-      }
-    ]
-  })
-}
-
-resource "aws_iam_policy" "lambda_management" {
-  name        = "${var.project}-${var.environment}-lambda-management-policy"
-  description = "Least privilege policy for managing Lambda resources"
-  policy      = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
+      # Lambda Statements
       {
         Sid    = "LambdaRead"
         Effect = "Allow"
@@ -510,42 +503,21 @@ resource "aws_iam_policy" "lambda_management" {
           }
         }
       },
+      # API Gateway Statements
       {
-        Sid    = "IAMPassRoleLambda"
-        Effect = "Allow"
-        Action = "iam:PassRole"
-        Resource = "*"
-        Condition = {
-          StringEquals = {
-            "aws:ResourceTag/Project" = var.project
-          }
-        }
-      }
-    ]
-  })
-}
-
-resource "aws_iam_policy" "nlb_management" {
-  name        = "${var.project}-${var.environment}-nlb-management-policy"
-  description = "Least privilege policy for managing NLB resources"
-  policy      = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "NLBRead"
+        Sid    = "APIGatewayRead"
         Effect = "Allow"
         Action = [
-          "elasticloadbalancing:Describe*"
+          "apigateway:GET"
         ]
         Resource = "*"
       },
       {
-        Sid    = "NLBCreateTagged"
+        Sid    = "APIGatewayCreateTagged"
         Effect = "Allow"
         Action = [
-          "elasticloadbalancing:CreateLoadBalancer",
-          "elasticloadbalancing:CreateTargetGroup",
-          "elasticloadbalancing:AddTags"
+          "apigateway:POST",
+          "apigateway:TagResource"
         ]
         Resource = "*"
         Condition = {
@@ -555,26 +527,13 @@ resource "aws_iam_policy" "nlb_management" {
         }
       },
       {
-        Sid    = "NLBManageProjectResources"
+        Sid    = "APIGatewayManageProjectResources"
         Effect = "Allow"
         Action = [
-          "elasticloadbalancing:DeleteLoadBalancer",
-          "elasticloadbalancing:ModifyLoadBalancerAttributes",
-          "elasticloadbalancing:DeleteTargetGroup",
-          "elasticloadbalancing:ModifyTargetGroupAttributes",
-          "elasticloadbalancing:ModifyTargetGroup",
-          "elasticloadbalancing:CreateListener",
-          "elasticloadbalancing:DeleteListener",
-          "elasticloadbalancing:ModifyListener",
-          "elasticloadbalancing:CreateRule",
-          "elasticloadbalancing:DeleteRule",
-          "elasticloadbalancing:ModifyRule",
-          "elasticloadbalancing:RemoveTags",
-          "elasticloadbalancing:RegisterTargets",
-          "elasticloadbalancing:DeregisterTargets",
-          "elasticloadbalancing:SetIpAddressType",
-          "elasticloadbalancing:SetSubnets",
-          "elasticloadbalancing:SetSecurityGroups"
+          "apigateway:DELETE",
+          "apigateway:PUT",
+          "apigateway:PATCH",
+          "apigateway:UntagResource"
         ]
         Resource = "*"
         Condition = {
@@ -582,17 +541,8 @@ resource "aws_iam_policy" "nlb_management" {
             "aws:ResourceTag/Project" = var.project
           }
         }
-      }
-    ]
-  })
-}
-
-resource "aws_iam_policy" "sqs_management" {
-  name        = "${var.project}-${var.environment}-sqs-management-policy"
-  description = "Least privilege policy for managing SQS resources"
-  policy      = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
+      },
+      # SQS Statements
       {
         Sid    = "SQSRead"
         Effect = "Allow"
@@ -626,59 +576,6 @@ resource "aws_iam_policy" "sqs_management" {
           "sqs:AddPermission",
           "sqs:RemovePermission",
           "sqs:PurgeQueue"
-        ]
-        Resource = "*"
-        Condition = {
-          StringEquals = {
-            "aws:ResourceTag/Project" = var.project
-          }
-        }
-      }
-    ]
-  })
-}
-
-resource "aws_iam_policy" "ssm_management" {
-  name        = "${var.project}-${var.environment}-ssm-management-policy"
-  description = "Least privilege policy for managing SSM Parameter Store resources"
-  policy      = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "SSMRead"
-        Effect = "Allow"
-        Action = [
-          "ssm:DescribeParameters",
-          "ssm:GetParameter",
-          "ssm:GetParameters",
-          "ssm:GetParameterHistory",
-          "ssm:GetParametersByPath"
-        ]
-        Resource = "*"
-      },
-      {
-        Sid    = "SSMCreateTagged"
-        Effect = "Allow"
-        Action = [
-          "ssm:PutParameter",
-          "ssm:AddTagsToResource"
-        ]
-        Resource = "*"
-        Condition = {
-          StringEquals = {
-            "aws:RequestTag/Project" = var.project
-          }
-        }
-      },
-      {
-        Sid    = "SSMManageProjectResources"
-        Effect = "Allow"
-        Action = [
-          "ssm:PutParameter",
-          "ssm:DeleteParameter",
-          "ssm:DeleteParameters",
-          "ssm:RemoveTagsFromResource",
-          "ssm:AddTagsToResource" 
         ]
         Resource = "*"
         Condition = {

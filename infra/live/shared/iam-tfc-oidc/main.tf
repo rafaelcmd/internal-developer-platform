@@ -15,16 +15,9 @@ module "tfc_oidc" {
     "app.terraform.io:sub" = var.tfc_allowed_subs
   }
   policy_arns = concat(var.tfc_policy_arns, [
-    aws_iam_policy.vpc_management.arn,
-    aws_iam_policy.iam_management.arn,
-    aws_iam_policy.ecr_management.arn,
-    aws_iam_policy.cognito_management.arn,
-    aws_iam_policy.ecs_management.arn,
-    aws_iam_policy.api_gateway_management.arn,
-    aws_iam_policy.lambda_management.arn,
-    aws_iam_policy.nlb_management.arn,
-    aws_iam_policy.sqs_management.arn,
-    aws_iam_policy.ssm_management.arn
+    aws_iam_policy.provisioner_api_infra_policy.arn,
+    aws_iam_policy.provisioner_api_security_policy.arn,
+    aws_iam_policy.provisioner_api_app_policy.arn
   ])
   tags        = local.tags
 }
