@@ -448,8 +448,11 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
         Action   = "iam:PassRole"
         Resource = "*"
         Condition = {
-          StringEquals = {
-            "aws:ResourceTag/Project" = var.project
+          StringLike = {
+            "iam:AssociatedResourceARN" = [
+              "arn:aws:ecs:*:*:task-definition/*",
+              "arn:aws:lambda:*:*:function:*"
+            ]
           }
         }
       },
@@ -535,15 +538,28 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
           "apigateway:PUT",
           "apigateway:PATCH",
           "apigateway:UntagResource",
-          "apigateway:POST",
-          "apigateway:TagResource"
+          "apigateway:TagResource",
+          "apigateway:POST"
         ]
         Resource = "*"
         Condition = {
-          StringEquals = {
-            "aws:ResourceTag/Project" = var.project
+          StringLike = {
+            "aws:ResourceTag/Project" = [
+               var.project,
+               "*" 
+            ]
           }
         }
+      },
+      {
+        Sid    = "APIGatewayPostTags"
+        Effect = "Allow"
+        Action = [
+          "apigateway:POST"
+        ]
+        Resource = [
+          "arn:aws:apigateway:*::/tags/*"
+        ]
       },
       # CloudWatch Logs Statements
       {
