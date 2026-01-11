@@ -25,7 +25,10 @@ resource "aws_iam_role" "ecs_task_execution_role" {
     }]
   })
 
-  tags = var.tags
+  tags = merge(var.tags, {
+    Project     = var.project
+    Environment = var.environment
+  })
 }
 
 resource "aws_iam_role_policy_attachment" "ecs_task_execution" {
@@ -47,7 +50,10 @@ resource "aws_iam_role" "ecs_task_role" {
     }]
   })
 
-  tags = var.tags
+  tags = merge(var.tags, {
+    Project     = var.project
+    Environment = var.environment
+  })
 }
 
 resource "aws_iam_policy" "ecs_task_policy" {
@@ -84,7 +90,10 @@ resource "aws_iam_policy" "ecs_task_policy" {
     ]
   })
 
-  tags = var.tags
+  tags = merge(var.tags, {
+    Project     = var.project
+    Environment = var.environment
+  })
 }
 
 resource "aws_iam_role_policy_attachment" "ecs_task_policy_attachment" {

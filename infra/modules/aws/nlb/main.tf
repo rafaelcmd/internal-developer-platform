@@ -5,7 +5,9 @@ resource "aws_lb" "this" {
   subnets            = var.subnets
 
   tags = merge(var.tags, {
-    Name = "${var.project}-${var.environment}-${var.nlb_name}"
+    Name        = "${var.project}-${var.environment}-${var.nlb_name}"
+    Project     = var.project
+    Environment = var.environment
   })
 }
 
@@ -31,7 +33,9 @@ resource "aws_lb_target_group" "this" {
   }
 
   tags = merge(var.tags, {
-    Name = "${var.project}-${var.environment}-${var.target_group_name}"
+    Name        = "${var.project}-${var.environment}-${var.target_group_name}"
+    Project     = var.project
+    Environment = var.environment
   })
 }
 
@@ -46,6 +50,8 @@ resource "aws_lb_listener" "this" {
   }
 
   tags = merge(var.tags, {
-    Name = "${var.project}-${var.environment}-${var.listener_port}"
+    Name        = "${var.project}-${var.environment}-${var.listener_port}"
+    Project     = var.project
+    Environment = var.environment
   })
 }

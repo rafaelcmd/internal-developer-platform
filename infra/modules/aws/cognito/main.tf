@@ -18,6 +18,11 @@ resource "aws_cognito_user_pool" "this" {
     email_subject        = "Account Confirmation"
     email_message        = "Your confirmation code is {####}"
   }
+
+  tags = merge(var.tags, {
+    Project     = var.project
+    Environment = var.environment
+  })
 }
 
 resource "aws_cognito_user_pool_client" "this" {
@@ -33,4 +38,9 @@ resource "aws_ssm_parameter" "cognito_client_id" {
   name  = "/INTERNAL_DEVELOPER_PLATFORM/COGNITO_CLIENT_ID"
   type  = "String"
   value = aws_cognito_user_pool_client.this.id
+
+  tags = merge(var.tags, {
+    Project     = var.project
+    Environment = var.environment
+  })
 }

@@ -30,7 +30,10 @@ resource "aws_lambda_function" "this" {
     aws_cloudwatch_log_group.lambda_logs,
   ]
 
-  tags = var.tags
+  tags = merge(var.tags, {
+    Project     = var.project
+    Environment = var.environment
+  })
 
   lifecycle {
     ignore_changes = [reserved_concurrent_executions]
@@ -43,7 +46,10 @@ resource "aws_iam_role" "lambda_role" {
 
   assume_role_policy = jsonencode(var.assume_role_policy)
 
-  tags = var.tags
+  tags = merge(var.tags, {
+    Project     = var.project
+    Environment = var.environment
+  })
 }
 
 # Basic Lambda execution policy
@@ -87,5 +93,8 @@ resource "aws_cloudwatch_log_group" "lambda_logs" {
   name              = "${var.log_group_name_prefix}/${var.function_name}"
   retention_in_days = var.log_retention_days
 
-  tags = var.tags
+  tags = merge(var.tags, {
+    Project     = var.project
+    Environment = var.environment
+  })
 }

@@ -5,5 +5,8 @@ resource "aws_sqs_queue" "provisioner_queue" {
   message_retention_seconds = var.message_retention_seconds
   receive_wait_time_seconds = var.receive_wait_time_seconds
 
-  tags = var.tags
+  tags = merge(var.tags, {
+    Project     = var.project
+    Environment = var.environment
+  })
 }
