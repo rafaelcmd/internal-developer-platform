@@ -208,13 +208,18 @@ resource "aws_iam_policy" "ecr_management" {
         Resource = "*"
       },
       {
-        Sid    = "CreateRepository"
+        Sid    = "CreateTaggedRepository"
         Effect = "Allow"
         Action = [
           "ecr:CreateRepository",
           "ecr:TagResource"
         ]
         Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/Project" = var.project
+          }
+        }
       },
       {
         Sid    = "ManageProjectRepository"
