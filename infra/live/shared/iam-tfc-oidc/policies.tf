@@ -177,3 +177,62 @@ resource "aws_iam_policy" "iam_management" {
     ]
   })
 }
+
+resource "aws_iam_policy" "ecr_management" {
+  name        = "${var.project}-${var.environment}-ecr-management-policy"
+  description = "Least privilege policy for managing ECR resources"
+  policy      = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "ECRRead"
+        Effect = "Allow"
+        Action = [
+          "ecr:DescribeRepositories",
+          "ecr:ListTagsForResource",
+          "ecr:GetLifecyclePolicy",
+          "ecr:GetRepositoryPolicy",
+          "ecr:GetLifecyclePolicyPreview",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage",
+          "ecr:BatchCheckLayerAvailability"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "CreateTaggedRepository"
+        Effect = "Allow"
+        Action = [
+          "ecr:CreateRepository",
+          "ecr:TagResource"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/Project" = var.project
+          }
+        }
+      },
+      {
+        Sid    = "ManageProjectRepository"
+        Effect = "Allow"
+        Action = [
+          "ecr:DeleteRepository",
+          "ecr:PutLifecyclePolicy",
+          "ecr:DeleteLifecyclePolicy",
+          "ecr:StartLifecyclePolicyPreview",
+          "ecr:SetRepositoryPolicy",
+          "ecr:DeleteRepositoryPolicy",
+          "ecr:PutImageScanningConfiguration",
+          "ecr:UntagResource"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/Project" = var.project
+          }
+        }
+      }
+    ]
+  })
+}
