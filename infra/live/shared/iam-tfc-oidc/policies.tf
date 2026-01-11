@@ -348,7 +348,8 @@ resource "aws_iam_policy" "provisioner_api_security_policy" {
           "ssm:GetParameter",
           "ssm:GetParameters",
           "ssm:GetParameterHistory",
-          "ssm:GetParametersByPath"
+          "ssm:GetParametersByPath",
+          "ssm:ListTagsForResource"
         ]
         Resource = "*"
       },
