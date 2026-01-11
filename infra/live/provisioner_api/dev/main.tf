@@ -108,6 +108,10 @@ module "sqs" {
   ssm_parameter_name = var.ssm_parameter_name
   ssm_parameter_type = var.ssm_parameter_type
 
+  # Common configuration
+  project     = var.project
+  environment = var.environment
+
   # Common tags
   tags = local.tags
 }
@@ -154,7 +158,9 @@ module "datadog_forwarder" {
   }
 
   # Tags
-  tags = local.tags
+  tags        = local.tags
+  project     = var.project
+  environment = var.environment
 
   # Additional IAM policy for Datadog forwarder
   additional_inline_policy = jsonencode({
@@ -249,4 +255,7 @@ module "cognito" {
   source = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/cognito?ref=main"
 
   user_pool_name = "${var.project}-${var.environment}-user-pool"
+  project        = var.project
+  environment    = var.environment
+  tags           = local.tags
 }
