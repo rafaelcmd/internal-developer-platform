@@ -164,6 +164,8 @@ resource "aws_iam_policy" "iam_management" {
           "iam:DeleteRole",
           "iam:AttachRolePolicy",
           "iam:DetachRolePolicy",
+          "iam:PutRolePolicy",
+          "iam:DeleteRolePolicy",
           "iam:UpdateRole",
           "iam:UpdateAssumeRolePolicy",
           "iam:TagRole",
@@ -624,6 +626,112 @@ resource "aws_iam_policy" "sqs_management" {
           "sqs:AddPermission",
           "sqs:RemovePermission",
           "sqs:PurgeQueue"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/Project" = var.project
+          }
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_policy" "ssm_management" {
+  name        = "${var.project}-${var.environment}-ssm-management-policy"
+  description = "Least privilege policy for managing SSM Parameter Store resources"
+  policy      = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "SSMRead"
+        Effect = "Allow"
+        Action = [
+          "ssm:DescribeParameters",
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:GetParameterHistory",
+          "ssm:GetParametersByPath"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "SSMCreateTagged"
+        Effect = "Allow"
+        Action = [
+          "ssm:PutParameter",
+          "ssm:AddTagsToResource"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/Project" = var.project
+          }
+        }
+      },
+      {
+        Sid    = "SSMManageProjectResources"
+        Effect = "Allow"
+        Action = [
+          "ssm:PutParameter",
+          "ssm:DeleteParameter",
+          "ssm:DeleteParameters",
+          "ssm:RemoveTagsFromResource",
+          "ssm:AddTagsToResource" 
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/Project" = var.project
+          }
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_policy" "ssm_management" {
+  name        = "${var.project}-${var.environment}-ssm-management-policy"
+  description = "Least privilege policy for managing SSM Parameter Store resources"
+  policy      = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "SSMRead"
+        Effect = "Allow"
+        Action = [
+          "ssm:DescribeParameters",
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:GetParameterHistory",
+          "ssm:GetParametersByPath"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "SSMCreateTagged"
+        Effect = "Allow"
+        Action = [
+          "ssm:PutParameter",
+          "ssm:AddTagsToResource"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/Project" = var.project
+          }
+        }
+      },
+      {
+        Sid    = "SSMManageProjectResources"
+        Effect = "Allow"
+        Action = [
+          "ssm:PutParameter",
+          "ssm:DeleteParameter",
+          "ssm:DeleteParameters",
+          "ssm:RemoveTagsFromResource",
+          "ssm:AddTagsToResource" 
         ]
         Resource = "*"
         Condition = {

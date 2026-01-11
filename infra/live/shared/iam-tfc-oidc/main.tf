@@ -23,7 +23,8 @@ module "tfc_oidc" {
     aws_iam_policy.api_gateway_management.arn,
     aws_iam_policy.lambda_management.arn,
     aws_iam_policy.nlb_management.arn,
-    aws_iam_policy.sqs_management.arn
+    aws_iam_policy.sqs_management.arn,
+    aws_iam_policy.ssm_management.arn
   ])
   tags        = local.tags
 }
