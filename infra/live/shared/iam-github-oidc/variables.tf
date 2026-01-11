@@ -25,7 +25,7 @@ variable "github_role_name" {
 variable "github_allowed_subs" {
   description = "List of allowed OIDC subject claims for GitHub Actions (e.g., repo:org/repo:ref:branch)"
   type        = list(string)
-  default     = [
+  default = [
     "repo:rafaelcmd/internal-developer-platform:ref:refs/heads/main"
   ]
 }
