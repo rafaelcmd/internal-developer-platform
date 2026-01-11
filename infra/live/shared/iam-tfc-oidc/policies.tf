@@ -534,7 +534,52 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
           "apigateway:DELETE",
           "apigateway:PUT",
           "apigateway:PATCH",
-          "apigateway:UntagResource"
+          "apigateway:UntagResource",
+          "apigateway:POST",
+          "apigateway:TagResource"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/Project" = var.project
+          }
+        }
+      },
+      # CloudWatch Logs Statements
+      {
+        Sid    = "CloudWatchLogsRead"
+        Effect = "Allow"
+        Action = [
+          "logs:Describe*",
+          "logs:Get*",
+          "logs:List*",
+          "logs:FilterLogEvents"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "CloudWatchLogsCreateTagged"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:TagLogGroup"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/Project" = var.project
+          }
+        }
+      },
+      {
+        Sid    = "CloudWatchLogsManageProjectResources"
+        Effect = "Allow"
+        Action = [
+          "logs:DeleteLogGroup",
+          "logs:PutRetentionPolicy",
+          "logs:UntagLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
         ]
         Resource = "*"
         Condition = {
