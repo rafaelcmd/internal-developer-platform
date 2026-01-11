@@ -168,12 +168,6 @@ variable "tags" {
 # Variables for resource tagging and metadata
 # =============================================================================
 
-variable "tags" {
-  description = "A map of tags to add to all resources"
-  type        = map(string)
-  default     = {}
-}
-
 variable "project" {
   description = "Project name"
   type        = string

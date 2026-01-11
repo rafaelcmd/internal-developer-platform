@@ -1,7 +1,7 @@
 resource "aws_iam_policy" "provisioner_api_infra_policy" {
   name        = "${var.project}-${var.environment}-provisioner-api-infra-policy"
   description = "Least privilege policy for managing Infrastructure resources (VPC, NLB, ECR)"
-  policy      = jsonencode({
+  policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       # VPC Statements
@@ -205,7 +205,7 @@ resource "aws_iam_policy" "provisioner_api_infra_policy" {
 resource "aws_iam_policy" "provisioner_api_security_policy" {
   name        = "${var.project}-${var.environment}-provisioner-api-security-policy"
   description = "Least privilege policy for managing Security resources (IAM, Cognito, SSM)"
-  policy      = jsonencode({
+  policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       # IAM Statements
@@ -375,7 +375,7 @@ resource "aws_iam_policy" "provisioner_api_security_policy" {
           "ssm:DeleteParameter",
           "ssm:DeleteParameters",
           "ssm:RemoveTagsFromResource",
-          "ssm:AddTagsToResource" 
+          "ssm:AddTagsToResource"
         ]
         Resource = "*"
         Condition = {
@@ -391,7 +391,7 @@ resource "aws_iam_policy" "provisioner_api_security_policy" {
 resource "aws_iam_policy" "provisioner_api_app_policy" {
   name        = "${var.project}-${var.environment}-provisioner-api-app-policy"
   description = "Least privilege policy for managing Application resources (ECS, Lambda, API Gateway, SQS)"
-  policy      = jsonencode({
+  policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       # ECS Statements
@@ -413,7 +413,7 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
           "ecs:CreateService",
           "ecs:RunTask",
           "ecs:StartTask",
-          "ecs:RegisterTaskDefinition", 
+          "ecs:RegisterTaskDefinition",
           "ecs:TagResource"
         ]
         Resource = "*"
@@ -443,9 +443,9 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
         }
       },
       {
-        Sid    = "IAMPassRoleECS"
-        Effect = "Allow"
-        Action = "iam:PassRole"
+        Sid      = "IAMPassRoleECS"
+        Effect   = "Allow"
+        Action   = "iam:PassRole"
         Resource = "*"
         Condition = {
           StringEquals = {
@@ -470,7 +470,7 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
           "lambda:CreateFunction",
           "lambda:TagResource",
           "lambda:PublishLayerVersion",
-          "lambda:CreateEventSourceMapping" 
+          "lambda:CreateEventSourceMapping"
         ]
         Resource = "*"
         Condition = {

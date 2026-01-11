@@ -19,6 +19,6 @@ module "tfc_oidc" {
     aws_iam_policy.provisioner_api_security_policy.arn,
     aws_iam_policy.provisioner_api_app_policy.arn
   ])
-  tags        = local.tags
+  tags = local.tags
 }
 
