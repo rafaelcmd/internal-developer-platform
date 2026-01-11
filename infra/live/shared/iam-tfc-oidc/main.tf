@@ -17,7 +17,13 @@ module "tfc_oidc" {
   policy_arns = concat(var.tfc_policy_arns, [
     aws_iam_policy.vpc_management.arn,
     aws_iam_policy.iam_management.arn,
-    aws_iam_policy.ecr_management.arn
+    aws_iam_policy.ecr_management.arn,
+    aws_iam_policy.cognito_management.arn,
+    aws_iam_policy.ecs_management.arn,
+    aws_iam_policy.api_gateway_management.arn,
+    aws_iam_policy.lambda_management.arn,
+    aws_iam_policy.nlb_management.arn,
+    aws_iam_policy.sqs_management.arn
   ])
   tags        = local.tags
 }
