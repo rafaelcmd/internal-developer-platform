@@ -21,3 +21,12 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+variable "environment" {
+  description = "Environment name (e.g., prod, staging, dev) used for resource naming and tagging"
+  type        = string
+}
+
+variable "project" {
+  description = "Project name used for tagging"
+  type        = string
+}
