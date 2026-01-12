@@ -75,7 +75,6 @@ resource "aws_iam_policy" "provisioner_api_infra_policy" {
           "ec2:AssociateRouteTable",
           "ec2:DisassociateRouteTable",
           "ec2:ReleaseAddress",
-          "ec2:DisassociateAddress",
           "ec2:DeleteNatGateway",
           "ec2:DeleteSecurityGroup",
           "ec2:AuthorizeSecurityGroupIngress",
@@ -94,6 +93,14 @@ resource "aws_iam_policy" "provisioner_api_infra_policy" {
             "aws:ResourceTag/Project" = var.project
           }
         }
+      },
+      {
+        Sid    = "EC2ManageAddresses"
+        Effect = "Allow"
+        Action = [
+          "ec2:DisassociateAddress"
+        ]
+        Resource = "*"
       },
       # NLB Statements
       {
