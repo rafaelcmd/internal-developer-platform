@@ -521,7 +521,8 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
         Effect = "Allow"
         Action = [
           "apigateway:POST",
-          "apigateway:TagResource"
+          "apigateway:TagResource",
+          "apigateway:PATCH"
         ]
         Resource = "*"
         Condition = {
@@ -552,7 +553,6 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
         }
       },
       {
-        # Allow POST/DELETE on API Gateway Tags specifically
         Sid    = "APIGatewayManageTags"
         Effect = "Allow"
         Action = [
