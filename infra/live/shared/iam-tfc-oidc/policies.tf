@@ -578,6 +578,16 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
           "arn:aws:apigateway:*::/tags/*"
         ]
       },
+      {
+        Sid    = "APIGatewayManageDeployments"
+        Effect = "Allow"
+        Action = [
+          "apigateway:POST"
+        ]
+        Resource = [
+          "arn:aws:apigateway:*::/apis/*/deployments"
+        ]
+      },
       # CloudWatch Logs Statements
       {
         Sid    = "CloudWatchLogsRead"
