@@ -552,10 +552,12 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
         }
       },
       {
-        Sid    = "APIGatewayPostTags"
+        # Allow POST/DELETE on API Gateway Tags specifically
+        Sid    = "APIGatewayManageTags"
         Effect = "Allow"
         Action = [
-          "apigateway:POST"
+          "apigateway:POST",
+          "apigateway:DELETE"
         ]
         Resource = [
           "arn:aws:apigateway:*::/tags/*"
@@ -595,7 +597,8 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
           "logs:PutRetentionPolicy",
           "logs:UntagLogGroup",
           "logs:CreateLogStream",
-          "logs:PutLogEvents"
+          "logs:PutLogEvents",
+          "logs:PutSubscriptionFilter"
         ]
         Resource = "*"
         Condition = {
