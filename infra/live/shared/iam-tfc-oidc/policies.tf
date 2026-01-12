@@ -432,7 +432,6 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
           "ecs:DeleteService",
           "ecs:UpdateService",
           "ecs:StopTask",
-          "ecs:DeregisterTaskDefinition",
           "ecs:UntagResource"
         ]
         Resource = "*"
@@ -441,6 +440,15 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
             "aws:ResourceTag/Project" = var.project
           }
         }
+      },
+      {
+        Sid    = "ECSManageTaskDefinitions"
+        Effect = "Allow"
+        Action = [
+          "ecs:RegisterTaskDefinition",
+          "ecs:DeregisterTaskDefinition"
+        ]
+        Resource = "*"
       },
       {
         Sid      = "IAMPassRoleECS"
@@ -623,7 +631,8 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
           "logs:UntagLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents",
-          "logs:PutSubscriptionFilter"
+          "logs:PutSubscriptionFilter",
+          "logs:DeleteSubscriptionFilter"
         ]
         Resource = "*"
         Condition = {
