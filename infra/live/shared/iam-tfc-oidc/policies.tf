@@ -517,6 +517,21 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
         Resource = "*"
       },
       {
+        Sid    = "APIGatewayManageUntagged"
+        Effect = "Allow"
+        Action = [
+          "apigateway:PATCH",
+          "apigateway:PUT",
+          "apigateway:DELETE"
+        ]
+        Resource = "*"
+        Condition = {
+          Null = {
+            "aws:ResourceTag/Project" = "true"
+          }
+        }
+      },
+      {
         Sid    = "APIGatewayCreateTagged"
         Effect = "Allow"
         Action = [
