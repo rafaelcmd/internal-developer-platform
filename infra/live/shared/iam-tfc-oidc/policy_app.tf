@@ -319,6 +319,17 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
         Resource = "*"
       },
       {
+        Sid    = "WAFv2ManagedRules"
+        Effect = "Allow"
+        Action = [
+          "wafv2:CreateWebACL",
+          "wafv2:UpdateWebACL"
+        ]
+        Resource = [
+          "arn:aws:wafv2:*:*:regional/managedruleset/*/*"
+        ]
+      },
+      {
         Sid    = "WAFv2CreateTagged"
         Effect = "Allow"
         Action = [
