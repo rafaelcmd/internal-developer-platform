@@ -22,7 +22,7 @@ resource "aws_ecs_task_definition" "api" {
       image     = var.app_image_uri
       essential = true
       healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://127.0.0.1:${var.container_port}/${var.environment}/health || exit 1"]
+        command     = ["CMD-SHELL", "curl -f http://127.0.0.1:${var.container_port}/${var.api_version}/health || exit 1"]
         interval    = 10
         retries     = 3
         startPeriod = 30

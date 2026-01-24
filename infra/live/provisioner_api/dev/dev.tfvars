@@ -3,6 +3,7 @@ environment  = "dev"
 aws_region   = "us-east-1"
 service_name = "resource-provisioner-api"
 app_version  = "1.0.0"
+api_version  = "v1"
 
 cluster_name                       = "internal-developer-platform-cluster"
 task_family                        = "resource-provisioner-api-task"
