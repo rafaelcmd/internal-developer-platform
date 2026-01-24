@@ -243,7 +243,8 @@ module "api_gateway" {
   cors_max_age           = var.cors_max_age
 
   # WAF configuration
-  waf_web_acl_arn = module.waf.web_acl_arn
+  enable_waf      = var.enable_waf
+  waf_web_acl_arn = var.enable_waf ? module.waf.web_acl_arn : null
 
   # Logging configuration
   log_retention_days = var.api_gateway_log_retention_days
