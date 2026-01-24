@@ -169,7 +169,7 @@ resource "aws_cloudwatch_log_group" "api_gateway_logs" {
 # =============================================================================
 
 resource "aws_wafv2_web_acl_association" "api_gateway" {
-  count = var.waf_web_acl_arn != null ? 1 : 0
+  count = var.enable_waf ? 1 : 0
 
   resource_arn = aws_apigatewayv2_stage.this.arn
   web_acl_arn  = var.waf_web_acl_arn

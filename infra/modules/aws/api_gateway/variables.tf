@@ -214,8 +214,14 @@ variable "enable_deprecation_headers" {
 # Variables for AWS WAF integration
 # =============================================================================
 
+variable "enable_waf" {
+  description = "Whether to enable WAF protection for the API Gateway"
+  type        = bool
+  default     = false
+}
+
 variable "waf_web_acl_arn" {
-  description = "ARN of the WAF Web ACL to associate with the API Gateway stage. Set to null to disable WAF."
+  description = "ARN of the WAF Web ACL to associate with the API Gateway stage. Required if enable_waf is true."
   type        = string
   default     = null
 }

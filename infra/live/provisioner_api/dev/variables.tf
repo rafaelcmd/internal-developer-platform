@@ -326,6 +326,12 @@ variable "api_gateway_xray_tracing_enabled" {
 # Variables for AWS WAF Web ACL configuration
 # =============================================================================
 
+variable "enable_waf" {
+  description = "Whether to enable WAF protection for the API Gateway"
+  type        = bool
+  default     = true
+}
+
 variable "waf_rate_limit_requests" {
   description = "Maximum number of requests per 5-minute period per IP"
   type        = number

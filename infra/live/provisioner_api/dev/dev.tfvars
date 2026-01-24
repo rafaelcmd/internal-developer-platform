@@ -56,6 +56,7 @@ api_gateway_data_trace_enabled   = false
 api_gateway_xray_tracing_enabled = true
 
 # WAF Configuration
+enable_waf                = true
 waf_rate_limit_requests   = 2000
 waf_max_request_body_size = 10240
 waf_common_rules_excluded = []
