@@ -57,3 +57,23 @@ output "stage_arn" {
   description = "ARN of the API Gateway stage"
   value       = aws_apigatewayv2_stage.this.arn
 }
+
+# =============================================================================
+# API VERSION OUTPUTS
+# Outputs for API versioning information
+# =============================================================================
+
+output "api_version" {
+  description = "Current API version"
+  value       = var.api_version
+}
+
+output "api_base_path" {
+  description = "Base path for the current API version (e.g., /v1)"
+  value       = "/${var.api_version}"
+}
+
+output "deprecated_versions" {
+  description = "List of deprecated API versions with their sunset dates"
+  value       = var.deprecated_versions
+}

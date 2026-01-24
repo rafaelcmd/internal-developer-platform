@@ -5,11 +5,18 @@
 
 locals {
   openapi_spec_path = "${path.module}/../../../../api/docs/swagger.yaml"
+
+  # API Versioning Configuration
+  # This API uses path-based versioning (e.g., /v1/resources)
+  # - Current version is defined in var.api_version
+  # - Deprecated versions are tracked in var.deprecated_versions
+  # - Deprecation headers (RFC 8594) are enabled via var.enable_deprecation_headers
+  api_version_path_prefix = "/${var.api_version}"
 }
 
 resource "aws_apigatewayv2_api" "this" {
   name          = var.api_name
-  description   = var.api_description
+  description   = "${var.api_description} (${var.api_version})"
   protocol_type = "HTTP"
 
   body = templatefile(local.openapi_spec_path, {
@@ -17,6 +24,7 @@ resource "aws_apigatewayv2_api" "this" {
     vpc_link_id      = aws_apigatewayv2_vpc_link.this.id
     jwt_issuer       = var.jwt_issuer
     jwt_audience     = jsonencode(var.jwt_audience)
+    api_version      = var.api_version
   })
 
   fail_on_warnings = true
@@ -34,6 +42,7 @@ resource "aws_apigatewayv2_api" "this" {
     Name        = var.api_name
     Project     = var.project
     Environment = var.environment
+    ApiVersion  = var.api_version
   })
 }
 
@@ -46,6 +55,7 @@ resource "aws_apigatewayv2_deployment" "this" {
       vpc_link_id      = aws_apigatewayv2_vpc_link.this.id
       jwt_issuer       = var.jwt_issuer
       jwt_audience     = jsonencode(var.jwt_audience)
+      api_version      = var.api_version
     }))
   }
 
@@ -79,6 +89,7 @@ resource "aws_security_group" "vpc_link" {
     Name        = "${var.vpc_link_name}-sg"
     Project     = var.project
     Environment = var.environment
+    ApiVersion  = var.api_version
   })
 }
 
@@ -91,6 +102,7 @@ resource "aws_apigatewayv2_vpc_link" "this" {
     Name        = var.vpc_link_name
     Project     = var.project
     Environment = var.environment
+    ApiVersion  = var.api_version
   })
 }
 
@@ -130,6 +142,7 @@ resource "aws_apigatewayv2_stage" "this" {
     Name        = "${var.api_name}-${var.stage_name}"
     Project     = var.project
     Environment = var.environment
+    ApiVersion  = var.api_version
   })
 }
 
@@ -146,5 +159,6 @@ resource "aws_cloudwatch_log_group" "api_gateway_logs" {
     Name        = "/aws/apigateway/${var.api_name}"
     Project     = var.project
     Environment = var.environment
+    ApiVersion  = var.api_version
   })
 }

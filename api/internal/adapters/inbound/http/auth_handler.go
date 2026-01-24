@@ -31,7 +31,7 @@ func NewAuthHandler(authService inbound.AuthService, logger *logrus.Entry) *Auth
 // @Success 201 {string} string "User created successfully"
 // @Failure 400 {string} string "Invalid request"
 // @Failure 500 {string} string "Internal server error"
-// @Router /auth/signup [post]
+// @Router /v1/auth/signup [post]
 func (h *AuthHandler) SignUp(w http.ResponseWriter, r *http.Request) {
 	var req model.SignUpRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -62,7 +62,7 @@ func (h *AuthHandler) SignUp(w http.ResponseWriter, r *http.Request) {
 // @Failure 400 {string} string "Invalid request"
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 500 {string} string "Internal server error"
-// @Router /auth/signin [post]
+// @Router /v1/auth/signin [post]
 func (h *AuthHandler) SignIn(w http.ResponseWriter, r *http.Request) {
 	var req model.SignInRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -93,7 +93,7 @@ func (h *AuthHandler) SignIn(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {string} string "User confirmed successfully"
 // @Failure 400 {string} string "Invalid request"
 // @Failure 500 {string} string "Internal server error"
-// @Router /auth/confirm [post]
+// @Router /v1/auth/confirm [post]
 func (h *AuthHandler) ConfirmSignUp(w http.ResponseWriter, r *http.Request) {
 	var req model.ConfirmSignUpRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

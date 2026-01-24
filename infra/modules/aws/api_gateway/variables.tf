@@ -182,3 +182,29 @@ variable "jwt_audience" {
   description = "JWT audience values (e.g., Cognito app client IDs)"
   type        = list(string)
 }
+
+# =============================================================================
+# API VERSIONING CONFIGURATION
+# Variables for API version management and deprecation headers
+# =============================================================================
+
+variable "api_version" {
+  description = "Current API version (e.g., v1, v2). Used for path-based versioning."
+  type        = string
+  default     = "v1"
+}
+
+variable "deprecated_versions" {
+  description = "List of deprecated API versions that are still supported but scheduled for removal"
+  type = list(object({
+    version     = string
+    sunset_date = string # ISO 8601 date format (e.g., 2026-06-01)
+  }))
+  default = []
+}
+
+variable "enable_deprecation_headers" {
+  description = "Whether to enable deprecation headers (Deprecation, Sunset) for deprecated endpoints"
+  type        = bool
+  default     = true
+}
