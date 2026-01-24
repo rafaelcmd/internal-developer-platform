@@ -235,3 +235,14 @@ variable "tags" {
   description = "Common tags to apply to all resources"
   type        = map(string)
 }
+
+# =============================================================================
+# API VERSIONING CONFIGURATION
+# Variables for API version management
+# =============================================================================
+
+variable "api_version" {
+  description = "API version for health check path (e.g., v1, v2)"
+  type        = string
+  default     = "v1"
+}

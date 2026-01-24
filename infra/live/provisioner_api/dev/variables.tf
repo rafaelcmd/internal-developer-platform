@@ -29,6 +29,12 @@ variable "app_version" {
   type        = string
 }
 
+variable "api_version" {
+  description = "API version for path-based versioning (e.g., v1, v2)"
+  type        = string
+  default     = "v1"
+}
+
 # =============================================================================
 # ECS CONFIGURATION
 # Variables for ECS cluster, service, and task configuration

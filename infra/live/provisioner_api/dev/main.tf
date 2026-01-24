@@ -16,6 +16,7 @@ module "ecs" {
   project         = var.project
   service_name    = var.service_name
   app_version     = var.app_version
+  api_version     = var.api_version
 
   # ECS-specific configuration
   cluster_name       = var.cluster_name
