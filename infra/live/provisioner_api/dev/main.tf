@@ -242,6 +242,9 @@ module "api_gateway" {
   cors_expose_headers    = var.cors_expose_headers
   cors_max_age           = var.cors_max_age
 
+  # WAF configuration
+  waf_web_acl_arn = module.waf.web_acl_arn
+
   # Logging configuration
   log_retention_days = var.api_gateway_log_retention_days
 
@@ -250,6 +253,36 @@ module "api_gateway" {
   environment = var.environment
 
   tags = local.tags
+}
+
+# =============================================================================
+# WAF MODULE
+# AWS WAF Web ACL for API Gateway edge protection
+# =============================================================================
+
+module "waf" {
+  source = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/waf?ref=main"
+
+  web_acl_name        = "${var.project}-${var.environment}-api-waf"
+  web_acl_description = "WAF Web ACL for ${var.project} API Gateway"
+
+  # Rate limiting
+  rate_limit_requests = var.waf_rate_limit_requests
+
+  # Request size validation
+  max_request_body_size = var.waf_max_request_body_size
+
+  # Rule exclusions (if any rules cause false positives)
+  common_rules_excluded = var.waf_common_rules_excluded
+
+  # Logging
+  enable_logging     = var.waf_enable_logging
+  log_retention_days = var.waf_log_retention_days
+
+  # Common configuration
+  project     = var.project
+  environment = var.environment
+  tags        = local.tags
 }
 
 module "cognito" {

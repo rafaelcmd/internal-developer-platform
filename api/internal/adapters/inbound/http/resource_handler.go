@@ -1,7 +1,6 @@
 package http
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/rafaelcmd/internal-developer-platform/api/internal/domain/model"
@@ -23,24 +22,34 @@ func NewResourceHandler(resourceService inbound.ResourceService) *ResourceHandle
 // @Description Submits a new resource provisioning request to be processed asynchronously. The request is validated and queued for processing via SQS.
 // @Tags resources
 // @Accept json
-// @Produce plain
+// @Produce json
 // @Param resource body model.Resource true "Resource provisioning request"
-// @Success 202 {string} string "Request accepted for processing"
-// @Failure 400 {string} string "Invalid request body"
-// @Failure 500 {string} string "Failed to process request"
+// @Success 202 {object} map[string]string "Request accepted for processing"
+// @Failure 400 {object} ErrorResponse "Validation error"
+// @Failure 500 {object} ErrorResponse "Failed to process request"
 // @Router /v1/provision [post]
 func (h *ResourceHandler) Provision(w http.ResponseWriter, r *http.Request) {
-	var resource model.Resource
-	if err := json.NewDecoder(r.Body).Decode(&resource); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+	requestID := getRequestID(r)
+
+	// Decode and validate request body
+	resource := DecodeAndValidate[model.Resource](w, r, requestID)
+	if resource == nil {
+		return // Response already sent by DecodeAndValidate
 	}
 
-	err := h.resourceService.SendProvisioningRequest(r.Context(), resource)
+	err := h.resourceService.SendProvisioningRequest(r.Context(), *resource)
 	if err != nil {
-		http.Error(w, "Failed to process request", http.StatusInternalServerError)
+		RespondWithError(w, http.StatusInternalServerError, ErrorResponse{
+			Code:      ErrCodeInternalError,
+			Message:   "Failed to process provisioning request",
+			RequestID: requestID,
+		})
 		return
 	}
 
-	w.WriteHeader(http.StatusAccepted)
+	RespondWithJSON(w, http.StatusAccepted, map[string]string{
+		"message":   "Request accepted for processing",
+		"requestId": requestID,
+		"status":    "ACCEPTED",
+	})
 }

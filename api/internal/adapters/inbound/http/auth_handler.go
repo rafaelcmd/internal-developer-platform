@@ -1,7 +1,6 @@
 package http
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/rafaelcmd/internal-developer-platform/api/internal/domain/model"
@@ -21,6 +20,17 @@ func NewAuthHandler(authService inbound.AuthService, logger *logrus.Entry) *Auth
 	}
 }
 
+// getRequestID extracts request ID from headers or generates one
+func getRequestID(r *http.Request) string {
+	if id := r.Header.Get("X-Request-Id"); id != "" {
+		return id
+	}
+	if id := r.Header.Get("X-Amzn-Trace-Id"); id != "" {
+		return id
+	}
+	return ""
+}
+
 // SignUp godoc
 // @Summary Sign up a new user
 // @Description Registers a new user with email and password
@@ -28,27 +38,31 @@ func NewAuthHandler(authService inbound.AuthService, logger *logrus.Entry) *Auth
 // @Accept json
 // @Produce json
 // @Param request body model.SignUpRequest true "Sign up request"
-// @Success 201 {string} string "User created successfully"
-// @Failure 400 {string} string "Invalid request"
-// @Failure 500 {string} string "Internal server error"
+// @Success 201 {object} map[string]string "User created successfully"
+// @Failure 400 {object} ErrorResponse "Validation error"
+// @Failure 500 {object} ErrorResponse "Internal server error"
 // @Router /v1/auth/signup [post]
 func (h *AuthHandler) SignUp(w http.ResponseWriter, r *http.Request) {
-	var req model.SignUpRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.logger.WithError(err).Warn("auth.signup: failed to decode request")
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+	requestID := getRequestID(r)
+
+	// Decode and validate request body
+	req := DecodeAndValidate[model.SignUpRequest](w, r, requestID)
+	if req == nil {
+		return // Response already sent by DecodeAndValidate
 	}
 
-	if err := h.authService.SignUp(r.Context(), req); err != nil {
+	if err := h.authService.SignUp(r.Context(), *req); err != nil {
 		h.logger.WithError(err).Error("auth.signup: service error")
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		RespondWithError(w, http.StatusInternalServerError, ErrorResponse{
+			Code:      ErrCodeInternalError,
+			Message:   "Failed to create user",
+			RequestID: requestID,
+		})
 		return
 	}
 
 	h.logger.WithField("email", req.Email).Info("auth.signup: user created")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"message": "User created successfully"})
+	RespondWithJSON(w, http.StatusCreated, map[string]string{"message": "User created successfully"})
 }
 
 // SignIn godoc
@@ -59,28 +73,32 @@ func (h *AuthHandler) SignUp(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Param request body model.SignInRequest true "Sign in request"
 // @Success 200 {object} model.AuthResponse
-// @Failure 400 {string} string "Invalid request"
-// @Failure 401 {string} string "Unauthorized"
-// @Failure 500 {string} string "Internal server error"
+// @Failure 400 {object} ErrorResponse "Validation error"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 500 {object} ErrorResponse "Internal server error"
 // @Router /v1/auth/signin [post]
 func (h *AuthHandler) SignIn(w http.ResponseWriter, r *http.Request) {
-	var req model.SignInRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.logger.WithError(err).Warn("auth.signin: failed to decode request")
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+	requestID := getRequestID(r)
+
+	// Decode and validate request body
+	req := DecodeAndValidate[model.SignInRequest](w, r, requestID)
+	if req == nil {
+		return // Response already sent by DecodeAndValidate
 	}
 
-	resp, err := h.authService.SignIn(r.Context(), req)
+	resp, err := h.authService.SignIn(r.Context(), *req)
 	if err != nil {
 		h.logger.WithError(err).Warn("auth.signin: unauthorized")
-		http.Error(w, err.Error(), http.StatusUnauthorized)
+		RespondWithError(w, http.StatusUnauthorized, ErrorResponse{
+			Code:      ErrCodeUnauthorized,
+			Message:   "Invalid credentials",
+			RequestID: requestID,
+		})
 		return
 	}
 
 	h.logger.WithField("email", req.Email).Info("auth.signin: user authenticated")
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	RespondWithJSON(w, http.StatusOK, resp)
 }
 
 // ConfirmSignUp godoc
@@ -90,25 +108,29 @@ func (h *AuthHandler) SignIn(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param request body model.ConfirmSignUpRequest true "Confirm sign up request"
-// @Success 200 {string} string "User confirmed successfully"
-// @Failure 400 {string} string "Invalid request"
-// @Failure 500 {string} string "Internal server error"
+// @Success 200 {object} map[string]string "User confirmed successfully"
+// @Failure 400 {object} ErrorResponse "Validation error"
+// @Failure 500 {object} ErrorResponse "Internal server error"
 // @Router /v1/auth/confirm [post]
 func (h *AuthHandler) ConfirmSignUp(w http.ResponseWriter, r *http.Request) {
-	var req model.ConfirmSignUpRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.logger.WithError(err).Warn("auth.confirm: failed to decode request")
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+	requestID := getRequestID(r)
+
+	// Decode and validate request body
+	req := DecodeAndValidate[model.ConfirmSignUpRequest](w, r, requestID)
+	if req == nil {
+		return // Response already sent by DecodeAndValidate
 	}
 
-	if err := h.authService.ConfirmSignUp(r.Context(), req); err != nil {
+	if err := h.authService.ConfirmSignUp(r.Context(), *req); err != nil {
 		h.logger.WithError(err).Error("auth.confirm: service error")
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		RespondWithError(w, http.StatusInternalServerError, ErrorResponse{
+			Code:      ErrCodeInternalError,
+			Message:   "Failed to confirm user",
+			RequestID: requestID,
+		})
 		return
 	}
 
 	h.logger.WithField("email", req.Email).Info("auth.confirm: user confirmed")
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"message": "User confirmed successfully"})
+	RespondWithJSON(w, http.StatusOK, map[string]string{"message": "User confirmed successfully"})
 }

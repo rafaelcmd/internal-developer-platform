@@ -322,6 +322,41 @@ variable "api_gateway_xray_tracing_enabled" {
 }
 
 # =============================================================================
+# WAF CONFIGURATION
+# Variables for AWS WAF Web ACL configuration
+# =============================================================================
+
+variable "waf_rate_limit_requests" {
+  description = "Maximum number of requests per 5-minute period per IP"
+  type        = number
+  default     = 2000
+}
+
+variable "waf_max_request_body_size" {
+  description = "Maximum request body size in bytes"
+  type        = number
+  default     = 10240
+}
+
+variable "waf_common_rules_excluded" {
+  description = "List of AWS Common Rule Set rules to exclude"
+  type        = list(string)
+  default     = []
+}
+
+variable "waf_enable_logging" {
+  description = "Enable CloudWatch logging for WAF"
+  type        = bool
+  default     = true
+}
+
+variable "waf_log_retention_days" {
+  description = "Number of days to retain WAF logs"
+  type        = number
+  default     = 7
+}
+
+# =============================================================================
 # LAMBDA CONFIGURATION
 # Variables for Lambda function (Datadog forwarder) configuration
 # =============================================================================
