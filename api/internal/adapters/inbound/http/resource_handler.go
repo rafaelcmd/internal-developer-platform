@@ -28,7 +28,7 @@ func NewResourceHandler(resourceService inbound.ResourceService) *ResourceHandle
 // @Success 202 {string} string "Request accepted for processing"
 // @Failure 400 {string} string "Invalid request body"
 // @Failure 500 {string} string "Failed to process request"
-// @Router /provision [post]
+// @Router /v1/provision [post]
 func (h *ResourceHandler) Provision(w http.ResponseWriter, r *http.Request) {
 	var resource model.Resource
 	if err := json.NewDecoder(r.Body).Decode(&resource); err != nil {

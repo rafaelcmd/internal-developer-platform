@@ -14,7 +14,7 @@ func NewHealthHandler() *HealthHandler {
 // @Tags health
 // @Produce plain
 // @Success 200 {string} string "Service is healthy and operational"
-// @Router /health [get]
+// @Router /v1/health [get]
 func (h *HealthHandler) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK"))

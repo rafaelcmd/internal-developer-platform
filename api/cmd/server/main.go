@@ -28,12 +28,16 @@ import (
 // @title Internal Developer Platform - Provisioner API
 // @version 1.0.0
 // @description The Internal Developer Platform Provisioner API provides endpoints for managing cloud resource provisioning requests. This API accepts provisioning requests and queues them for asynchronous processing via SQS.
+// @description.markdown
+// @description ## API Versioning
+// @description This API uses path-based versioning (e.g., /v1/resources). Breaking changes will result in a new version.
+// @description Deprecated endpoints will include `Deprecation` and `Sunset` headers in responses.
 // @termsOfService https://internal-developer-platform.com/terms/
 // @contact.name Internal Developer Platform Team
 // @contact.email team@internal-developer-platform.com
 // @license.name MIT
 // @license.url https://opensource.org/licenses/MIT
-// @BasePath /dev/
+// @BasePath /
 // @schemes http https
 // @tag.name resources
 // @tag.description Resource provisioning operations
