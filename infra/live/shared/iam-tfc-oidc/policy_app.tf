@@ -306,6 +306,63 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
             "aws:ResourceTag/Project" = var.project
           }
         }
+      },
+      # WAFv2 Statements
+      {
+        Sid    = "WAFv2Read"
+        Effect = "Allow"
+        Action = [
+          "wafv2:List*",
+          "wafv2:Get*",
+          "wafv2:Describe*"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "WAFv2CreateTagged"
+        Effect = "Allow"
+        Action = [
+          "wafv2:CreateWebACL",
+          "wafv2:TagResource"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/Project" = var.project
+          }
+        }
+      },
+      {
+        Sid    = "WAFv2ManageProjectResources"
+        Effect = "Allow"
+        Action = [
+          "wafv2:DeleteWebACL",
+          "wafv2:UpdateWebACL",
+          "wafv2:UntagResource",
+          "wafv2:AssociateWebACL",
+          "wafv2:DisassociateWebACL",
+          "wafv2:PutLoggingConfiguration",
+          "wafv2:DeleteLoggingConfiguration"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/Project" = var.project
+          }
+        }
+      },
+      {
+        Sid    = "WAFv2AssociateWebACL"
+        Effect = "Allow"
+        Action = [
+          "wafv2:AssociateWebACL",
+          "wafv2:DisassociateWebACL"
+        ]
+        Resource = [
+          "arn:aws:wafv2:*:*:regional/webacl/*/*",
+          "arn:aws:apigateway:*::/apis/*",
+          "arn:aws:apigateway:*::/apis/*/stages/*"
+        ]
       }
     ]
   })
