@@ -208,3 +208,14 @@ variable "enable_deprecation_headers" {
   type        = bool
   default     = true
 }
+
+# =============================================================================
+# WAF CONFIGURATION
+# Variables for AWS WAF integration
+# =============================================================================
+
+variable "waf_web_acl_arn" {
+  description = "ARN of the WAF Web ACL to associate with the API Gateway stage. Set to null to disable WAF."
+  type        = string
+  default     = null
+}

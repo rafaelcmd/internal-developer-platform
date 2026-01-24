@@ -346,23 +346,113 @@ components:
           maxLength: 100
     SignInRequest:
       type: object
+      description: User authentication request
+      required:
+        - email
+        - password
       properties:
         email:
           type: string
+          description: User's email address
+          format: email
+          maxLength: 254
+          example: user@example.com
         password:
           type: string
+          description: User's password
+          minLength: 1
+          maxLength: 128
+          example: SecureP@ss123
     SignUpRequest:
       type: object
+      description: User registration request
+      required:
+        - email
+        - password
       properties:
         email:
           type: string
+          description: User's email address
+          format: email
+          maxLength: 254
+          example: user@example.com
         password:
           type: string
+          description: User's password (min 8 chars)
+          minLength: 8
+          maxLength: 128
+          example: SecureP@ss123
 
     ConfirmSignUpRequest:
       type: object
+      description: Sign-up confirmation request with verification code
+      required:
+        - email
+        - confirmation_code
       properties:
         email:
           type: string
+          description: User's email address
+          format: email
+          maxLength: 254
+          example: user@example.com
         confirmation_code:
           type: string
+          description: Confirmation code sent to user's email
+          pattern: "^[a-zA-Z0-9]{6,10}$"
+          minLength: 6
+          maxLength: 10
+          example: "123456"
+
+    # ==========================================================================
+    # ERROR RESPONSE SCHEMAS
+    # Standardized error response structure (DVA-C02 best practice)
+    # ==========================================================================
+    ErrorResponse:
+      type: object
+      description: Standardized API error response
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Error code for programmatic handling
+          enum:
+            - VALIDATION_ERROR
+            - INVALID_JSON
+            - MISSING_HEADER
+            - INTERNAL_ERROR
+            - UNAUTHORIZED
+            - NOT_FOUND
+            - RATE_LIMITED
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          description: Human-readable error message
+          example: Request validation failed
+        requestId:
+          type: string
+          description: Request ID for tracing
+          example: abc123-def456
+        details:
+          type: array
+          description: Detailed validation errors
+          items:
+            $ref: '#/components/schemas/ValidationError'
+
+    ValidationError:
+      type: object
+      description: Individual field validation error
+      properties:
+        field:
+          type: string
+          description: Field name that failed validation
+          example: email
+        message:
+          type: string
+          description: Validation error message
+          example: email must be a valid email address
+        value:
+          description: The invalid value that was provided
+          example: invalid-email

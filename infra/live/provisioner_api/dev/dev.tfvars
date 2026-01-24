@@ -55,6 +55,13 @@ api_gateway_metrics_enabled      = true
 api_gateway_data_trace_enabled   = false
 api_gateway_xray_tracing_enabled = true
 
+# WAF Configuration
+waf_rate_limit_requests   = 2000
+waf_max_request_body_size = 10240
+waf_common_rules_excluded = []
+waf_enable_logging        = true
+waf_log_retention_days    = 7
+
 lambda_function_name              = "provisioner-api-datadog-forwarder"
 lambda_runtime                    = "python3.9"
 lambda_timeout                    = 120
