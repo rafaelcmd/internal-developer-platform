@@ -82,12 +82,14 @@ paths:
       tags:
       - auth
       x-amazon-apigateway-integration:
-        payloadFormatVersion: "1.0"
         type: http_proxy
         httpMethod: POST
-        uri: "${nlb_listener_arn}"
+        uri: "${nlb_uri}/${api_version}/auth/signin"
         connectionType: VPC_LINK
         connectionId: "${vpc_link_id}"
+        passthroughBehavior: when_no_match
+        requestParameters:
+          integration.request.header.X-Request-Id: context.requestId
   /${api_version}/auth/confirm:
     post:
       description: Confirms a user's sign up using the code sent by email
@@ -138,12 +140,14 @@ paths:
       tags:
       - auth
       x-amazon-apigateway-integration:
-        payloadFormatVersion: "1.0"
         type: http_proxy
         httpMethod: POST
-        uri: "${nlb_listener_arn}"
+        uri: "${nlb_uri}/${api_version}/auth/confirm"
         connectionType: VPC_LINK
         connectionId: "${vpc_link_id}"
+        passthroughBehavior: when_no_match
+        requestParameters:
+          integration.request.header.X-Request-Id: context.requestId
   /${api_version}/auth/signup:
     post:
       description: Registers a new user with email and password
@@ -194,12 +198,14 @@ paths:
       tags:
       - auth
       x-amazon-apigateway-integration:
-        payloadFormatVersion: "1.0"
         type: http_proxy
         httpMethod: POST
-        uri: "${nlb_listener_arn}"
+        uri: "${nlb_uri}/${api_version}/auth/signup"
         connectionType: VPC_LINK
         connectionId: "${vpc_link_id}"
+        passthroughBehavior: when_no_match
+        requestParameters:
+          integration.request.header.X-Request-Id: context.requestId
   /${api_version}/health:
     get:
       description: Returns the health status of the API. Used for load balancer health checks and monitoring purposes.
@@ -214,12 +220,14 @@ paths:
       tags:
       - health
       x-amazon-apigateway-integration:
-        payloadFormatVersion: "1.0"
         type: http_proxy
         httpMethod: GET
-        uri: "${nlb_listener_arn}"
+        uri: "${nlb_uri}/${api_version}/health"
         connectionType: VPC_LINK
         connectionId: "${vpc_link_id}"
+        passthroughBehavior: when_no_match
+        requestParameters:
+          integration.request.header.X-Request-Id: context.requestId
   /${api_version}/provision:
     post:
       description: Submits a new resource provisioning request to be processed asynchronously. The request is validated and queued for processing via SQS.
@@ -306,12 +314,14 @@ paths:
       tags:
       - resources
       x-amazon-apigateway-integration:
-        payloadFormatVersion: "1.0"
         type: http_proxy
         httpMethod: POST
-        uri: "${nlb_listener_arn}"
+        uri: "${nlb_uri}/${api_version}/provision"
         connectionType: VPC_LINK
         connectionId: "${vpc_link_id}"
+        passthroughBehavior: when_no_match
+        requestParameters:
+          integration.request.header.X-Request-Id: context.requestId
   /${api_version}/swagger/{proxy+}:
     get:
       parameters:
@@ -337,12 +347,15 @@ paths:
               schema:
                 type: string
       x-amazon-apigateway-integration:
-        payloadFormatVersion: "1.0"
         type: http_proxy
         httpMethod: GET
-        uri: "${nlb_listener_arn}"
+        uri: "${nlb_uri}/${api_version}/swagger/{proxy}"
         connectionType: VPC_LINK
         connectionId: "${vpc_link_id}"
+        passthroughBehavior: when_no_match
+        requestParameters:
+          integration.request.header.X-Request-Id: context.requestId
+          integration.request.path.proxy: method.request.path.proxy
   /${api_version}/swagger:
     get:
       responses:
@@ -353,12 +366,14 @@ paths:
               schema:
                 type: string
       x-amazon-apigateway-integration:
-        payloadFormatVersion: "1.0"
         type: http_proxy
         httpMethod: GET
-        uri: "${nlb_listener_arn}"
+        uri: "${nlb_uri}/${api_version}/swagger"
         connectionType: VPC_LINK
         connectionId: "${vpc_link_id}"
+        passthroughBehavior: when_no_match
+        requestParameters:
+          integration.request.header.X-Request-Id: context.requestId
 tags:
 - description: Resource provisioning operations
   name: resources
@@ -373,12 +388,11 @@ components:
       type: apiKey
       name: Authorization
       in: header
+      x-amazon-apigateway-authtype: cognito_user_pools
       x-amazon-apigateway-authorizer:
-        type: jwt
-        identitySource: "$request.header.Authorization"
-        jwtConfiguration:
-          audience: ${jwt_audience}
-          issuer: "${jwt_issuer}"
+        type: cognito_user_pools
+        providerARNs:
+          - "${cognito_user_pool_arn}"
   schemas:
     AuthResponse:
       type: object
