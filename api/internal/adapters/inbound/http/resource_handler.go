@@ -24,7 +24,7 @@ func NewResourceHandler(resourceService inbound.ResourceService) *ResourceHandle
 // @Accept json
 // @Produce json
 // @Param resource body model.Resource true "Resource provisioning request"
-// @Success 202 {object} map[string]string "Request accepted for processing"
+// @Success 202 {object} APIResponse[AcceptedResponse] "Request accepted for processing"
 // @Failure 400 {object} ErrorResponse "Validation error"
 // @Failure 500 {object} ErrorResponse "Failed to process request"
 // @Router /v1/provision [post]
@@ -47,9 +47,9 @@ func (h *ResourceHandler) Provision(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	RespondWithJSON(w, http.StatusAccepted, map[string]string{
-		"message":   "Request accepted for processing",
-		"requestId": requestID,
-		"status":    "ACCEPTED",
-	})
+	RespondWithJSON(w, http.StatusAccepted, NewAPIResponse(AcceptedResponse{
+		Message:   "Request accepted for processing",
+		RequestID: requestID,
+		Status:    "ACCEPTED",
+	}, requestID))
 }

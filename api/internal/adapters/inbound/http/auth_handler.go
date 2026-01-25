@@ -38,7 +38,7 @@ func getRequestID(r *http.Request) string {
 // @Accept json
 // @Produce json
 // @Param request body model.SignUpRequest true "Sign up request"
-// @Success 201 {object} map[string]string "User created successfully"
+// @Success 201 {object} APIResponse[CreatedResponse] "User created successfully"
 // @Failure 400 {object} ErrorResponse "Validation error"
 // @Failure 500 {object} ErrorResponse "Internal server error"
 // @Router /v1/auth/signup [post]
@@ -62,7 +62,10 @@ func (h *AuthHandler) SignUp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logger.WithField("email", req.Email).Info("auth.signup: user created")
-	RespondWithJSON(w, http.StatusCreated, map[string]string{"message": "User created successfully"})
+	RespondWithJSON(w, http.StatusCreated, NewAPIResponse(CreatedResponse{
+		Message: "User created successfully",
+		Status:  "CREATED",
+	}, requestID))
 }
 
 // SignIn godoc
@@ -72,7 +75,7 @@ func (h *AuthHandler) SignUp(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param request body model.SignInRequest true "Sign in request"
-// @Success 200 {object} model.AuthResponse
+// @Success 200 {object} APIResponse[model.AuthResponse] "Authentication successful"
 // @Failure 400 {object} ErrorResponse "Validation error"
 // @Failure 401 {object} ErrorResponse "Unauthorized"
 // @Failure 500 {object} ErrorResponse "Internal server error"
@@ -98,7 +101,7 @@ func (h *AuthHandler) SignIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logger.WithField("email", req.Email).Info("auth.signin: user authenticated")
-	RespondWithJSON(w, http.StatusOK, resp)
+	RespondWithJSON(w, http.StatusOK, NewAPIResponse(resp, requestID))
 }
 
 // ConfirmSignUp godoc
@@ -108,7 +111,7 @@ func (h *AuthHandler) SignIn(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param request body model.ConfirmSignUpRequest true "Confirm sign up request"
-// @Success 200 {object} map[string]string "User confirmed successfully"
+// @Success 200 {object} APIResponse[MessageResponse] "User confirmed successfully"
 // @Failure 400 {object} ErrorResponse "Validation error"
 // @Failure 500 {object} ErrorResponse "Internal server error"
 // @Router /v1/auth/confirm [post]
@@ -132,5 +135,8 @@ func (h *AuthHandler) ConfirmSignUp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logger.WithField("email", req.Email).Info("auth.confirm: user confirmed")
-	RespondWithJSON(w, http.StatusOK, map[string]string{"message": "User confirmed successfully"})
+	RespondWithJSON(w, http.StatusOK, NewAPIResponse(MessageResponse{
+		Message: "User confirmed successfully",
+		Status:  "CONFIRMED",
+	}, requestID))
 }
