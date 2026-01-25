@@ -125,130 +125,25 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
           }
         }
       },
-      # API Gateway Statements
+      # API Gateway Statements (REST API)
       {
         Sid    = "APIGatewayRead"
         Effect = "Allow"
-        Action = [
-          "apigateway:GET"
-        ]
+        Action = "apigateway:GET"
         Resource = "*"
       },
       {
-        Sid    = "APIGatewayManageUntagged"
-        Effect = "Allow"
-        Action = [
-          "apigateway:PATCH",
-          "apigateway:PUT",
-          "apigateway:DELETE"
-        ]
-        Resource = "*"
-        Condition = {
-          Null = {
-            "aws:ResourceTag/Project" = "true"
-          }
-        }
-      },
-      {
-        Sid    = "APIGatewayCreateTagged"
+        Sid    = "APIGatewayWrite"
         Effect = "Allow"
         Action = [
           "apigateway:POST",
-          "apigateway:TagResource",
-          "apigateway:PATCH"
-        ]
-        Resource = "*"
-        Condition = {
-          StringEquals = {
-            "aws:RequestTag/Project" = var.project
-          }
-        }
-      },
-      {
-        Sid    = "APIGatewayManageProjectResources"
-        Effect = "Allow"
-        Action = [
+          "apigateway:PUT",
+          "apigateway:PATCH",
           "apigateway:DELETE",
-          "apigateway:PUT",
-          "apigateway:PATCH",
-          "apigateway:UntagResource",
           "apigateway:TagResource",
-          "apigateway:POST"
+          "apigateway:UntagResource"
         ]
         Resource = "*"
-        Condition = {
-          StringLike = {
-            "aws:ResourceTag/Project" = [
-               var.project,
-               "*" 
-            ]
-          }
-        }
-      },
-      {
-        Sid    = "APIGatewayManageTags"
-        Effect = "Allow"
-        Action = [
-          "apigateway:POST",
-          "apigateway:DELETE"
-        ]
-        Resource = [
-          "arn:aws:apigateway:*::/tags/*"
-        ]
-      },
-      {
-        Sid    = "APIGatewayManageDeployments"
-        Effect = "Allow"
-        Action = [
-          "apigateway:POST",
-          "apigateway:GET",
-          "apigateway:DELETE"
-        ]
-        Resource = [
-          "arn:aws:apigateway:*::/restapis/*/deployments",
-          "arn:aws:apigateway:*::/restapis/*/deployments/*"
-        ]
-      },
-      {
-        Sid    = "APIGatewayManageStages"
-        Effect = "Allow"
-        Action = [
-          "apigateway:POST",
-          "apigateway:GET",
-          "apigateway:PUT",
-          "apigateway:PATCH",
-          "apigateway:DELETE"
-        ]
-        Resource = [
-          "arn:aws:apigateway:*::/restapis/*/stages",
-          "arn:aws:apigateway:*::/restapis/*/stages/*"
-        ]
-      },
-      {
-        Sid    = "APIGatewayManageVPCLinks"
-        Effect = "Allow"
-        Action = [
-          "apigateway:POST",
-          "apigateway:GET",
-          "apigateway:PUT",
-          "apigateway:PATCH",
-          "apigateway:DELETE"
-        ]
-        Resource = [
-          "arn:aws:apigateway:*::/vpclinks",
-          "arn:aws:apigateway:*::/vpclinks/*"
-        ]
-      },
-      {
-        Sid    = "APIGatewayManageAccount"
-        Effect = "Allow"
-        Action = [
-          "apigateway:GET",
-          "apigateway:PATCH"
-        ]
-        Resource = [
-          "arn:aws:apigateway:*::/account"
-        ]
       },
       # CloudWatch Logs Statements
       {
@@ -415,8 +310,8 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
         ]
         Resource = [
           "arn:aws:wafv2:*:*:regional/webacl/*/*",
-          "arn:aws:apigateway:*::/apis/*",
-          "arn:aws:apigateway:*::/apis/*/stages/*"
+          "arn:aws:apigateway:*::/restapis/*",
+          "arn:aws:apigateway:*::/restapis/*/stages/*"
         ]
       }
     ]
