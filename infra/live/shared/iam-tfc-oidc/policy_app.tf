@@ -200,10 +200,54 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
         Sid    = "APIGatewayManageDeployments"
         Effect = "Allow"
         Action = [
-          "apigateway:POST"
+          "apigateway:POST",
+          "apigateway:GET",
+          "apigateway:DELETE"
         ]
         Resource = [
-          "arn:aws:apigateway:*::/apis/*/deployments"
+          "arn:aws:apigateway:*::/restapis/*/deployments",
+          "arn:aws:apigateway:*::/restapis/*/deployments/*"
+        ]
+      },
+      {
+        Sid    = "APIGatewayManageStages"
+        Effect = "Allow"
+        Action = [
+          "apigateway:POST",
+          "apigateway:GET",
+          "apigateway:PUT",
+          "apigateway:PATCH",
+          "apigateway:DELETE"
+        ]
+        Resource = [
+          "arn:aws:apigateway:*::/restapis/*/stages",
+          "arn:aws:apigateway:*::/restapis/*/stages/*"
+        ]
+      },
+      {
+        Sid    = "APIGatewayManageVPCLinks"
+        Effect = "Allow"
+        Action = [
+          "apigateway:POST",
+          "apigateway:GET",
+          "apigateway:PUT",
+          "apigateway:PATCH",
+          "apigateway:DELETE"
+        ]
+        Resource = [
+          "arn:aws:apigateway:*::/vpclinks",
+          "arn:aws:apigateway:*::/vpclinks/*"
+        ]
+      },
+      {
+        Sid    = "APIGatewayManageAccount"
+        Effect = "Allow"
+        Action = [
+          "apigateway:GET",
+          "apigateway:PATCH"
+        ]
+        Resource = [
+          "arn:aws:apigateway:*::/account"
         ]
       },
       # CloudWatch Logs Statements
