@@ -155,6 +155,8 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
           "ec2:DeleteVpcEndpointServiceConfigurations",
           "ec2:DescribeVpcEndpointServiceConfigurations",
           "ec2:ModifyVpcEndpointServiceConfiguration",
+          "ec2:ModifyVpcEndpointServicePermissions",
+          "ec2:DescribeVpcEndpointServicePermissions",
           "ec2:DescribeVpcEndpointServices"
         ]
         Resource = "*"
