@@ -34,29 +34,50 @@ paths:
               $ref: '#/components/schemas/SignInRequest'
       responses:
         "200":
-          description: OK
+          description: Authentication successful
+          headers:
+            X-Request-Id:
+              description: Unique request identifier for tracing
+              schema:
+                type: string
+            X-API-Version:
+              description: API version that processed the request
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthResponse'
+                $ref: '#/components/schemas/AuthResponseEnvelope'
         "400":
-          description: Invalid request
+          description: Validation error
+          headers:
+            X-Request-Id:
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                type: string
+                $ref: '#/components/schemas/ErrorResponse'
         "401":
-          description: Unauthorized
+          description: Unauthorized - Invalid credentials
+          headers:
+            X-Request-Id:
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                type: string
+                $ref: '#/components/schemas/ErrorResponse'
         "500":
           description: Internal server error
+          headers:
+            X-Request-Id:
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                type: string
+                $ref: '#/components/schemas/ErrorResponse'
       summary: Sign in
       tags:
       - auth
@@ -80,22 +101,39 @@ paths:
       responses:
         "200":
           description: User confirmed successfully
+          headers:
+            X-Request-Id:
+              description: Unique request identifier for tracing
+              schema:
+                type: string
+            X-API-Version:
+              description: API version that processed the request
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                type: string
+                $ref: '#/components/schemas/MessageResponseEnvelope'
         "400":
-          description: Invalid request
+          description: Validation error
+          headers:
+            X-Request-Id:
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                type: string
+                $ref: '#/components/schemas/ErrorResponse'
         "500":
           description: Internal server error
+          headers:
+            X-Request-Id:
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                type: string
+                $ref: '#/components/schemas/ErrorResponse'
       summary: Confirm sign up
       tags:
       - auth
@@ -119,22 +157,39 @@ paths:
       responses:
         "201":
           description: User created successfully
+          headers:
+            X-Request-Id:
+              description: Unique request identifier for tracing
+              schema:
+                type: string
+            X-API-Version:
+              description: API version that processed the request
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                type: string
+                $ref: '#/components/schemas/CreatedResponseEnvelope'
         "400":
-          description: Invalid request
+          description: Validation error
+          headers:
+            X-Request-Id:
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                type: string
+                $ref: '#/components/schemas/ErrorResponse'
         "500":
           description: Internal server error
+          headers:
+            X-Request-Id:
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                type: string
+                $ref: '#/components/schemas/ErrorResponse'
       summary: Sign up a new user
       tags:
       - auth
@@ -180,22 +235,73 @@ paths:
       responses:
         "202":
           description: Request accepted for processing
-          content:
-            text/plain:
+          headers:
+            X-Request-Id:
+              description: Unique request identifier for tracing
               schema:
                 type: string
+            X-API-Version:
+              description: API version that processed the request
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AcceptedResponseEnvelope'
         "400":
-          description: Invalid request body
+          description: Validation error
+          headers:
+            X-Request-Id:
+              schema:
+                type: string
           content:
             application/json:
               schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "401":
+          description: Unauthorized - Missing or invalid JWT token
+          headers:
+            X-Request-Id:
+              schema:
                 type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "403":
+          description: Forbidden - Insufficient permissions
+          headers:
+            X-Request-Id:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "429":
+          description: Too Many Requests - Rate limit exceeded
+          headers:
+            X-Request-Id:
+              schema:
+                type: string
+            Retry-After:
+              description: Seconds to wait before retrying
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         "500":
-          description: Failed to process request
+          description: Internal server error
+          headers:
+            X-Request-Id:
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                type: string
+                $ref: '#/components/schemas/ErrorResponse'
       summary: Submit a resource provisioning request
       tags:
       - resources
@@ -456,3 +562,163 @@ components:
         value:
           description: The invalid value that was provided
           example: invalid-email
+
+    # ==========================================================================
+    # API RESPONSE ENVELOPE SCHEMAS
+    # Standardized response wrapper for consistent API responses
+    # ==========================================================================
+    ResponseMeta:
+      type: object
+      description: Metadata about the API response
+      required:
+        - timestamp
+        - apiVersion
+      properties:
+        requestId:
+          type: string
+          description: Unique request identifier for tracing
+          example: abc123-def456-ghi789
+        timestamp:
+          type: string
+          format: date-time
+          description: Response timestamp in RFC3339 format
+          example: "2026-01-24T10:30:00Z"
+        apiVersion:
+          type: string
+          description: API version that processed the request
+          example: v1
+
+    MessageResponse:
+      type: object
+      description: Simple success message response
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          description: Success message
+          example: Operation completed successfully
+        status:
+          type: string
+          description: Operation status
+          example: COMPLETED
+
+    CreatedResponse:
+      type: object
+      description: Response for resource creation operations
+      required:
+        - message
+        - status
+      properties:
+        message:
+          type: string
+          description: Success message
+          example: User created successfully
+        resourceId:
+          type: string
+          description: ID of the created resource
+          example: user-12345
+        status:
+          type: string
+          description: Creation status
+          enum:
+            - CREATED
+            - PENDING
+          example: CREATED
+
+    AcceptedResponse:
+      type: object
+      description: Response for asynchronous operations (202 Accepted)
+      required:
+        - message
+        - requestId
+        - status
+      properties:
+        message:
+          type: string
+          description: Acceptance message
+          example: Request accepted for processing
+        requestId:
+          type: string
+          description: Request tracking ID
+          example: req-abc123
+        status:
+          type: string
+          description: Request status
+          enum:
+            - ACCEPTED
+            - QUEUED
+          example: ACCEPTED
+        trackUrl:
+          type: string
+          format: uri
+          description: URL to track the request status
+          example: /v1/requests/req-abc123/status
+
+    # ==========================================================================
+    # API RESPONSE ENVELOPE WRAPPERS
+    # These wrap the response types in the standard APIResponse envelope
+    # ==========================================================================
+    AuthResponseEnvelope:
+      type: object
+      description: Wrapped authentication response
+      required:
+        - success
+        - data
+        - meta
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/AuthResponse'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    MessageResponseEnvelope:
+      type: object
+      description: Wrapped message response
+      required:
+        - success
+        - data
+        - meta
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/MessageResponse'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    CreatedResponseEnvelope:
+      type: object
+      description: Wrapped created response
+      required:
+        - success
+        - data
+        - meta
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/CreatedResponse'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    AcceptedResponseEnvelope:
+      type: object
+      description: Wrapped accepted response for async operations
+      required:
+        - success
+        - data
+        - meta
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/AcceptedResponse'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'

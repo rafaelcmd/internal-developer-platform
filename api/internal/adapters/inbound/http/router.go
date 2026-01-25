@@ -11,7 +11,24 @@ type ServeMuxAdapter interface {
 	HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request))
 }
 
+// RouterConfig holds configuration for the router
+type RouterConfig struct {
+	// AllowedOrigins for CORS (used in local development, API Gateway handles CORS in production)
+	AllowedOrigins []string
+}
+
+// DefaultRouterConfig returns default router configuration
+func DefaultRouterConfig() RouterConfig {
+	return RouterConfig{
+		AllowedOrigins: []string{"*"},
+	}
+}
+
 func NewRouter(resourceHandler *ResourceHandler, healthHandler *HealthHandler, authHandler *AuthHandler, swaggerHandler *SwaggerHandler) http.Handler {
+	return NewRouterWithConfig(resourceHandler, healthHandler, authHandler, swaggerHandler, DefaultRouterConfig())
+}
+
+func NewRouterWithConfig(resourceHandler *ResourceHandler, healthHandler *HealthHandler, authHandler *AuthHandler, swaggerHandler *SwaggerHandler, config RouterConfig) http.Handler {
 	mux := http.NewServeMux()
 
 	// =============================================================================
@@ -40,5 +57,15 @@ func NewRouter(resourceHandler *ResourceHandler, healthHandler *HealthHandler, a
 	mux.Handle("GET "+APIVersionPrefix+"/swagger", swaggerUI)
 	mux.Handle("GET "+APIVersionPrefix+"/swagger/", swaggerUI)
 
-	return mux
+	// =============================================================================
+	// Middleware Chain
+	// Applied in order: Recovery -> RequestContext -> StandardHeaders -> CORS -> Routes
+	// =============================================================================
+	return ChainMiddleware(
+		mux,
+		RecoveryMiddleware,
+		RequestContextMiddleware,
+		StandardHeadersMiddleware,
+		CORSMiddleware(config.AllowedOrigins),
+	)
 }

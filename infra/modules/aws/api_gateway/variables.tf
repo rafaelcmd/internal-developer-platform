@@ -131,7 +131,7 @@ variable "cors_allow_origins" {
 variable "cors_expose_headers" {
   description = "List of headers to expose in CORS responses"
   type        = list(string)
-  default     = []
+  default     = ["X-Request-Id", "X-API-Version", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"]
 }
 
 variable "cors_max_age" {
