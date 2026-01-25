@@ -48,7 +48,6 @@ module "ecs" {
   # Security group configuration
   security_group_name        = "${var.project}-${var.environment}-api-ecs-sg"
   security_group_description = "Security group for ${var.project} ECS API"
-  vpc_link_security_group_id = module.api_gateway.vpc_link_security_group_id
 
   # Application image configuration
   app_image_uri       = "${data.terraform_remote_state.internal_developer_platform_ecr_repository.outputs.repository_url}:${var.app_image_tag}"
@@ -210,44 +209,44 @@ module "api_gateway" {
   # API Gateway configuration
   api_name        = var.api_gateway_name
   api_description = var.api_gateway_description
+  aws_region      = var.aws_region
 
-  # VPC Link configuration
-  vpc_link_name       = var.vpc_link_name
-  vpc_id              = data.terraform_remote_state.shared_vpc.outputs.vpc_id
-  vpc_link_subnet_ids = data.terraform_remote_state.shared_vpc.outputs.private_subnet_ids
-  nlb_arn             = module.nlb.nlb_arn
-  nlb_dns_name        = module.nlb.nlb_dns_name
-  nlb_listener_arn    = module.nlb.lb_listener
+  # VPC Link configuration (REST API uses NLB ARN directly)
+  vpc_link_name = var.vpc_link_name
+  nlb_arn       = module.nlb.nlb_arn
+  nlb_dns_name  = module.nlb.nlb_dns_name
 
-  # JWT authorizer configuration
-  jwt_issuer   = "https://cognito-idp.${var.aws_region}.amazonaws.com/${module.cognito.user_pool_id}"
-  jwt_audience = [module.cognito.user_pool_client_id]
+  # Cognito authorizer configuration (REST API uses User Pool ARN)
+  cognito_user_pool_arn = module.cognito.user_pool_arn
 
   # Stage configuration
-  stage_name  = var.api_gateway_stage_name
-  auto_deploy = var.api_gateway_auto_deploy
+  stage_name = var.api_gateway_stage_name
 
-  # Integration configuration
-  integration_timeout_ms = var.integration_timeout_ms
+  # API versioning
+  api_version = var.api_version
+
+  # Endpoint configuration (REST API specific)
+  endpoint_type            = "REGIONAL"
+  minimum_compression_size = -1
 
   # Throttling configuration
   throttle_rate_limit  = var.throttle_rate_limit
   throttle_burst_limit = var.throttle_burst_limit
 
-  # CORS configuration
-  cors_allow_credentials = var.cors_allow_credentials
-  cors_allow_headers     = var.cors_allow_headers
-  cors_allow_methods     = var.cors_allow_methods
-  cors_allow_origins     = var.cors_allow_origins
-  cors_expose_headers    = var.cors_expose_headers
-  cors_max_age           = var.cors_max_age
+  # Logging and monitoring configuration
+  log_retention_days         = var.api_gateway_log_retention_days
+  logging_level              = var.api_gateway_logging_level
+  data_trace_enabled         = var.api_gateway_data_trace_enabled
+  metrics_enabled            = var.api_gateway_metrics_enabled
+  xray_tracing_enabled       = var.api_gateway_xray_tracing_enabled
+  create_api_gateway_account = true
 
-  # WAF configuration
+  # Caching (disabled by default)
+  cache_cluster_enabled = false
+
+  # WAF configuration (REST API supports direct WAF association)
   enable_waf      = var.enable_waf
   waf_web_acl_arn = var.enable_waf ? module.waf.web_acl_arn : null
-
-  # Logging configuration
-  log_retention_days = var.api_gateway_log_retention_days
 
   # Common configuration
   project     = var.project

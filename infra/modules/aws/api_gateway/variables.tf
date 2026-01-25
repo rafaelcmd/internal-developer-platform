@@ -13,30 +13,20 @@ variable "api_description" {
   type        = string
 }
 
+variable "aws_region" {
+  description = "AWS region for API Gateway"
+  type        = string
+}
+
 # =============================================================================
 # VPC LINK CONFIGURATION
 # Variables for VPC Link setup and NLB integration
+# Note: REST API VPC Links connect directly to NLB ARN (not subnets)
 # =============================================================================
 
 variable "vpc_link_name" {
   description = "Name of the VPC Link"
   type        = string
-}
-
-variable "vpc_id" {
-  description = "VPC ID where the VPC Link security group will be created"
-  type        = string
-}
-
-variable "vpc_link_security_group_ids" {
-  description = "List of security group IDs for the VPC Link (optional - will create one if empty)"
-  type        = list(string)
-  default     = []
-}
-
-variable "vpc_link_subnet_ids" {
-  description = "List of subnet IDs for the VPC Link"
-  type        = list(string)
 }
 
 variable "nlb_arn" {
@@ -46,11 +36,6 @@ variable "nlb_arn" {
 
 variable "nlb_dns_name" {
   description = "DNS name of the Network Load Balancer"
-  type        = string
-}
-
-variable "nlb_listener_arn" {
-  description = "ARN of the NLB Listener"
   type        = string
 }
 
@@ -65,21 +50,26 @@ variable "stage_name" {
   default     = "dev"
 }
 
-variable "auto_deploy" {
-  description = "Whether to automatically deploy API changes"
-  type        = bool
-  default     = true
+# =============================================================================
+# ENDPOINT CONFIGURATION
+# Variables for REST API endpoint type
+# =============================================================================
+
+variable "endpoint_type" {
+  description = "Endpoint type for the REST API (EDGE, REGIONAL, or PRIVATE)"
+  type        = string
+  default     = "REGIONAL"
+
+  validation {
+    condition     = contains(["EDGE", "REGIONAL", "PRIVATE"], var.endpoint_type)
+    error_message = "endpoint_type must be EDGE, REGIONAL, or PRIVATE"
+  }
 }
 
-# =============================================================================
-# INTEGRATION CONFIGURATION
-# Variables for backend integration settings
-# =============================================================================
-
-variable "integration_timeout_ms" {
-  description = "Integration timeout in milliseconds"
+variable "minimum_compression_size" {
+  description = "Minimum response size to compress (0-10485760 bytes). -1 disables compression."
   type        = number
-  default     = 29000
+  default     = -1
 }
 
 # =============================================================================
@@ -100,47 +90,6 @@ variable "throttle_burst_limit" {
 }
 
 # =============================================================================
-# CORS CONFIGURATION
-# Variables for Cross-Origin Resource Sharing configuration
-# =============================================================================
-
-variable "cors_allow_credentials" {
-  description = "Whether to allow credentials in CORS requests"
-  type        = bool
-  default     = false
-}
-
-variable "cors_allow_headers" {
-  description = "List of allowed headers for CORS"
-  type        = list(string)
-  default     = ["content-type", "x-amz-date", "authorization", "x-api-key", "x-amz-security-token"]
-}
-
-variable "cors_allow_methods" {
-  description = "List of allowed HTTP methods for CORS"
-  type        = list(string)
-  default     = ["GET", "POST", "OPTIONS"]
-}
-
-variable "cors_allow_origins" {
-  description = "List of allowed origins for CORS"
-  type        = list(string)
-  default     = ["*"]
-}
-
-variable "cors_expose_headers" {
-  description = "List of headers to expose in CORS responses"
-  type        = list(string)
-  default     = ["X-Request-Id", "X-API-Version", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"]
-}
-
-variable "cors_max_age" {
-  description = "Maximum age for CORS preflight requests in seconds"
-  type        = number
-  default     = 86400
-}
-
-# =============================================================================
 # LOGGING AND MONITORING CONFIGURATION
 # Variables for CloudWatch logs and monitoring
 # =============================================================================
@@ -149,6 +98,58 @@ variable "log_retention_days" {
   description = "CloudWatch log group retention period in days"
   type        = number
   default     = 7
+}
+
+variable "logging_level" {
+  description = "Logging level for API Gateway (OFF, INFO, ERROR)"
+  type        = string
+  default     = "INFO"
+
+  validation {
+    condition     = contains(["OFF", "INFO", "ERROR"], var.logging_level)
+    error_message = "logging_level must be OFF, INFO, or ERROR"
+  }
+}
+
+variable "data_trace_enabled" {
+  description = "Whether to enable data tracing (logs request/response bodies). WARNING: may log sensitive data."
+  type        = bool
+  default     = false
+}
+
+variable "metrics_enabled" {
+  description = "Whether to enable CloudWatch metrics for API Gateway"
+  type        = bool
+  default     = true
+}
+
+variable "xray_tracing_enabled" {
+  description = "Whether to enable X-Ray tracing for API Gateway"
+  type        = bool
+  default     = true
+}
+
+variable "create_api_gateway_account" {
+  description = "Whether to create the API Gateway account resource for CloudWatch logging. Only one per region."
+  type        = bool
+  default     = true
+}
+
+# =============================================================================
+# CACHING CONFIGURATION
+# Variables for API Gateway caching (REST API feature)
+# =============================================================================
+
+variable "cache_cluster_enabled" {
+  description = "Whether to enable API Gateway cache cluster"
+  type        = bool
+  default     = false
+}
+
+variable "cache_cluster_size" {
+  description = "Size of the API Gateway cache cluster (0.5, 1.6, 6.1, 13.5, 28.4, 58.2, 118, 237)"
+  type        = string
+  default     = "0.5"
 }
 
 # =============================================================================
@@ -172,15 +173,14 @@ variable "tags" {
   default     = {}
 }
 
+# =============================================================================
+# AUTHORIZATION CONFIGURATION
+# Variables for Cognito User Pool authorization
+# =============================================================================
 
-variable "jwt_issuer" {
-  description = "JWT issuer URL (e.g., Cognito user pool issuer) used by API Gateway authorizer"
+variable "cognito_user_pool_arn" {
+  description = "Cognito User Pool ARN for the REST API authorizer"
   type        = string
-}
-
-variable "jwt_audience" {
-  description = "JWT audience values (e.g., Cognito app client IDs)"
-  type        = list(string)
 }
 
 # =============================================================================
@@ -203,15 +203,9 @@ variable "deprecated_versions" {
   default = []
 }
 
-variable "enable_deprecation_headers" {
-  description = "Whether to enable deprecation headers (Deprecation, Sunset) for deprecated endpoints"
-  type        = bool
-  default     = true
-}
-
 # =============================================================================
 # WAF CONFIGURATION
-# Variables for AWS WAF integration
+# Variables for AWS WAF integration (REST API supports direct WAF association)
 # =============================================================================
 
 variable "enable_waf" {
