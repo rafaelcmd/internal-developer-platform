@@ -61,15 +61,16 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
         Resource = "*"
       },
       {
-        Sid      = "IAMPassRoleECS"
+        Sid      = "IAMPassRole"
         Effect   = "Allow"
         Action   = "iam:PassRole"
         Resource = "*"
         Condition = {
           StringLike = {
-            "iam:AssociatedResourceARN" = [
-              "arn:aws:ecs:*:*:task-definition/*",
-              "arn:aws:lambda:*:*:function:*"
+            "iam:PassedToService" = [
+              "ecs-tasks.amazonaws.com",
+              "lambda.amazonaws.com",
+              "apigateway.amazonaws.com"
             ]
           }
         }
@@ -142,6 +143,19 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
           "apigateway:DELETE",
           "apigateway:TagResource",
           "apigateway:UntagResource"
+        ]
+        Resource = "*"
+      },
+      # EC2 permissions for REST API VPC Link (uses VPC Endpoint Services)
+      {
+        Sid    = "EC2VPCLinkPermissions"
+        Effect = "Allow"
+        Action = [
+          "ec2:CreateVpcEndpointServiceConfiguration",
+          "ec2:DeleteVpcEndpointServiceConfigurations",
+          "ec2:DescribeVpcEndpointServiceConfigurations",
+          "ec2:ModifyVpcEndpointServiceConfiguration",
+          "ec2:DescribeVpcEndpointServices"
         ]
         Resource = "*"
       },
