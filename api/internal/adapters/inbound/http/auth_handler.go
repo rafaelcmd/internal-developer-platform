@@ -5,18 +5,18 @@ import (
 
 	"github.com/rafaelcmd/internal-developer-platform/api/internal/domain/model"
 	"github.com/rafaelcmd/internal-developer-platform/api/internal/domain/ports/inbound"
-	"github.com/sirupsen/logrus"
+	"github.com/rafaelcmd/internal-developer-platform/api/internal/logger"
 )
 
 type AuthHandler struct {
 	authService inbound.AuthService
-	logger      *logrus.Entry
+	logger      logger.Logger
 }
 
-func NewAuthHandler(authService inbound.AuthService, logger *logrus.Entry) *AuthHandler {
+func NewAuthHandler(authService inbound.AuthService, log logger.Logger) *AuthHandler {
 	return &AuthHandler{
 		authService: authService,
-		logger:      logger,
+		logger:      log.WithField("component", "auth_handler"),
 	}
 }
 
