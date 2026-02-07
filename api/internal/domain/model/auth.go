@@ -1,7 +1,6 @@
 package model
 
-// SignUpRequest represents a user registration request
-// @Description User registration request
+// SignUpRequest represents a user registration request.
 type SignUpRequest struct {
 	// User's email address
 	Email string `json:"email" validate:"required,email,max=254" example:"user@example.com"`
@@ -9,8 +8,7 @@ type SignUpRequest struct {
 	Password string `json:"password" validate:"required,min=8,max=128" example:"SecureP@ss123"`
 }
 
-// SignInRequest represents a user authentication request
-// @Description User authentication request
+// SignInRequest represents a user authentication request.
 type SignInRequest struct {
 	// User's email address
 	Email string `json:"email" validate:"required,email,max=254" example:"user@example.com"`
@@ -18,8 +16,7 @@ type SignInRequest struct {
 	Password string `json:"password" validate:"required,min=1,max=128" example:"SecureP@ss123"`
 }
 
-// ConfirmSignUpRequest represents a sign-up confirmation request
-// @Description Sign-up confirmation request with verification code
+// ConfirmSignUpRequest represents a sign-up confirmation request.
 type ConfirmSignUpRequest struct {
 	// User's email address
 	Email string `json:"email" validate:"required,email,max=254" example:"user@example.com"`

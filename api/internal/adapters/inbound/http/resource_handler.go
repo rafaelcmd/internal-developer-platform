@@ -17,17 +17,7 @@ func NewResourceHandler(resourceService inbound.ResourceService) *ResourceHandle
 	}
 }
 
-// Provision godoc
-// @Summary Submit a resource provisioning request
-// @Description Submits a new resource provisioning request to be processed asynchronously. The request is validated and queued for processing via SQS.
-// @Tags resources
-// @Accept json
-// @Produce json
-// @Param resource body model.Resource true "Resource provisioning request"
-// @Success 202 {object} APIResponse[AcceptedResponse] "Request accepted for processing"
-// @Failure 400 {object} ErrorResponse "Validation error"
-// @Failure 500 {object} ErrorResponse "Failed to process request"
-// @Router /v1/provision [post]
+// Provision handles submitting a resource provisioning request for async processing.
 func (h *ResourceHandler) Provision(w http.ResponseWriter, r *http.Request) {
 	requestID := getRequestID(r)
 
