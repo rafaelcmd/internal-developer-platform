@@ -215,7 +215,7 @@ paths:
           content:
             text/plain:
               schema:
-                type: string
+                $ref: '#/components/schemas/StringResponse'
       summary: Health check endpoint
       tags:
       - health
@@ -336,16 +336,16 @@ paths:
           content:
             text/html:
               schema:
-                type: string
+                $ref: '#/components/schemas/StringResponse'
             application/yaml:
               schema:
-                type: string
+                $ref: '#/components/schemas/StringResponse'
             application/javascript:
               schema:
-                type: string
+                $ref: '#/components/schemas/StringResponse'
             text/css:
               schema:
-                type: string
+                $ref: '#/components/schemas/StringResponse'
       x-amazon-apigateway-integration:
         type: http_proxy
         httpMethod: GET
@@ -364,7 +364,7 @@ paths:
           content:
             text/html:
               schema:
-                type: string
+                $ref: '#/components/schemas/StringResponse'
       x-amazon-apigateway-integration:
         type: http_proxy
         httpMethod: GET
@@ -394,6 +394,12 @@ components:
         providerARNs:
           - "${cognito_user_pool_arn}"
   schemas:
+    StringResponse:
+      type: object
+      description: Simple string response wrapper for API Gateway compatibility
+      properties:
+        value:
+          type: string
     AuthResponse:
       type: object
       properties:
