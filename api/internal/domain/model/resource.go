@@ -1,7 +1,6 @@
 package model
 
-// Resource represents a cloud resource provisioning request
-// @Description Cloud resource provisioning request
+// Resource represents a cloud resource provisioning request.
 type Resource struct {
 	// Unique identifier for the resource
 	ID string `json:"id" example:"vm-001" validate:"required,min=1,max=100"`

@@ -1,16 +1,16 @@
 # Internal Developer Platform API Makefile
 
-.PHONY: help build test swagger-gen swagger-install clean run
+.PHONY: help build test swagger-validate run clean dev
 
 # Default target
 help:
 	@echo "Available targets:"
-	@echo "  build          - Build the application"
-	@echo "  test           - Run tests"
-	@echo "  swagger-gen    - Generate OpenAPI documentation from code annotations"
-	@echo "  swagger-install- Install swag CLI tool"
-	@echo "  run            - Run the application"
-	@echo "  clean          - Clean build artifacts"
+	@echo "  build            - Build the application"
+	@echo "  test             - Run tests"
+	@echo "  swagger-validate - Validate the OpenAPI spec (docs/swagger.yaml)"
+	@echo "  run              - Run the application"
+	@echo "  clean            - Clean build artifacts"
+	@echo "  dev              - Validate spec and build"
 
 # Build the application
 build:
@@ -20,13 +20,11 @@ build:
 test:
 	go test ./...
 
-# Generate OpenAPI documentation from Swagger annotations
-swagger-gen:
-	swag init -g cmd/server/main.go --outputTypes go,yaml
-
-# Install swag CLI tool
-swagger-install:
-	go install github.com/swaggo/swag/cmd/swag@latest
+# Validate the hand-maintained OpenAPI spec
+swagger-validate:
+	@echo "Validating docs/swagger.yaml..."
+	@command -v swagger-cli >/dev/null 2>&1 && swagger-cli validate docs/swagger.yaml || \
+		echo "  (install swagger-cli for validation: npm install -g @apidevtools/swagger-cli)"
 
 # Run the application
 run: build
@@ -35,9 +33,8 @@ run: build
 # Clean build artifacts
 clean:
 	rm -rf bin/
-	rm -rf docs/docs.go docs/swagger.yaml
 
-# Development workflow: regenerate docs and build
-dev: swagger-gen build
+# Development workflow: validate spec and build
+dev: swagger-validate build
 
 .DEFAULT_GOAL := help

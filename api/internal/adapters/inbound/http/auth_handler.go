@@ -31,17 +31,7 @@ func getRequestID(r *http.Request) string {
 	return ""
 }
 
-// SignUp godoc
-// @Summary Sign up a new user
-// @Description Registers a new user with email and password
-// @Tags auth
-// @Accept json
-// @Produce json
-// @Param request body model.SignUpRequest true "Sign up request"
-// @Success 201 {object} APIResponse[CreatedResponse] "User created successfully"
-// @Failure 400 {object} ErrorResponse "Validation error"
-// @Failure 500 {object} ErrorResponse "Internal server error"
-// @Router /v1/auth/signup [post]
+// SignUp handles user registration requests.
 func (h *AuthHandler) SignUp(w http.ResponseWriter, r *http.Request) {
 	requestID := getRequestID(r)
 
@@ -68,18 +58,7 @@ func (h *AuthHandler) SignUp(w http.ResponseWriter, r *http.Request) {
 	}, requestID))
 }
 
-// SignIn godoc
-// @Summary Sign in
-// @Description Authenticates a user and returns tokens
-// @Tags auth
-// @Accept json
-// @Produce json
-// @Param request body model.SignInRequest true "Sign in request"
-// @Success 200 {object} APIResponse[model.AuthResponse] "Authentication successful"
-// @Failure 400 {object} ErrorResponse "Validation error"
-// @Failure 401 {object} ErrorResponse "Unauthorized"
-// @Failure 500 {object} ErrorResponse "Internal server error"
-// @Router /v1/auth/signin [post]
+// SignIn handles user authentication and returns tokens.
 func (h *AuthHandler) SignIn(w http.ResponseWriter, r *http.Request) {
 	requestID := getRequestID(r)
 
@@ -104,17 +83,7 @@ func (h *AuthHandler) SignIn(w http.ResponseWriter, r *http.Request) {
 	RespondWithJSON(w, http.StatusOK, NewAPIResponse(resp, requestID))
 }
 
-// ConfirmSignUp godoc
-// @Summary Confirm sign up
-// @Description Confirms a user's sign up using the code sent by email
-// @Tags auth
-// @Accept json
-// @Produce json
-// @Param request body model.ConfirmSignUpRequest true "Confirm sign up request"
-// @Success 200 {object} APIResponse[MessageResponse] "User confirmed successfully"
-// @Failure 400 {object} ErrorResponse "Validation error"
-// @Failure 500 {object} ErrorResponse "Internal server error"
-// @Router /v1/auth/confirm [post]
+// ConfirmSignUp handles sign-up confirmation using the code sent by email.
 func (h *AuthHandler) ConfirmSignUp(w http.ResponseWriter, r *http.Request) {
 	requestID := getRequestID(r)
 
