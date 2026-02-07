@@ -142,7 +142,8 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
           "apigateway:PATCH",
           "apigateway:DELETE",
           "apigateway:TagResource",
-          "apigateway:UntagResource"
+          "apigateway:UntagResource",
+          "apigateway:SetWebACL"
         ]
         Resource = "*"
       },
