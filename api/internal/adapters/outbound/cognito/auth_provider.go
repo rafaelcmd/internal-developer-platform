@@ -2,19 +2,26 @@ package cognito
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider"
 	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider/types"
+
+	"github.com/rafaelcmd/internal-developer-platform/api/internal/domain/errors"
 	"github.com/rafaelcmd/internal-developer-platform/api/internal/domain/model"
+	"github.com/rafaelcmd/internal-developer-platform/api/internal/domain/ports/outbound"
 )
 
+// CognitoAuthProvider implements the AuthProvider interface using AWS Cognito.
 type CognitoAuthProvider struct {
 	client   *cognitoidentityprovider.Client
 	clientID string
 }
 
+// Ensure CognitoAuthProvider implements the AuthProvider interface.
+var _ outbound.AuthProvider = (*CognitoAuthProvider)(nil)
+
+// NewCognitoAuthProvider creates a new CognitoAuthProvider.
 func NewCognitoAuthProvider(client *cognitoidentityprovider.Client, clientID string) *CognitoAuthProvider {
 	return &CognitoAuthProvider{
 		client:   client,
@@ -22,6 +29,7 @@ func NewCognitoAuthProvider(client *cognitoidentityprovider.Client, clientID str
 	}
 }
 
+// SignUp registers a new user in Cognito.
 func (p *CognitoAuthProvider) SignUp(ctx context.Context, email, password string) error {
 	_, err := p.client.SignUp(ctx, &cognitoidentityprovider.SignUpInput{
 		ClientId: aws.String(p.clientID),
@@ -34,9 +42,17 @@ func (p *CognitoAuthProvider) SignUp(ctx context.Context, email, password string
 			},
 		},
 	})
-	return err
+	if err != nil {
+		return errors.NewDomainError(
+			errors.ErrCodeUserAlreadyExists,
+			"failed to register user",
+			err,
+		)
+	}
+	return nil
 }
 
+// SignIn authenticates a user and returns tokens.
 func (p *CognitoAuthProvider) SignIn(ctx context.Context, email, password string) (*model.AuthResponse, error) {
 	output, err := p.client.InitiateAuth(ctx, &cognitoidentityprovider.InitiateAuthInput{
 		AuthFlow: types.AuthFlowTypeUserPasswordAuth,
@@ -47,11 +63,19 @@ func (p *CognitoAuthProvider) SignIn(ctx context.Context, email, password string
 		},
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.NewDomainError(
+			errors.ErrCodeInvalidCredentials,
+			"authentication failed",
+			err,
+		)
 	}
 
 	if output.AuthenticationResult == nil {
-		return nil, fmt.Errorf("authentication failed: no result returned")
+		return nil, errors.NewDomainError(
+			errors.ErrCodeAuthFailed,
+			"authentication failed: no result returned",
+			errors.ErrUnauthorized,
+		)
 	}
 
 	return &model.AuthResponse{
@@ -63,11 +87,19 @@ func (p *CognitoAuthProvider) SignIn(ctx context.Context, email, password string
 	}, nil
 }
 
+// ConfirmSignUp confirms a user's email with the confirmation code.
 func (p *CognitoAuthProvider) ConfirmSignUp(ctx context.Context, email, confirmationCode string) error {
 	_, err := p.client.ConfirmSignUp(ctx, &cognitoidentityprovider.ConfirmSignUpInput{
 		ClientId:         aws.String(p.clientID),
 		Username:         aws.String(email),
 		ConfirmationCode: aws.String(confirmationCode),
 	})
-	return err
+	if err != nil {
+		return errors.NewDomainError(
+			errors.ErrCodeInvalidConfirmationCode,
+			"failed to confirm user registration",
+			err,
+		)
+	}
+	return nil
 }

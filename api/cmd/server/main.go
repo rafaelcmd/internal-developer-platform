@@ -1,173 +1,46 @@
+// Package main is the entry point for the Internal Developer Platform API.
+// It follows Clean Architecture principles with a minimal main function
+// that delegates to the bootstrap package for dependency injection.
 package main
 
 import (
 	"context"
-	"fmt"
-	"net/http"
 	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider"
-	"github.com/aws/aws-sdk-go-v2/service/sqs"
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	"github.com/sirupsen/logrus"
-	httptrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/net/http"
-	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
-
-	httpmod "github.com/rafaelcmd/internal-developer-platform/api/internal/adapters/inbound/http"
-	"github.com/rafaelcmd/internal-developer-platform/api/internal/adapters/outbound/cognito"
-	sqsmod "github.com/rafaelcmd/internal-developer-platform/api/internal/adapters/outbound/sqs"
-	"github.com/rafaelcmd/internal-developer-platform/api/internal/application/service"
+	"github.com/rafaelcmd/internal-developer-platform/api/internal/bootstrap"
+	"github.com/rafaelcmd/internal-developer-platform/api/internal/config"
+	"github.com/rafaelcmd/internal-developer-platform/api/internal/logger"
 )
 
 func main() {
-	// Initialize structured logging
-	log := logrus.New()
-	log.SetFormatter(&logrus.JSONFormatter{})
-	log.SetLevel(logrus.InfoLevel)
-
+	// Create a base context for the application
 	ctx := context.Background()
 
-	// Initialize Datadog tracer with environment variables
-	tracer.Start()
-	defer tracer.Stop()
+	// Load configuration from environment
+	cfg := config.NewConfig()
+	if err := cfg.Validate(); err != nil {
+		// Use a basic logger for configuration errors since the app isn't initialized yet
+		log := logger.New(logger.DefaultConfig())
+		log.Fatal("Configuration validation failed", logger.F("error", err.Error()))
+	}
 
-	log.Info("Starting Internal Developer Platform API")
-
-	// Load AWS configuration
-	cfg, err := config.LoadDefaultConfig(ctx)
+	// Initialize the application with all dependencies
+	app, err := bootstrap.New(ctx, cfg, bootstrap.DefaultOptions())
 	if err != nil {
-		log.WithError(err).Fatal("failed to load AWS config")
+		log := logger.New(logger.DefaultConfig())
+		log.Fatal("Failed to initialize application", logger.F("error", err.Error()))
 	}
 
-	// Get SQS queue URL from Parameter Store
-	provisionerQueueURL, err := getQueueURL(ctx, cfg)
-	if err != nil {
-		log.WithError(err).Fatal("failed to get SQS queue URL")
+	// Run the application (blocks until shutdown signal)
+	if err := app.Run(ctx); err != nil {
+		app.Logger.Error("Application error", logger.F("error", err.Error()))
+		app.Shutdown()
+		os.Exit(1)
 	}
 
-	log.WithField("queue_url", provisionerQueueURL).Info("Retrieved SQS queue URL")
-
-	// Get Cognito Client ID from Parameter Store
-	cognitoClientID, err := getCognitoClientID(ctx, cfg)
-	if err != nil {
-		log.WithError(err).Fatal("failed to get Cognito Client ID")
+	// Graceful shutdown
+	if err := app.Shutdown(); err != nil {
+		app.Logger.Error("Shutdown error", logger.F("error", err.Error()))
+		os.Exit(1)
 	}
-
-	log.WithField("cognito_client_id", cognitoClientID).Info("Retrieved Cognito Client ID")
-
-	// Initialize dependencies
-	sqsClient := sqs.NewFromConfig(cfg)
-	publisher := sqsmod.NewResourcePublisher(sqsClient, provisionerQueueURL)
-	resourceService := service.NewResourceService(publisher)
-	resourceHandler := httpmod.NewResourceHandler(resourceService)
-	healthHandler := httpmod.NewHealthHandler()
-	swaggerHandler := httpmod.NewSwaggerHandler("./docs/swagger.yaml")
-
-	cognitoClient := cognitoidentityprovider.NewFromConfig(cfg)
-	authProvider := cognito.NewCognitoAuthProvider(cognitoClient, cognitoClientID)
-	authService := service.NewAuthService(authProvider)
-	authHandler := httpmod.NewAuthHandler(authService, log.WithField("component", "auth_handler"))
-
-	// Setup HTTP server with Datadog tracing
-	router := httpmod.NewRouter(resourceHandler, healthHandler, authHandler, swaggerHandler)
-	mux := httptrace.NewServeMux(httptrace.WithServiceName("internal-developer-platform.api"))
-
-	env := os.Getenv("ENVIRONMENT")
-	if env == "" {
-		env = "dev"
-	}
-
-	// Handle routes with environment prefix (for local development)
-	basePath := fmt.Sprintf("/%s/", env)
-	stripPath := fmt.Sprintf("/%s", env)
-	mux.Handle(basePath, http.StripPrefix(stripPath, router))
-
-	// Handle routes without prefix (API Gateway HTTP API strips the stage prefix)
-	mux.Handle("/", router)
-
-	port := getPort()
-	server := &http.Server{
-		Addr:         ":" + port,
-		Handler:      mux,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
-	}
-
-	// Start server in a goroutine
-	go func() {
-		log.WithField("port", port).Info("Starting API server")
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.WithError(err).Fatal("failed to start server")
-		}
-	}()
-
-	log.WithField("port", port).Info("API server started successfully")
-
-	// Wait for interrupt signal to gracefully shut down the server
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-
-	log.Info("Shutting down server...")
-
-	// Create a deadline to wait for
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	// Attempt graceful shutdown
-	if err := server.Shutdown(ctx); err != nil {
-		log.WithError(err).Error("Server forced to shutdown")
-	}
-
-	log.Info("Server exited")
-}
-
-func getQueueURL(ctx context.Context, cfg aws.Config) (string, error) {
-	ssmClient := ssm.NewFromConfig(cfg)
-	provisionerQueueParamName := "/INTERNAL_DEVELOPER_PLATFORM/PROVISIONER_QUEUE_URL"
-
-	result, err := ssmClient.GetParameter(ctx, &ssm.GetParameterInput{
-		Name: &provisionerQueueParamName,
-	})
-	if err != nil {
-		return "", err
-	}
-
-	if result.Parameter == nil || result.Parameter.Value == nil {
-		return "", fmt.Errorf("parameter %s not found or empty", provisionerQueueParamName)
-	}
-
-	return *result.Parameter.Value, nil
-}
-
-func getCognitoClientID(ctx context.Context, cfg aws.Config) (string, error) {
-	ssmClient := ssm.NewFromConfig(cfg)
-	paramName := "/INTERNAL_DEVELOPER_PLATFORM/COGNITO_CLIENT_ID"
-
-	result, err := ssmClient.GetParameter(ctx, &ssm.GetParameterInput{
-		Name: &paramName,
-	})
-	if err != nil {
-		return "", err
-	}
-
-	if result.Parameter == nil || result.Parameter.Value == nil {
-		return "", fmt.Errorf("parameter %s not found or empty", paramName)
-	}
-
-	return *result.Parameter.Value, nil
-}
-
-func getPort() string {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-	return port
 }
