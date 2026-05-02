@@ -1,0 +1,138 @@
+; Jacking in...
+; Connecting using "deps.edn" project type.
+; Starting Jack-in: (cd /home/rafael/dev/internal-developer-platform/services/cost-manager; clojure -Sdeps '{:deps {nrepl/nrepl {:mvn/version,"1.5.1"},cider/cider-nrepl {:mvn/version,"0.58.0"}}}' -M -m nrepl.cmdline --middleware "[cider.nrepl/cider-middleware]")
+; Using host:port localhost:40545 ...
+; Hooking up nREPL sessions on port 40545...
+; Connected session: clj, port: 40545
+; Evaluating code from settings: 'calva.autoEvaluateCode.onConnect.clj'
+nil
+clj꞉user꞉> 
+"Please see https://calva.io/output/#about-stdout-in-the-repl-window
+about why stdout printed to this file is prepended with `;` to be line comments."
+clj꞉user꞉> 
+; Jack-in done.
+clj꞉user꞉> 
+; Running all project tests…
+; No tests found. 😱, ns: 0, vars: 0
+clj꞉user꞉> 
+; Jacking in...
+; Connecting using "deps.edn" project type.
+; Starting Jack-in: (cd /home/rafael/dev/internal-developer-platform/services/cost-manager; clojure -Sdeps '{:deps {nrepl/nrepl {:mvn/version,"1.5.1"},cider/cider-nrepl {:mvn/version,"0.58.0"}}}' -M -m nrepl.cmdline --middleware "[cider.nrepl/cider-middleware]")
+; Using host:port localhost:44071 ...
+; Hooking up nREPL sessions on port 44071...
+; Connected session: clj, port: 44071
+; Evaluating code from settings: 'calva.autoEvaluateCode.onConnect.clj'
+nil
+clj꞉user꞉> 
+; Jack-in done.
+clj꞉user꞉> 
+; Running all project tests…
+; No tests found. 😱, ns: 0, vars: 0
+clj꞉user꞉> 
+; Jacking in...
+; Connecting using "deps.edn" project type.
+; Starting Jack-in: (cd /home/rafael/dev/internal-developer-platform/services/cost-manager; clojure -Sdeps '{:deps {nrepl/nrepl {:mvn/version,"1.5.1"},cider/cider-nrepl {:mvn/version,"0.58.0"}}}' -M:test)
+; Jacking in...
+; Connecting using "deps.edn" project type.
+; Starting Jack-in: (cd /home/rafael/dev/internal-developer-platform/services/cost-manager; clojure -Sdeps '{:deps {nrepl/nrepl {:mvn/version,"1.5.1"},cider/cider-nrepl {:mvn/version,"0.58.0"}}}' -M:test)
+; Jacking in...
+; Connecting using "deps.edn" project type.
+; Starting Jack-in: (cd /home/rafael/dev/internal-developer-platform/services/cost-manager; clojure -Sdeps '{:deps {nrepl/nrepl {:mvn/version,"1.5.1"},cider/cider-nrepl {:mvn/version,"0.58.0"}}}' -M:kaocha)
+; Jacking in...
+; Connecting using "deps.edn" project type.
+; Starting Jack-in: (cd /home/rafael/dev/internal-developer-platform/services/cost-manager; clojure -Sdeps '{:deps {nrepl/nrepl {:mvn/version,"1.5.1"},cider/cider-nrepl {:mvn/version,"0.58.0"}}}' -M:test -m nrepl.cmdline --middleware "[cider.nrepl/cider-middleware]")
+; Using host:port localhost:40739 ...
+; Hooking up nREPL sessions on port 40739...
+; Connected session: clj, port: 40739
+; Evaluating code from settings: 'calva.autoEvaluateCode.onConnect.clj'
+nil
+clj꞉user꞉> 
+; Jack-in done.
+clj꞉user꞉> 
+; Running all project tests…
+; No tests found. 😱, ns: 0, vars: 0
+clj꞉user꞉> 
+; Running tests for the following namespaces:
+;   cost-manager.domain.value-objects.money-test
+;   cost-manager.domain.value-objects.money
+
+; No tests found. 😱, ns: 0, vars: 0
+clj꞉cost-manager.domain.value-objects.money-test꞉> 
+; Evaluating file: money_test.clj
+; 
+; ; clj  cost-manager.domain.value-objects.money-test 
+; Execution error (IllegalAccessError) at cost-manager.domain.value-objects.money-test/eval9877$loading (money_test.clj:1).
+; Money does not exist
+; Evaluation of file money_test.clj failed: class java.lang.IllegalAccessError
+clj꞉cost-manager.domain.value-objects.money-test꞉> 
+; Evaluating file: money_test.clj
+; 
+; Execution error (IllegalAccessError) at cost-manager.domain.value-objects.money-test/eval9883$loading (money_test.clj:1).
+; Money does not exist
+; Evaluation of file money_test.clj failed: class java.lang.IllegalAccessError
+clj꞉cost-manager.domain.value-objects.money-test꞉> 
+; Evaluating file: money.clj
+#'cost-manager.domain.value-objects.money/make-money
+clj꞉cost-manager.domain.value-objects.money꞉> 
+; Evaluating file: money_test.clj
+; 
+; ; clj  cost-manager.domain.value-objects.money-test 
+; Execution error (IllegalAccessError) at cost-manager.domain.value-objects.money-test/eval9924$loading (money_test.clj:1).
+; Money does not exist
+; Evaluation of file money_test.clj failed: class java.lang.IllegalAccessError
+clj꞉cost-manager.domain.value-objects.money-test꞉> 
+; Evaluating file: money.clj
+#'cost-manager.domain.value-objects.money/make-money
+clj꞉cost-manager.domain.value-objects.money꞉> 
+; Evaluating file: money_test.clj
+; 
+; ; clj  cost-manager.domain.value-objects.money-test 
+; Execution error (IllegalAccessError) at cost-manager.domain.value-objects.money-test/eval9965$loading (money_test.clj:1).
+; Money does not exist
+; Evaluation of file money_test.clj failed: class java.lang.IllegalAccessError
+clj꞉cost-manager.domain.value-objects.money-test꞉> 
+; Evaluating file: money.clj
+#'cost-manager.domain.value-objects.money/make-money
+clj꞉cost-manager.domain.value-objects.money꞉> 
+; Evaluating file: money_test.clj
+#'cost-manager.domain.value-objects.money-test/test-make-money
+clj꞉cost-manager.domain.value-objects.money-test꞉> 
+; Running tests for the following namespaces:
+;   cost-manager.domain.value-objects.money-test
+;   cost-manager.domain.value-objects.money
+
+; 6 tests finished, all passing 👍, ns: 1, vars: 1
+clj꞉cost-manager.domain.value-objects.money-test꞉> 
+; Running tests for the following namespaces:
+;   cost-manager.domain.value-objects.money-test
+;   cost-manager.domain.value-objects.money
+
+; 6 tests finished, all passing 👍, ns: 1, vars: 1
+clj꞉cost-manager.domain.value-objects.money-test꞉> 
+; Jacking in...
+; Connecting using "deps.edn" project type.
+; Starting Jack-in: (cd /home/rafael/dev/internal-developer-platform/services/cost-manager; clojure -Sdeps '{:deps {nrepl/nrepl {:mvn/version,"1.5.1"},cider/cider-nrepl {:mvn/version,"0.58.0"}}}' -M:test -m nrepl.cmdline --middleware "[cider.nrepl/cider-middleware]")
+; Using host:port localhost:45355 ...
+; Hooking up nREPL sessions on port 45355...
+; Connected session: clj, port: 45355
+; Evaluating code from settings: 'calva.autoEvaluateCode.onConnect.clj'
+nil
+clj꞉user꞉> 
+"Please see https://calva.io/output/#about-stdout-in-the-repl-window
+about why stdout printed to this file is prepended with `;` to be line comments."
+clj꞉user꞉> 
+; Jack-in done.
+clj꞉user꞉> 
+; Evaluating file: money.clj
+#'cost-manager.domain.value-objects.money/make-money
+clj꞉cost-manager.domain.value-objects.money꞉> 
+; Evaluating file: money_test.clj
+#'cost-manager.domain.value-objects.money-test/test-make-money
+clj꞉cost-manager.domain.value-objects.money-test꞉> 
+; Running tests for the following namespaces:
+;   cost-manager.domain.value-objects.money-test
+;   cost-manager.domain.value-objects.money
+
+; 6 tests finished, all passing 👍, ns: 1, vars: 1
+clj꞉cost-manager.domain.value-objects.money-test꞉> 
+; nREPL Connection was closed for client: nrepl-client-1, port: 45355
