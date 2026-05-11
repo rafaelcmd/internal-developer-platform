@@ -161,7 +161,7 @@ resource "aws_ecs_task_definition" "redis" {
         logDriver = "awslogs"
         options = {
           awslogs-group         = aws_cloudwatch_log_group.redis.name
-          awslogs-region        = data.aws_region.current.region
+          awslogs-region        = data.aws_region.current.name
           awslogs-stream-prefix = var.service_name
         }
       }
