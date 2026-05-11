@@ -61,7 +61,7 @@ resource "aws_security_group" "redis" {
 }
 
 resource "aws_security_group_rule" "redis_ingress" {
-  for_each = toset(var.ingress_security_group_ids)
+  for_each = var.ingress_security_group_ids
 
   type                     = "ingress"
   from_port                = var.container_port
@@ -69,7 +69,7 @@ resource "aws_security_group_rule" "redis_ingress" {
   protocol                 = "tcp"
   security_group_id        = aws_security_group.redis.id
   source_security_group_id = each.value
-  description              = "Allow Redis traffic from approved upstream services"
+  description              = "Allow Redis traffic from ${each.key}"
 }
 
 # =============================================================================
