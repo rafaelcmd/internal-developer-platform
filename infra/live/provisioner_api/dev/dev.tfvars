@@ -84,3 +84,14 @@ message_retention_seconds = 345600
 receive_wait_time_seconds = 20
 ssm_parameter_name        = "/INTERNAL_DEVELOPER_PLATFORM/PROVISIONER_QUEUE_URL"
 ssm_parameter_type        = "String"
+
+# Redis (ECS service backing the idempotency layer)
+redis_service_name                = "redis"
+redis_service_discovery_namespace = "internal.idp.local"
+redis_service_discovery_dns_ttl   = 10
+redis_cpu                         = 256
+redis_memory                      = 512
+redis_max_memory_mb               = 384
+redis_maxmemory_policy            = "allkeys-lru"
+redis_log_retention_days          = 7
+redis_ssm_parameter_name          = "/INTERNAL_DEVELOPER_PLATFORM/REDIS_ADDR"
