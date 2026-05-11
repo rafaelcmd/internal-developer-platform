@@ -94,6 +94,46 @@ module "nlb" {
   tags = local.tags
 }
 
+module "redis" {
+  source = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/redis_ecs?ref=main"
+
+  service_name = var.redis_service_name
+
+  # Reuse the existing API ECS cluster
+  cluster_id = module.ecs.cluster_id
+
+  # Networking
+  vpc_id                     = data.terraform_remote_state.shared_vpc.outputs.vpc_id
+  private_subnet_ids         = data.terraform_remote_state.shared_vpc.outputs.private_subnet_ids
+  ingress_security_group_ids = [module.ecs.api_task_security_group_id]
+
+  # Service discovery — API resolves the endpoint via Cloud Map private DNS
+  service_discovery_namespace_name = var.redis_service_discovery_namespace
+  service_discovery_dns_ttl        = var.redis_service_discovery_dns_ttl
+
+  # IAM
+  task_execution_role_name = "${var.project}-${var.environment}-${var.redis_service_name}-execution-role"
+  task_role_name           = "${var.project}-${var.environment}-${var.redis_service_name}-task-role"
+
+  # Sizing
+  cpu              = var.redis_cpu
+  memory           = var.redis_memory
+  max_memory_mb    = var.redis_max_memory_mb
+  maxmemory_policy = var.redis_maxmemory_policy
+
+  # Logs
+  log_group_name     = "/ecs/${var.redis_service_name}"
+  log_retention_days = var.redis_log_retention_days
+
+  # SSM — published at this key, read by the API at runtime
+  ssm_parameter_name = var.redis_ssm_parameter_name
+  ssm_parameter_type = "String"
+
+  project     = var.project
+  environment = var.environment
+  tags        = local.tags
+}
+
 module "sqs" {
   source = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/sqs?ref=main"
 

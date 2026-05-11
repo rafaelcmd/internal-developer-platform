@@ -7,14 +7,17 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/redis/go-redis/v9"
 	httptrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/net/http"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 
 	apihttp "github.com/rafaelcmd/internal-developer-platform/api/internal/adapters/inbound/http"
 	"github.com/rafaelcmd/internal-developer-platform/api/internal/adapters/outbound/cognito"
+	"github.com/rafaelcmd/internal-developer-platform/api/internal/adapters/outbound/idempotency"
 	sqsadapter "github.com/rafaelcmd/internal-developer-platform/api/internal/adapters/outbound/sqs"
 	"github.com/rafaelcmd/internal-developer-platform/api/internal/application/service"
 	"github.com/rafaelcmd/internal-developer-platform/api/internal/config"
+	"github.com/rafaelcmd/internal-developer-platform/api/internal/domain/ports/outbound"
 	"github.com/rafaelcmd/internal-developer-platform/api/internal/infrastructure"
 	"github.com/rafaelcmd/internal-developer-platform/api/internal/logger"
 	"github.com/rafaelcmd/internal-developer-platform/api/internal/server"
@@ -33,6 +36,11 @@ type Application struct {
 	// Runtime configuration (loaded from Parameter Store)
 	ProvisionerQueueURL string
 	CognitoClientID     string
+	RedisAddr           string
+
+	// Idempotency layer
+	RedisClient      *redis.Client
+	IdempotencyStore outbound.IdempotencyStore
 
 	// Services
 	ResourceService *service.ResourceService
@@ -97,6 +105,11 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*Application, e
 		return nil, fmt.Errorf("failed to load runtime configuration: %w", err)
 	}
 
+	// Initialize Redis (idempotency backend)
+	if err := app.initializeRedis(ctx); err != nil {
+		return nil, fmt.Errorf("failed to initialize Redis: %w", err)
+	}
+
 	// Initialize adapters
 	app.initializeAdapters(opts)
 
@@ -133,6 +146,47 @@ func (a *Application) loadRuntimeConfig(ctx context.Context) error {
 	}
 	a.Logger.Info("Loaded Cognito client ID", logger.F("client_id", a.CognitoClientID))
 
+	// REDIS_ADDR (env override) wins for local docker-compose; otherwise pull from Parameter Store
+	// where Terraform writes the ElastiCache primary endpoint.
+	if a.Config.Idempotency.RedisAddr != "" {
+		a.RedisAddr = a.Config.Idempotency.RedisAddr
+	} else if a.Config.AWS.RedisAddrParamKey != "" {
+		a.RedisAddr, err = a.ParameterStore.GetParameter(ctx, a.Config.AWS.RedisAddrParamKey)
+		if err != nil {
+			return fmt.Errorf("failed to get Redis address: %w", err)
+		}
+	}
+	if a.RedisAddr != "" {
+		a.Logger.Info("Loaded Redis address", logger.F("redis_addr", a.RedisAddr))
+	}
+
+	return nil
+}
+
+// initializeRedis dials Redis and constructs the idempotency store. The store is left
+// nil when no address is configured, which causes the router to skip the middleware —
+// useful for environments that haven't provisioned Redis yet.
+func (a *Application) initializeRedis(ctx context.Context) error {
+	if a.RedisAddr == "" {
+		a.Logger.Warn("Redis address not configured; idempotency layer disabled")
+		return nil
+	}
+
+	client, err := infrastructure.NewRedisClient(ctx, infrastructure.RedisConfig{
+		Addr:         a.RedisAddr,
+		Password:     a.Config.Idempotency.RedisPassword,
+		DB:           a.Config.Idempotency.RedisDB,
+		DialTimeout:  a.Config.Idempotency.DialTimeout,
+		ReadTimeout:  a.Config.Idempotency.ReadTimeout,
+		WriteTimeout: a.Config.Idempotency.WriteTimeout,
+	})
+	if err != nil {
+		return err
+	}
+
+	a.RedisClient = client
+	a.IdempotencyStore = idempotency.NewRedisStore(client)
+	a.Logger.Info("Idempotency layer enabled (redis)")
 	return nil
 }
 
@@ -163,7 +217,9 @@ func (a *Application) initializeHandlers() {
 func (a *Application) initializeServer() error {
 	// Create router with all handlers
 	routerConfig := apihttp.RouterConfig{
-		AllowedOrigins: a.Config.App.AllowedOrigins,
+		AllowedOrigins:   a.Config.App.AllowedOrigins,
+		IdempotencyStore: a.IdempotencyStore,
+		IdempotencyTTL:   a.Config.Idempotency.TTL,
 	}
 	router := apihttp.NewRouterWithConfig(
 		a.ResourceHandler,
@@ -213,6 +269,12 @@ func (a *Application) Run(ctx context.Context) error {
 // Shutdown gracefully shuts down the application.
 func (a *Application) Shutdown() error {
 	a.Logger.Info("Shutting down application")
+
+	if a.RedisClient != nil {
+		if err := a.RedisClient.Close(); err != nil {
+			a.Logger.Warn("Failed to close Redis client", logger.F("error", err.Error()))
+		}
+	}
 
 	// Stop tracer
 	if a.Config.App.EnableTracing {

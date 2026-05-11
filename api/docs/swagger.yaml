@@ -233,6 +233,17 @@ paths:
       description: Submits a new resource provisioning request to be processed asynchronously. The request is validated and queued for processing via SQS.
       security:
       - CognitoAuthorizer: []
+      parameters:
+        - in: header
+          name: X-Idempotency-Key
+          required: false
+          description: |
+            Client-generated UUIDv4 used to deduplicate retries. Reuse the same key when retrying
+            a failed request to avoid double-publishing. Stored responses are replayed for 24 hours.
+            Reusing a key with a different request body returns 422.
+          schema:
+            type: string
+            format: uuid
       requestBody:
         description: Resource provisioning request
         required: true
@@ -252,12 +263,16 @@ paths:
               description: API version that processed the request
               schema:
                 type: string
+            X-Idempotent-Replay:
+              description: Present and set to "true" when this response was replayed from the idempotency cache.
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AcceptedResponseEnvelope'
         "400":
-          description: Validation error
+          description: Validation error (includes malformed X-Idempotency-Key)
           headers:
             X-Request-Id:
               schema:
@@ -278,6 +293,32 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         "403":
           description: Forbidden - Insufficient permissions
+          headers:
+            X-Request-Id:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "409":
+          description: |
+            A request with this idempotency key is still being processed. Retry after a brief delay.
+          headers:
+            X-Request-Id:
+              schema:
+                type: string
+            Retry-After:
+              description: Suggested seconds to wait before retrying
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "422":
+          description: |
+            The X-Idempotency-Key was reused with a different request body. Use a new key.
           headers:
             X-Request-Id:
               schema:

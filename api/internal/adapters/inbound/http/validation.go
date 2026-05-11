@@ -32,13 +32,16 @@ type ErrorResponse struct {
 
 // Common error codes
 const (
-	ErrCodeValidation    = "VALIDATION_ERROR"
-	ErrCodeInvalidJSON   = "INVALID_JSON"
-	ErrCodeMissingHeader = "MISSING_HEADER"
-	ErrCodeInternalError = "INTERNAL_ERROR"
-	ErrCodeUnauthorized  = "UNAUTHORIZED"
-	ErrCodeNotFound      = "NOT_FOUND"
-	ErrCodeRateLimited   = "RATE_LIMITED"
+	ErrCodeValidation             = "VALIDATION_ERROR"
+	ErrCodeInvalidJSON            = "INVALID_JSON"
+	ErrCodeMissingHeader          = "MISSING_HEADER"
+	ErrCodeInternalError          = "INTERNAL_ERROR"
+	ErrCodeUnauthorized           = "UNAUTHORIZED"
+	ErrCodeNotFound               = "NOT_FOUND"
+	ErrCodeRateLimited            = "RATE_LIMITED"
+	ErrCodeIdempotencyKeyInvalid  = "IDEMPOTENCY_KEY_INVALID"
+	ErrCodeIdempotencyKeyMismatch = "IDEMPOTENCY_KEY_MISMATCH"
+	ErrCodeIdempotencyInProgress  = "IDEMPOTENT_REQUEST_IN_PROGRESS"
 )
 
 // =============================================================================

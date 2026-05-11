@@ -501,3 +501,60 @@ variable "ssm_parameter_type" {
   description = "Type of the SSM parameter"
   type        = string
 }
+
+# =============================================================================
+# REDIS-ON-ECS CONFIGURATION
+# Variables for the centralized Redis cache used by the idempotency layer
+# =============================================================================
+
+variable "redis_service_name" {
+  description = "ECS/Cloud Map service name for Redis (becomes the host portion of the DNS record)"
+  type        = string
+  default     = "redis"
+}
+
+variable "redis_service_discovery_namespace" {
+  description = "Cloud Map private DNS namespace (e.g. internal.idp.local)"
+  type        = string
+}
+
+variable "redis_service_discovery_dns_ttl" {
+  description = "DNS TTL for the Redis service record"
+  type        = number
+  default     = 10
+}
+
+variable "redis_cpu" {
+  description = "Fargate CPU units for the Redis task"
+  type        = number
+  default     = 256
+}
+
+variable "redis_memory" {
+  description = "Fargate memory (MiB) for the Redis task"
+  type        = number
+  default     = 512
+}
+
+variable "redis_max_memory_mb" {
+  description = "Redis maxmemory in MiB (kept below task memory)"
+  type        = number
+  default     = 384
+}
+
+variable "redis_maxmemory_policy" {
+  description = "Redis eviction policy"
+  type        = string
+  default     = "allkeys-lru"
+}
+
+variable "redis_log_retention_days" {
+  description = "CloudWatch log retention for the Redis container"
+  type        = number
+  default     = 7
+}
+
+variable "redis_ssm_parameter_name" {
+  description = "SSM parameter name where the Redis host:port endpoint is published"
+  type        = string
+}

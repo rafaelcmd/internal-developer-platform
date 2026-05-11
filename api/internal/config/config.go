@@ -20,6 +20,9 @@ type Config struct {
 
 	// Feature flags and application settings
 	App AppConfig
+
+	// Redis-backed idempotency layer
+	Idempotency IdempotencyConfig
 }
 
 // ServerConfig holds HTTP server configuration.
@@ -36,6 +39,21 @@ type AWSConfig struct {
 	Region                   string
 	ProvisionerQueueParamKey string
 	CognitoClientIDParamKey  string
+	RedisAddrParamKey        string
+}
+
+// IdempotencyConfig holds settings for the Redis-backed idempotency layer.
+//
+// RedisAddr can be overridden for local docker-compose; in deployed environments
+// the address is loaded from Parameter Store via AWS.RedisAddrParamKey.
+type IdempotencyConfig struct {
+	RedisAddr     string
+	RedisPassword string
+	RedisDB       int
+	TTL           time.Duration
+	DialTimeout   time.Duration
+	ReadTimeout   time.Duration
+	WriteTimeout  time.Duration
 }
 
 // AppConfig holds application-specific configuration.
@@ -67,6 +85,7 @@ func NewConfig(opts ...Option) *Config {
 			Region:                   getEnvOrDefault("AWS_REGION", "us-east-1"),
 			ProvisionerQueueParamKey: getEnvOrDefault("PROVISIONER_QUEUE_PARAM_KEY", "/INTERNAL_DEVELOPER_PLATFORM/PROVISIONER_QUEUE_URL"),
 			CognitoClientIDParamKey:  getEnvOrDefault("COGNITO_CLIENT_ID_PARAM_KEY", "/INTERNAL_DEVELOPER_PLATFORM/COGNITO_CLIENT_ID"),
+			RedisAddrParamKey:        getEnvOrDefault("REDIS_ADDR_PARAM_KEY", "/INTERNAL_DEVELOPER_PLATFORM/REDIS_ADDR"),
 		},
 		App: AppConfig{
 			Environment:    getEnvOrDefault("ENVIRONMENT", "dev"),
@@ -74,6 +93,15 @@ func NewConfig(opts ...Option) *Config {
 			AllowedOrigins: getSliceEnv("ALLOWED_ORIGINS", []string{"*"}),
 			EnableTracing:  getBoolEnv("ENABLE_TRACING", true),
 			ServiceName:    getEnvOrDefault("SERVICE_NAME", "internal-developer-platform.api"),
+		},
+		Idempotency: IdempotencyConfig{
+			RedisAddr:     getEnvOrDefault("REDIS_ADDR", ""),
+			RedisPassword: getEnvOrDefault("REDIS_PASSWORD", ""),
+			RedisDB:       getIntEnv("REDIS_DB", 0),
+			TTL:           getDurationEnv("IDEMPOTENCY_TTL", 24*time.Hour),
+			DialTimeout:   getDurationEnv("REDIS_DIAL_TIMEOUT", 2*time.Second),
+			ReadTimeout:   getDurationEnv("REDIS_READ_TIMEOUT", 1*time.Second),
+			WriteTimeout:  getDurationEnv("REDIS_WRITE_TIMEOUT", 1*time.Second),
 		},
 	}
 
@@ -132,6 +160,15 @@ func getDurationEnv(key string, defaultValue time.Duration) time.Duration {
 	if value := os.Getenv(key); value != "" {
 		if d, err := time.ParseDuration(value); err == nil {
 			return d
+		}
+	}
+	return defaultValue
+}
+
+func getIntEnv(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if i, err := strconv.Atoi(value); err == nil {
+			return i
 		}
 	}
 	return defaultValue

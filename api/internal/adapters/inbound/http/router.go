@@ -1,6 +1,11 @@
 package http
 
-import "net/http"
+import (
+	"net/http"
+	"time"
+
+	"github.com/rafaelcmd/internal-developer-platform/api/internal/domain/ports/outbound"
+)
 
 // API version prefix for path-based versioning
 const APIVersionPrefix = "/v1"
@@ -15,12 +20,20 @@ type ServeMuxAdapter interface {
 type RouterConfig struct {
 	// AllowedOrigins for CORS (used in local development, API Gateway handles CORS in production)
 	AllowedOrigins []string
+
+	// IdempotencyStore backs the idempotency middleware on mutating routes. If nil,
+	// the middleware is skipped — useful for tests that don't exercise the layer.
+	IdempotencyStore outbound.IdempotencyStore
+
+	// IdempotencyTTL controls how long stored responses are replayable.
+	IdempotencyTTL time.Duration
 }
 
 // DefaultRouterConfig returns default router configuration
 func DefaultRouterConfig() RouterConfig {
 	return RouterConfig{
 		AllowedOrigins: []string{"*"},
+		IdempotencyTTL: 24 * time.Hour,
 	}
 }
 
@@ -36,8 +49,17 @@ func NewRouterWithConfig(resourceHandler *ResourceHandler, healthHandler *Health
 	// All API endpoints use path-based versioning for backward compatibility
 	// =============================================================================
 
-	// Handle POST /v1/provision
-	mux.HandleFunc("POST "+APIVersionPrefix+"/provision", resourceHandler.Provision)
+	// POST /v1/provision is wrapped in the idempotency middleware so retries are deduped.
+	provisionHandler := http.HandlerFunc(resourceHandler.Provision)
+	if config.IdempotencyStore != nil {
+		ttl := config.IdempotencyTTL
+		if ttl == 0 {
+			ttl = 24 * time.Hour
+		}
+		mux.Handle("POST "+APIVersionPrefix+"/provision", IdempotencyMiddleware(config.IdempotencyStore, ttl)(provisionHandler))
+	} else {
+		mux.Handle("POST "+APIVersionPrefix+"/provision", provisionHandler)
+	}
 
 	// Handle GET /v1/health
 	mux.HandleFunc("GET "+APIVersionPrefix+"/health", healthHandler.HealthCheck)
