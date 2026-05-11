@@ -68,8 +68,8 @@ variable "private_subnet_ids" {
 }
 
 variable "ingress_security_group_ids" {
-  description = "Security groups allowed to reach Redis on container_port (e.g. the API task SG)"
-  type        = list(string)
+  description = "Security groups allowed to reach Redis on container_port, keyed by a stable caller-supplied label (e.g. { api = module.ecs.api_task_security_group_id }). Keys must be known at plan time; values may be apply-time."
+  type        = map(string)
 }
 
 # =============================================================================

@@ -105,7 +105,9 @@ module "redis" {
   # Networking
   vpc_id                     = data.terraform_remote_state.shared_vpc.outputs.vpc_id
   private_subnet_ids         = data.terraform_remote_state.shared_vpc.outputs.private_subnet_ids
-  ingress_security_group_ids = [module.ecs.api_task_security_group_id]
+  ingress_security_group_ids = {
+    api = module.ecs.api_task_security_group_id
+  }
 
   # Service discovery — API resolves the endpoint via Cloud Map private DNS
   service_discovery_namespace_name = var.redis_service_discovery_namespace
