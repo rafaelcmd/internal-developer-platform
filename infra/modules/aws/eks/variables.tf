@@ -65,6 +65,19 @@ variable "public_access_cidrs" {
 }
 
 # =============================================================================
+# CLUSTER ACCESS
+# IAM principals granted cluster-admin via the Access Entries API. Use this to
+# add operator IAM users/roles so `kubectl` works from their workstations — the
+# cluster creator (the TFC role) already has admin implicitly.
+# =============================================================================
+
+variable "cluster_admin_principal_arns" {
+  description = "List of IAM principal ARNs to grant cluster-admin via EKS Access Entries"
+  type        = list(string)
+  default     = []
+}
+
+# =============================================================================
 # FARGATE PROFILE CONFIGURATION
 # Namespaces routed to Fargate. Anything outside this list won't schedule
 # because there are no EC2 nodes attached to this cluster.

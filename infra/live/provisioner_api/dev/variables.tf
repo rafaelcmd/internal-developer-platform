@@ -75,6 +75,12 @@ variable "aws_load_balancer_controller_chart_version" {
   default     = "1.8.1"
 }
 
+variable "cluster_admin_principal_arns" {
+  description = "IAM principal ARNs granted cluster-admin via EKS Access Entries. Add operator IAM users/roles here so they can use kubectl against the cluster."
+  type        = list(string)
+  default     = []
+}
+
 # =============================================================================
 # LAMBDA CONFIGURATION
 # Variables for Lambda function (Datadog forwarder) configuration
