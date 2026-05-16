@@ -1,65 +1,134 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: internal-developer-platform-api-deployment
+  name: internal-developer-platform-api
+  namespace: default
   labels:
     app: internal-developer-platform-api
+    "tags.datadoghq.com/service": resource-provisioner-api
+    "tags.datadoghq.com/env": dev
+    "tags.datadoghq.com/version": "1.0.0"
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: internal-developer-platform-api
-  strategy: {}
   template:
     metadata:
-      name: internal-developer-platform-api-deployment
       labels:
         app: internal-developer-platform-api
+        "tags.datadoghq.com/service": resource-provisioner-api
+        "tags.datadoghq.com/env": dev
+        "tags.datadoghq.com/version": "1.0.0"
+      annotations:
+        "ad.datadoghq.com/internal-developer-platform-api.logs": >
+          [{"source":"go","service":"resource-provisioner-api","tags":["env:dev","project:internal-developer-platform"]}]
     spec:
       containers:
         - name: internal-developer-platform-api
-          image: rafaelcmd/internal-developer-platform-api:v2
-          volumeMounts:
-            - mountPath: "/.aws"
-              name: aws-credentials
-              readOnly: true
-          env:
-            - name: AWS_SHARED_CREDENTIALS_FILE
-              value: "/.aws/credentials"
-          resources:
-            limits:
-              cpu: 500m
-              memory: 256Mi
-            requests:
-              cpu: 250m
-              memory: 128Mi
+          image: PLACEHOLDER-ECR-REPO/internal-developer-platform-api:latest
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 5000
+            - name: http
+              containerPort: 8080
               protocol: TCP
-          livenessProbe:
-            httpGet:
-              path: /resource-provisioner
-              port: 5000
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            failureThreshold: 3
-          readinessProbe:
-            tcpSocket:
-              port: 5000
-            initialDelaySeconds: 5
-            periodSeconds: 5
-            failureThreshold: 2
+          env:
+            - name: PORT
+              value: "8080"
+            - name: ENVIRONMENT
+              value: dev
+            - name: DD_SERVICE
+              value: resource-provisioner-api
+            - name: DD_ENV
+              value: dev
+            - name: DD_VERSION
+              value: "1.0.0"
+            - name: DD_LOGS_ENABLED
+              value: "true"
+            - name: DD_LOGS_INJECTION
+              value: "true"
+            - name: DD_LOGS_SOURCE
+              value: go
+            - name: DD_AGENT_HOST
+              value: localhost
+            - name: DD_TRACE_AGENT_PORT
+              value: "8126"
+            - name: DD_DOGSTATSD_PORT
+              value: "8125"
+            - name: DD_TAGS
+              value: "project:internal-developer-platform,environment:dev,service:resource-provisioner-api"
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
           startupProbe:
             httpGet:
-              path: /resource-provisioner
-              port: 5000
-            initialDelaySeconds: 0
+              path: /v1/health
+              port: 8080
+            initialDelaySeconds: 5
             periodSeconds: 5
             failureThreshold: 30
-      restartPolicy: Always
+          readinessProbe:
+            httpGet:
+              path: /v1/health
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /v1/health
+              port: 8080
+            periodSeconds: 10
+            failureThreshold: 3
 
-      volumes:
-        - name: aws-credentials
-          secret:
-            secretName: aws-credentials
+        - name: datadog-agent
+          image: PLACEHOLDER-ECR-REPO/internal-developer-platform-api:datadog-agent
+          ports:
+            - name: dogstatsd
+              containerPort: 8125
+              protocol: UDP
+            - name: trace
+              containerPort: 8126
+              protocol: TCP
+          env:
+            - name: DD_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: datadog-api-key
+                  key: api-key
+            - name: DD_SITE
+              value: datadoghq.com
+            - name: DD_EKS_FARGATE
+              value: "true"
+            - name: DD_APM_ENABLED
+              value: "true"
+            - name: DD_APM_NON_LOCAL_TRAFFIC
+              value: "true"
+            - name: DD_DOGSTATSD_NON_LOCAL_TRAFFIC
+              value: "true"
+            - name: DD_LOGS_ENABLED
+              value: "true"
+            - name: DD_LOGS_CONFIG_USE_HTTP
+              value: "true"
+            - name: DD_LOGS_CONFIG_USE_COMPRESSION
+              value: "true"
+            - name: DD_TAGS
+              value: "project:internal-developer-platform,environment:dev,cluster:internal-developer-platform-cluster"
+            - name: DD_CLUSTER_NAME
+              value: internal-developer-platform-cluster
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 200m
+              memory: 512Mi
+          livenessProbe:
+            exec:
+              command: ["agent", "health"]
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            failureThreshold: 3

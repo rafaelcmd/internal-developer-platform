@@ -1,6 +1,24 @@
 # =============================================================================
+# EKS OUTPUTS
+# =============================================================================
+
+output "eks_cluster_name" {
+  description = "Name of the EKS cluster"
+  value       = module.eks.cluster_name
+}
+
+output "eks_cluster_endpoint" {
+  description = "API server endpoint of the EKS cluster"
+  value       = module.eks.cluster_endpoint
+}
+
+output "eks_oidc_provider_arn" {
+  description = "ARN of the IAM OIDC provider — needed when minting IRSA roles for workloads"
+  value       = module.eks.oidc_provider_arn
+}
+
+# =============================================================================
 # DATADOG INTEGRATION OUTPUTS
-# Outputs for Datadog Lambda forwarder identification and references
 # =============================================================================
 
 output "datadog_forwarder_arn" {
@@ -15,7 +33,6 @@ output "datadog_forwarder_name" {
 
 # =============================================================================
 # API GATEWAY OUTPUTS
-# Outputs for API Gateway access and identification
 # =============================================================================
 
 output "api_gateway_id" {

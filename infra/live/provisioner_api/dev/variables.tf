@@ -36,162 +36,61 @@ variable "api_version" {
 }
 
 # =============================================================================
-# ECS CONFIGURATION
-# Variables for ECS cluster, service, and task configuration
+# EKS CONFIGURATION
+# Variables for the EKS-on-Fargate cluster that hosts the API and Redis
 # =============================================================================
 
 variable "cluster_name" {
-  description = "Name of the ECS cluster"
+  description = "Name of the EKS cluster"
   type        = string
 }
 
-variable "task_family" {
-  description = "ECS task definition family name"
+variable "cluster_version" {
+  description = "Kubernetes control-plane version"
   type        = string
+  default     = "1.30"
 }
 
-variable "task_cpu" {
-  description = "CPU units for the ECS task"
-  type        = number
-}
-
-variable "task_memory" {
-  description = "Memory (in MiB) for the ECS task"
-  type        = number
-}
-
-variable "desired_count" {
-  description = "Desired number of running tasks"
-  type        = number
-}
-
-variable "container_port" {
-  description = "Port on which the application container listens"
-  type        = number
-}
-
-variable "app_image_tag" {
-  description = "Tag of the application Docker image"
-  type        = string
-}
-
-variable "deployment_maximum_percent" {
-  description = "Maximum percentage of tasks that can be running during a deployment"
-  type        = number
-}
-
-variable "deployment_minimum_healthy_percent" {
-  description = "Minimum percentage of healthy tasks during a deployment"
-  type        = number
-}
-
-variable "platform_version" {
-  description = "Platform version for ECS Fargate tasks"
-  type        = string
-}
-
-variable "force_new_deployment" {
-  description = "Whether to force a new deployment of the service"
+variable "cluster_endpoint_public_access" {
+  description = "Whether the EKS API server is reachable from the public internet"
   type        = bool
+  default     = true
 }
 
-variable "assign_public_ip" {
-  description = "Whether to assign a public IP to ECS tasks"
-  type        = bool
+variable "cluster_public_access_cidrs" {
+  description = "CIDRs allowed to reach the public EKS API endpoint"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
+variable "fargate_namespaces" {
+  description = "Namespaces routed to Fargate. Pods outside these namespaces won't schedule."
+  type        = list(string)
+  default     = ["default", "kube-system"]
+}
+
+variable "cluster_log_retention_days" {
+  description = "CloudWatch retention for EKS control-plane logs"
+  type        = number
+  default     = 7
+}
+
+variable "aws_load_balancer_controller_chart_version" {
+  description = "Helm chart version for the AWS Load Balancer Controller"
+  type        = string
+  default     = "1.8.1"
 }
 
 # =============================================================================
 # LOAD BALANCER CONFIGURATION
-# Variables for Network Load Balancer setup
+# The NLB itself is provisioned by the AWS Load Balancer Controller from the
+# k8s Service in /k8s/api/service.yaml. We only need its name (must match the
+# service.beta.kubernetes.io/aws-load-balancer-name annotation) so Terraform
+# can look it up via data.aws_lb for the API Gateway VPC Link.
 # =============================================================================
 
 variable "nlb_name" {
-  description = "Name of the Network Load Balancer"
-  type        = string
-}
-
-variable "internal" {
-  description = "Whether the load balancer is internal (true) or internet-facing (false)"
-  type        = bool
-}
-
-variable "load_balancer_type" {
-  description = "Type of load balancer to create (network for NLB)"
-  type        = string
-}
-
-variable "target_group_name" {
-  description = "Name of the NLB target group"
-  type        = string
-}
-
-variable "target_group_protocol" {
-  description = "Protocol for the target group (TCP, UDP, TCP_UDP for NLB)"
-  type        = string
-}
-
-variable "target_type" {
-  description = "Type of target that you must specify when registering targets (instance, ip)"
-  type        = string
-}
-
-# =============================================================================
-# HEALTH CHECK CONFIGURATION
-# Variables for NLB health check configuration
-# =============================================================================
-
-variable "health_check_enabled" {
-  description = "Whether health checks are enabled for the target group"
-  type        = bool
-}
-
-variable "health_check_protocol" {
-  description = "Protocol to use for health checks (TCP or HTTP for NLB)"
-  type        = string
-}
-
-variable "health_check_port" {
-  description = "Port to use for health checks"
-  type        = string
-}
-
-variable "health_check_interval" {
-  description = "Approximate amount of time, in seconds, between health checks (10 or 30 for NLB)"
-  type        = number
-}
-
-variable "health_check_timeout" {
-  description = "Amount of time, in seconds, during which no response means a failed health check (6 or 10 for NLB)"
-  type        = number
-}
-
-variable "healthy_threshold" {
-  description = "Number of consecutive health checks successes required before considering an unhealthy target healthy (2-10 for NLB)"
-  type        = number
-}
-
-variable "unhealthy_threshold" {
-  description = "Number of consecutive health check failures required before considering the target unhealthy (2-10 for NLB)"
-  type        = number
-}
-
-# =============================================================================
-# LISTENER CONFIGURATION
-# Variables for NLB listener configuration
-# =============================================================================
-
-variable "listener_port" {
-  description = "Port on which the load balancer is listening"
-  type        = number
-}
-
-variable "listener_protocol" {
-  description = "Protocol for connections from clients to the load balancer (TCP, UDP, TCP_UDP for NLB)"
-  type        = string
-}
-
-variable "listener_action_type" {
-  description = "Type of action for the default listener rule"
+  description = "Name the AWS Load Balancer Controller assigns to the API NLB. Must match the service.beta.kubernetes.io/aws-load-balancer-name annotation in k8s/api/service.yaml."
   type        = string
 }
 
@@ -503,58 +402,19 @@ variable "ssm_parameter_type" {
 }
 
 # =============================================================================
-# REDIS-ON-ECS CONFIGURATION
-# Variables for the centralized Redis cache used by the idempotency layer
+# REDIS CONFIGURATION
+# Redis runs as a k8s Deployment (see /k8s/redis/). We only need to publish the
+# in-cluster DNS endpoint to SSM so the API can resolve it at runtime — same
+# contract the ECS-era module exposed.
 # =============================================================================
-
-variable "redis_service_name" {
-  description = "ECS/Cloud Map service name for Redis (becomes the host portion of the DNS record)"
-  type        = string
-  default     = "redis"
-}
-
-variable "redis_service_discovery_namespace" {
-  description = "Cloud Map private DNS namespace (e.g. internal.idp.local)"
-  type        = string
-}
-
-variable "redis_service_discovery_dns_ttl" {
-  description = "DNS TTL for the Redis service record"
-  type        = number
-  default     = 10
-}
-
-variable "redis_cpu" {
-  description = "Fargate CPU units for the Redis task"
-  type        = number
-  default     = 256
-}
-
-variable "redis_memory" {
-  description = "Fargate memory (MiB) for the Redis task"
-  type        = number
-  default     = 512
-}
-
-variable "redis_max_memory_mb" {
-  description = "Redis maxmemory in MiB (kept below task memory)"
-  type        = number
-  default     = 384
-}
-
-variable "redis_maxmemory_policy" {
-  description = "Redis eviction policy"
-  type        = string
-  default     = "allkeys-lru"
-}
-
-variable "redis_log_retention_days" {
-  description = "CloudWatch log retention for the Redis container"
-  type        = number
-  default     = 7
-}
 
 variable "redis_ssm_parameter_name" {
   description = "SSM parameter name where the Redis host:port endpoint is published"
   type        = string
+}
+
+variable "redis_endpoint" {
+  description = "host:port the API uses to reach Redis. Defaults to the Service DNS name created by /k8s/redis/service.yaml."
+  type        = string
+  default     = "redis.default.svc.cluster.local:6379"
 }
