@@ -5,35 +5,18 @@ service_name = "resource-provisioner-api"
 app_version  = "1.0.0"
 api_version  = "v1"
 
-cluster_name                       = "internal-developer-platform-cluster"
-task_family                        = "resource-provisioner-api-task"
-task_cpu                           = 512
-task_memory                        = 1024
-desired_count                      = 1
-container_port                     = 8080
-app_image_tag                      = "latest"
-deployment_maximum_percent         = 200
-deployment_minimum_healthy_percent = 50
-platform_version                   = "1.4.0"
-force_new_deployment               = true
-assign_public_ip                   = false
+# EKS cluster
+cluster_name                               = "internal-developer-platform-cluster"
+cluster_version                            = "1.30"
+cluster_endpoint_public_access             = true
+cluster_public_access_cidrs                = ["0.0.0.0/0"]
+fargate_namespaces                         = ["default", "kube-system"]
+cluster_log_retention_days                 = 7
+aws_load_balancer_controller_chart_version = "1.8.1"
 
-nlb_name              = "idp-nlb"
-internal              = true
-load_balancer_type    = "network"
-target_group_name     = "idp-tg-8080"
-target_group_protocol = "TCP"
-target_type           = "ip"
-health_check_enabled  = true
-health_check_protocol = "TCP"
-health_check_port     = "traffic-port"
-health_check_interval = 30
-health_check_timeout  = 6
-healthy_threshold     = 3
-unhealthy_threshold   = 3
-listener_port         = 80
-listener_protocol     = "TCP"
-listener_action_type  = "forward"
+# NLB name the AWS Load Balancer Controller will assign. Must match the
+# service.beta.kubernetes.io/aws-load-balancer-name annotation in k8s/api/service.yaml.
+nlb_name = "idp-api-nlb"
 
 api_gateway_name                 = "internal-developer-platform-api"
 api_gateway_description          = "Internal Developer Platform Provisioner API Gateway"
@@ -85,13 +68,7 @@ receive_wait_time_seconds = 20
 ssm_parameter_name        = "/INTERNAL_DEVELOPER_PLATFORM/PROVISIONER_QUEUE_URL"
 ssm_parameter_type        = "String"
 
-# Redis (ECS service backing the idempotency layer)
-redis_service_name                = "redis"
-redis_service_discovery_namespace = "internal.idp.local"
-redis_service_discovery_dns_ttl   = 10
-redis_cpu                         = 256
-redis_memory                      = 512
-redis_max_memory_mb               = 384
-redis_maxmemory_policy            = "allkeys-lru"
-redis_log_retention_days          = 7
-redis_ssm_parameter_name          = "/INTERNAL_DEVELOPER_PLATFORM/REDIS_ADDR"
+# Redis runs in-cluster (see /k8s/redis/). The SSM parameter publishes the
+# service DNS so the API resolves it the same way it did under the ECS module.
+redis_ssm_parameter_name = "/INTERNAL_DEVELOPER_PLATFORM/REDIS_ADDR"
+redis_endpoint           = "redis.default.svc.cluster.local:6379"

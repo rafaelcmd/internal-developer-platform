@@ -1,30 +1,29 @@
 resource "aws_iam_policy" "provisioner_api_app_policy" {
   name        = "${var.project}-${var.environment}-provisioner-api-app-policy"
-  description = "Least privilege policy for managing Application resources (ECS, Lambda, API Gateway, SQS)"
+  description = "Least privilege policy for managing Application resources (EKS, Lambda, API Gateway, SQS)"
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-      # ECS Statements
+      # EKS Statements
       {
-        Sid    = "ECSRead"
+        Sid    = "EKSRead"
         Effect = "Allow"
         Action = [
-          "ecs:List*",
-          "ecs:Describe*",
-          "ecs:Get*"
+          "eks:List*",
+          "eks:Describe*"
         ]
         Resource = "*"
       },
       {
-        Sid    = "ECSCreateTagged"
+        Sid    = "EKSCreateTagged"
         Effect = "Allow"
         Action = [
-          "ecs:CreateCluster",
-          "ecs:CreateService",
-          "ecs:RunTask",
-          "ecs:StartTask",
-          "ecs:RegisterTaskDefinition",
-          "ecs:TagResource"
+          "eks:CreateCluster",
+          "eks:CreateFargateProfile",
+          "eks:CreateNodegroup",
+          "eks:CreateAddon",
+          "eks:CreateAccessEntry",
+          "eks:TagResource"
         ]
         Resource = "*"
         Condition = {
@@ -34,15 +33,25 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
         }
       },
       {
-        Sid    = "ECSManageProjectResources"
+        Sid    = "EKSManageProjectResources"
         Effect = "Allow"
         Action = [
-          "ecs:DeleteCluster",
-          "ecs:UpdateCluster",
-          "ecs:DeleteService",
-          "ecs:UpdateService",
-          "ecs:StopTask",
-          "ecs:UntagResource"
+          "eks:DeleteCluster",
+          "eks:UpdateClusterConfig",
+          "eks:UpdateClusterVersion",
+          "eks:DeleteFargateProfile",
+          "eks:DeleteNodegroup",
+          "eks:UpdateNodegroupConfig",
+          "eks:UpdateNodegroupVersion",
+          "eks:DeleteAddon",
+          "eks:UpdateAddon",
+          "eks:DeleteAccessEntry",
+          "eks:UpdateAccessEntry",
+          "eks:AssociateAccessPolicy",
+          "eks:DisassociateAccessPolicy",
+          "eks:AssociateIdentityProviderConfig",
+          "eks:DisassociateIdentityProviderConfig",
+          "eks:UntagResource"
         ]
         Resource = "*"
         Condition = {
@@ -51,12 +60,20 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
           }
         }
       },
+      # IAM OIDC provider — EKS module creates one per cluster for IRSA
       {
-        Sid    = "ECSManageTaskDefinitions"
+        Sid    = "IAMOpenIDConnectProvider"
         Effect = "Allow"
         Action = [
-          "ecs:RegisterTaskDefinition",
-          "ecs:DeregisterTaskDefinition"
+          "iam:CreateOpenIDConnectProvider",
+          "iam:DeleteOpenIDConnectProvider",
+          "iam:GetOpenIDConnectProvider",
+          "iam:ListOpenIDConnectProviders",
+          "iam:UpdateOpenIDConnectProviderThumbprint",
+          "iam:AddClientIDToOpenIDConnectProvider",
+          "iam:RemoveClientIDFromOpenIDConnectProvider",
+          "iam:TagOpenIDConnectProvider",
+          "iam:UntagOpenIDConnectProvider"
         ]
         Resource = "*"
       },
@@ -68,7 +85,8 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
         Condition = {
           StringLike = {
             "iam:PassedToService" = [
-              "ecs-tasks.amazonaws.com",
+              "eks.amazonaws.com",
+              "eks-fargate-pods.amazonaws.com",
               "lambda.amazonaws.com",
               "apigateway.amazonaws.com"
             ]

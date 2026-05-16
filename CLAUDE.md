@@ -4,7 +4,7 @@ Monorepo for an internal developer platform that provisions cloud resources and 
 
 ## Architecture
 
-Event-driven, multi-service platform on AWS (ECS, SQS, Cognito):
+Event-driven, multi-service platform on AWS (EKS, SQS, Cognito):
 
 1. **API** (`/api`) — Go 1.24 REST API. Receives resource creation requests, publishes messages to SQS.
 2. **Cost Manager** (`/services/cost-manager`) — Clojure 1.12 service. Consumes SQS messages and tracks costs across AWS/GCP/Azure.
@@ -15,7 +15,7 @@ Message flow: API → SQS → Cost Manager / Provisioner
 ## Tech Stack
 
 - **Languages:** Go (API, Provisioner), Clojure (Cost Manager)
-- **Infra:** AWS ECS, Terraform (`/infra`), Kubernetes (`/k8s`)
+- **Infra:** AWS EKS on Fargate, Terraform (`/infra`), Kubernetes (`/k8s`)
 - **Messaging:** AWS SQS, Kafka (local dev)
 - **Observability:** Datadog, AWS X-Ray
 - **CI/CD:** GitHub Actions (`.github/workflows/`)
