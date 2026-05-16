@@ -1,5 +1,7 @@
 # =============================================================================
 # EKS OUTPUTS
+# Consumed by the edge stack (infra/live/provisioner_api_gateway/dev) and by
+# operators running kubectl against the cluster.
 # =============================================================================
 
 output "eks_cluster_name" {
@@ -29,28 +31,4 @@ output "datadog_forwarder_arn" {
 output "datadog_forwarder_name" {
   description = "The name of the Datadog Lambda forwarder"
   value       = module.datadog_forwarder.function_name
-}
-
-# =============================================================================
-# API GATEWAY OUTPUTS
-# =============================================================================
-
-output "api_gateway_id" {
-  description = "ID of the API Gateway"
-  value       = module.api_gateway.api_gateway_id
-}
-
-output "api_gateway_invoke_url" {
-  description = "Invoke URL of the API Gateway"
-  value       = module.api_gateway.api_gateway_invoke_url
-}
-
-output "api_gateway_execution_arn" {
-  description = "Execution ARN of the API Gateway"
-  value       = module.api_gateway.api_gateway_execution_arn
-}
-
-output "vpc_link_id" {
-  description = "ID of the VPC Link"
-  value       = module.api_gateway.vpc_link_id
 }
