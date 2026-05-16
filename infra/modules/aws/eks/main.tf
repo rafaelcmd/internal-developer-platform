@@ -78,15 +78,53 @@ resource "aws_eks_cluster" "this" {
     public_access_cidrs     = var.public_access_cidrs
   }
 
+  # Use the Access Entries API for cluster auth. CONFIG_MAP is kept on so that
+  # any tooling still expecting aws-auth keeps working during the transition.
+  access_config {
+    authentication_mode                         = "API_AND_CONFIG_MAP"
+    bootstrap_cluster_creator_admin_permissions = true
+  }
+
   tags = merge(local.common_tags, {
-    Datadog           = "monitored"
-    "datadog:env"     = var.environment
+    Datadog       = "monitored"
+    "datadog:env" = var.environment
   })
 
   depends_on = [
     aws_iam_role_policy_attachment.cluster_policy,
     aws_cloudwatch_log_group.cluster,
   ]
+}
+
+# =============================================================================
+# CLUSTER ADMIN ACCESS ENTRIES
+# Grants extra IAM principals (e.g. operator IAM users) cluster-admin via the
+# Access Entries API. The cluster creator (the TFC role) already has admin
+# implicitly through bootstrap_cluster_creator_admin_permissions above.
+# =============================================================================
+
+resource "aws_eks_access_entry" "admins" {
+  for_each = toset(var.cluster_admin_principal_arns)
+
+  cluster_name  = aws_eks_cluster.this.name
+  principal_arn = each.value
+  type          = "STANDARD"
+
+  tags = local.common_tags
+}
+
+resource "aws_eks_access_policy_association" "admins" {
+  for_each = toset(var.cluster_admin_principal_arns)
+
+  cluster_name  = aws_eks_cluster.this.name
+  principal_arn = each.value
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+
+  access_scope {
+    type = "cluster"
+  }
+
+  depends_on = [aws_eks_access_entry.admins]
 }
 
 # =============================================================================

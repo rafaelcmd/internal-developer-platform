@@ -13,6 +13,12 @@ fargate_namespaces                         = ["default", "kube-system"]
 cluster_log_retention_days                 = 7
 aws_load_balancer_controller_chart_version = "1.8.1"
 
+# IAM principals granted cluster-admin via EKS Access Entries. Replace the
+# placeholder with the output of `aws sts get-caller-identity` on your workstation.
+cluster_admin_principal_arns = [
+  "arn:aws:iam::413703165862:user/rafael",
+]
+
 lambda_function_name              = "provisioner-api-datadog-forwarder"
 lambda_runtime                    = "python3.9"
 lambda_timeout                    = 120

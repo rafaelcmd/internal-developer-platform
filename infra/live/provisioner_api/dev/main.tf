@@ -30,6 +30,9 @@ module "eks" {
   install_aws_load_balancer_controller       = true
   aws_load_balancer_controller_chart_version = var.aws_load_balancer_controller_chart_version
 
+  # Operator IAM principals granted cluster-admin so kubectl works from their workstations.
+  cluster_admin_principal_arns = var.cluster_admin_principal_arns
+
   tags = local.tags
 }
 
