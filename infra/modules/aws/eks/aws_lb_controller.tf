@@ -206,6 +206,31 @@ resource "aws_iam_policy" "lbc" {
           }
         }
       },
+      # AddTags during CreateLoadBalancer/CreateTargetGroup. Required because
+      # the LBC tags the resource in the same API call that creates it, before
+      # the elbv2.k8s.aws/cluster ResourceTag exists.
+      {
+        Effect = "Allow"
+        Action = [
+          "elasticloadbalancing:AddTags"
+        ]
+        Resource = [
+          "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*",
+          "arn:aws:elasticloadbalancing:*:*:loadbalancer/net/*/*",
+          "arn:aws:elasticloadbalancing:*:*:loadbalancer/app/*/*"
+        ]
+        Condition = {
+          StringEquals = {
+            "elasticloadbalancing:CreateAction" = [
+              "CreateTargetGroup",
+              "CreateLoadBalancer"
+            ]
+          }
+          Null = {
+            "aws:RequestTag/elbv2.k8s.aws/cluster" = "false"
+          }
+        }
+      },
       {
         Effect = "Allow"
         Action = [
