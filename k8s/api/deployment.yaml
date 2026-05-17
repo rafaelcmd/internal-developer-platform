@@ -24,6 +24,7 @@ spec:
         "ad.datadoghq.com/internal-developer-platform-api.logs": >
           [{"source":"go","service":"resource-provisioner-api","tags":["env:dev","project:internal-developer-platform"]}]
     spec:
+      serviceAccountName: internal-developer-platform-api
       containers:
         - name: internal-developer-platform-api
           image: PLACEHOLDER-ECR-REPO:api-latest
