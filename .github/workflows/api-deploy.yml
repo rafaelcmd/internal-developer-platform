@@ -36,12 +36,40 @@ jobs:
             --query 'Parameter.Value' \
             --output text)
           echo "ECR_URL=$ECR_URL" >> "$GITHUB_ENV"
+          echo "ECR_REGISTRY=$(echo "$ECR_URL" | cut -d/ -f1)" >> "$GITHUB_ENV"
+
+      - name: Login to Amazon ECR
+        run: |
+          aws ecr get-login-password --region "${{ env.AWS_REGION }}" \
+            | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+
+      - name: Build and push API image
+        working-directory: api
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            -f Dockerfile.dev \
+            -t "$ECR_URL:api-latest" \
+            -t "$ECR_URL:api-${{ github.sha }}" \
+            .
+          docker push "$ECR_URL:api-latest"
+          docker push "$ECR_URL:api-${{ github.sha }}"
 
       - name: Substitute ECR URL in deployment manifest
         run: sed -i "s|PLACEHOLDER-ECR-REPO|${ECR_URL}|g" k8s/api/deployment.yaml
 
       - name: Update kubeconfig
         run: aws eks update-kubeconfig --name "${{ env.EKS_CLUSTER_NAME }}" --region "${{ env.AWS_REGION }}"
+
+      - name: Create or update datadog-api-key Secret
+        env:
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+        run: |
+          kubectl create secret generic datadog-api-key \
+            --from-literal=api-key="$DD_API_KEY" \
+            --namespace=default \
+            --dry-run=client -o yaml \
+            | kubectl apply -f -
 
       - name: Apply manifests
         run: |
