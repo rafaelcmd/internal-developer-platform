@@ -1,0 +1,49 @@
+name: API - Deploy to EKS
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+  EKS_CLUSTER_NAME: internal-developer-platform-cluster
+  SSM_PARAM_NAME: /internal-developer-platform/shared/ecr/internal-developer-platform-repo/repository_url
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy API to EKS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          role-session-name: github-actions-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Fetch ECR URL from SSM Parameter Store
+        run: |
+          ECR_URL=$(aws ssm get-parameter \
+            --name "${{ env.SSM_PARAM_NAME }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          echo "ECR_URL=$ECR_URL" >> "$GITHUB_ENV"
+
+      - name: Substitute ECR URL in deployment manifest
+        run: sed -i "s|PLACEHOLDER-ECR-REPO|${ECR_URL}|g" k8s/api/deployment.yaml
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name "${{ env.EKS_CLUSTER_NAME }}" --region "${{ env.AWS_REGION }}"
+
+      - name: Apply manifests
+        run: |
+          kubectl apply -f k8s/api/deployment.yaml
+          kubectl apply -f k8s/api/service.yaml

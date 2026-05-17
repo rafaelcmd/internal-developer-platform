@@ -1,4 +1,4 @@
-name: AWS ECR - Create
+name: Shared - Create AWS ECR
 
 on:
   workflow_dispatch:

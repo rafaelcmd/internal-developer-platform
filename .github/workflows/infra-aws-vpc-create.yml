@@ -1,4 +1,4 @@
-name: AWS VPC - Create
+name: Shared - Create AWS VPC
 
 on:
   workflow_dispatch:

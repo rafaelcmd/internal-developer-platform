@@ -17,6 +17,17 @@ resource "aws_ecr_repository" "this" {
   })
 }
 
+resource "aws_ssm_parameter" "repository_url" {
+  name  = "/${var.project}/${var.environment}/ecr/${var.repository_name}/repository_url"
+  type  = "String"
+  value = aws_ecr_repository.this.repository_url
+
+  tags = merge(var.tags, {
+    Project     = var.project
+    Environment = var.environment
+  })
+}
+
 resource "aws_ecr_lifecycle_policy" "this" {
   repository = aws_ecr_repository.this.name
 
