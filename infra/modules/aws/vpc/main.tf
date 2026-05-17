@@ -47,7 +47,8 @@ resource "aws_subnet" "public" {
   availability_zone       = var.availability_zones[count.index % local.az_count]
 
   tags = merge(var.tags, local.common_tags, {
-    Name = "${var.project}-${var.environment}-public-${count.index + 1}"
+    Name                     = "${var.project}-${var.environment}-public-${count.index + 1}"
+    "kubernetes.io/role/elb" = "1"
   })
 }
 
@@ -84,7 +85,8 @@ resource "aws_subnet" "private" {
   availability_zone = var.availability_zones[count.index % local.az_count]
 
   tags = merge(var.tags, local.common_tags, {
-    Name = "${var.project}-${var.environment}-private-${count.index + 1}"
+    Name                              = "${var.project}-${var.environment}-private-${count.index + 1}"
+    "kubernetes.io/role/internal-elb" = "1"
   })
 }
 
