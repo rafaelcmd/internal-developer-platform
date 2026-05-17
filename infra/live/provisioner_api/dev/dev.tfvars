@@ -17,6 +17,7 @@ aws_load_balancer_controller_chart_version = "1.8.1"
 # placeholder with the output of `aws sts get-caller-identity` on your workstation.
 cluster_admin_principal_arns = [
   "arn:aws:iam::413703165862:user/rafael",
+  "arn:aws:iam::413703165862:role/github-actions-oidc-role",
 ]
 
 lambda_function_name              = "provisioner-api-datadog-forwarder"
