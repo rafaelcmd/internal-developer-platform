@@ -9,3 +9,7 @@ output "repository_url" {
 output "repository_arn" {
   value = module.ecr.repository_arn
 }
+
+output "repository_url_ssm_parameter_name" {
+  value = module.ecr.repository_url_ssm_parameter_name
+}

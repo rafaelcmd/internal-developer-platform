@@ -26,7 +26,7 @@ spec:
     spec:
       containers:
         - name: internal-developer-platform-api
-          image: PLACEHOLDER-ECR-REPO/internal-developer-platform-api:latest
+          image: PLACEHOLDER-ECR-REPO:api-latest
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -85,7 +85,7 @@ spec:
             failureThreshold: 3
 
         - name: datadog-agent
-          image: PLACEHOLDER-ECR-REPO/internal-developer-platform-api:datadog-agent
+          image: PLACEHOLDER-ECR-REPO:datadog-agent
           ports:
             - name: dogstatsd
               containerPort: 8125
