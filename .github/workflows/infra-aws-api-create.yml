@@ -52,3 +52,9 @@ jobs:
 
       - name: Terraform Apply
         run: terraform apply -auto-approve -input=false -var-file=dev.tfvars
+
+      - name: Restart CoreDNS to schedule on Fargate
+        run: |
+          aws eks update-kubeconfig --name internal-developer-platform-cluster --region "${{ env.AWS_REGION }}"
+          kubectl rollout restart deployment/coredns -n kube-system
+          kubectl rollout status deployment/coredns -n kube-system --timeout=5m
