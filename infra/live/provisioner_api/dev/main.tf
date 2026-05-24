@@ -1,9 +1,9 @@
 module "eks" {
-  source = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/eks?ref=main"
+  source = "../../../modules/aws/eks"
 
-  # Infrastructure dependencies
-  vpc_id             = data.terraform_remote_state.shared_vpc.outputs.vpc_id
-  private_subnet_ids = data.terraform_remote_state.shared_vpc.outputs.private_subnet_ids
+  # Infrastructure dependencies — sourced from SSM (published by shared/vpc)
+  vpc_id             = data.aws_ssm_parameter.vpc_id.value
+  private_subnet_ids = split(",", data.aws_ssm_parameter.private_subnet_ids.value)
 
   # Project / region
   aws_region  = var.aws_region
@@ -37,7 +37,7 @@ module "eks" {
 }
 
 module "sqs" {
-  source = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/sqs?ref=main"
+  source = "../../../modules/aws/sqs"
 
   # SQS configuration
   queue_name                = var.queue_name
@@ -77,7 +77,7 @@ resource "aws_ssm_parameter" "redis_endpoint" {
 # Application logs now originate from the CloudWatch log group the Datadog agent
 # DaemonSet writes to, or from EKS control-plane logs.
 module "datadog_forwarder" {
-  source = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/lambda?ref=main"
+  source = "../../../modules/aws/lambda"
 
   # Basic Lambda configuration
   function_name                  = var.lambda_function_name

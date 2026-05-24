@@ -2,6 +2,10 @@ name: API - Deploy to EKS
 
 on:
   workflow_dispatch:
+  workflow_call:
+    secrets:
+      DD_API_KEY:
+        required: true
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION }}

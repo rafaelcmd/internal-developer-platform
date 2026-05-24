@@ -1,0 +1,276 @@
+# Internal Developer Platform — Infrastructure
+
+> AWS infrastructure for an event-driven internal developer platform. Terraform modules + live workspaces, deployed across decoupled stacks orchestrated by GitHub Actions over OIDC.
+
+This directory is a self-contained Terraform monorepo. It provisions the network, container registry, identity, EKS-on-Fargate cluster, message bus, API gateway and observability that the platform's Go API, Go provisioner, and Clojure cost-manager services run on.
+
+It exists primarily as a study and portfolio artifact: every decision below is one I would defend in a system-design interview.
+
+---
+
+## What this demonstrates
+
+- **Stack decomposition** — the platform is split across eight independently appliable Terraform stacks. Each stack owns one well-defined responsibility (network, identity, compute, etc.) and can be destroyed and recreated without touching the others.
+- **State decoupling via SSM Parameter Store** — producers publish identifiers to `/idp/shared/<stack>/*`; consumers read them via `data.aws_ssm_parameter`. There are zero `terraform_remote_state` reads anywhere in `live/`. A consumer stack does not need TFC API access to a producer's state file, only IAM read on a known SSM path.
+- **OIDC everywhere, no static keys** — GitHub Actions assumes an AWS role via the GitHub OIDC provider, and Terraform Cloud assumes one via the TFC OIDC provider. No `AWS_ACCESS_KEY_ID` lives in repository secrets.
+- **EKS on Fargate** — no node groups, no EC2 patching, no Cluster Autoscaler. Workload IAM is via IRSA, bound to the cluster's OIDC issuer.
+- **One-click create / destroy** — an orchestrator workflow chains the per-stack workflows in dependency order via `workflow_call`, making full-platform tear-up and tear-down a single GitHub Actions click.
+- **Reusable AWS modules** — every resource lives in a module under `modules/aws/*`. Live workspaces are thin compositions: a few `module` blocks, a `data` block or two, a backend.
+
+---
+
+## Architecture
+
+```
+                          GitHub Actions (OIDC)
+                                 │
+                                 ▼
+                  ┌──────────────────────────────┐
+                  │  Terraform Cloud workspaces  │
+                  └──────────────────────────────┘
+                                 │
+   ┌─────────────────────────────┼─────────────────────────────┐
+   │                             │                             │
+   ▼                             ▼                             ▼
+ shared/vpc          shared/ecr          shared/identity (Cognito)
+   │                             │                             │
+   ├── publishes ──────▶ /idp/shared/vpc/*    ──┐               │
+   ├── publishes ──────▶ /idp/shared/ecr/*    ──┤               │
+   └── publishes ──────▶ /idp/shared/identity/* ─────────────┐  │
+                                                              │  │
+                                                              ▼  ▼
+                                                       SSM Parameter Store
+                                                              │
+                                  ┌───────────────────────────┤
+                                  ▼                           ▼
+                       provisioner_api/dev           provisioner_api_gateway/dev
+                       (EKS + LBC + SQS +            (API Gateway + WAF +
+                        Redis SSM + DD fwd)           Cognito authorizer + VPC Link)
+                                  │                           ▲
+                                  ▼                           │
+                          K8s API Service  ─── NLB ───────────┘
+                          (provisions the NLB the
+                           API Gateway VPC Link targets)
+```
+
+Cross-stack edges are SSM reads, not state reads. The only place a downstream stack pulls live AWS data instead of SSM is the gateway's `data.aws_lb.api` lookup — necessary because the NLB is provisioned by the AWS Load Balancer Controller in response to a Kubernetes Service, not by Terraform.
+
+---
+
+## Layout
+
+```
+infra/
+├── modules/                         # reusable, parameterized Terraform modules
+│   ├── aws/
+│   │   ├── api_gateway/             # REST API Gateway + stage + VPC Link
+│   │   ├── cognito/                 # User pool + client; publishes IDs to SSM
+│   │   ├── datadog_integration/     # AWS↔Datadog integration role + log forwarder wiring
+│   │   ├── ecr/                     # ECR repo + lifecycle policy; publishes URL to SSM
+│   │   ├── eks/                     # EKS-on-Fargate cluster, OIDC provider, IRSA scaffolding,
+│   │   │                            # CoreDNS Fargate patch, AWS Load Balancer Controller
+│   │   ├── lambda/                  # Generic Lambda module (used for Datadog forwarder)
+│   │   ├── oidc/                    # Generic AWS IAM OIDC provider + role
+│   │   ├── sqs/                     # SQS queue + SSM publishing of URL
+│   │   ├── vpc/                     # VPC, subnets, NAT-less private routing, SSM publishing
+│   │   └── waf/                     # WAFv2 Web ACL for API Gateway
+│   └── datadog/                     # Datadog provider integration (consumed by shared/datadog)
+└── live/
+    ├── shared/                      # platform-wide, environment-independent
+    │   ├── vpc/                     # the only VPC
+    │   ├── ecr/                     # the only image registry
+    │   ├── identity/                # Cognito; standalone so other stacks need only SSM reads
+    │   ├── datadog/                 # AWS↔Datadog integration + API key in SSM
+    │   ├── iam-github-oidc/         # AWS role assumed by GitHub Actions
+    │   └── iam-tfc-oidc/            # AWS role assumed by Terraform Cloud
+    └── provisioner_api/dev/         # EKS + SQS + Redis SSM + Datadog Lambda forwarder
+        provisioner_api_gateway/dev/ # API Gateway + WAF (consumes identity + NLB)
+```
+
+Module composition stays inside the repo. Live workspaces reference modules by **relative path** (`source = "../../../modules/aws/eks"`), not by git URL — there is no push-before-apply trap and no version drift between live and module code.
+
+---
+
+## The eight stacks
+
+| Stack | Workspace | Owns | Reads (SSM) |
+|---|---|---|---|
+| `shared/vpc` | `internal-developer-platform-shared-vpc` | VPC, 2 public + 2 private subnets, IGW, route tables, ELB role-tags | — |
+| `shared/ecr` | `internal-developer-platform-shared-ecr` | ECR repo, lifecycle, repo URL in SSM | — |
+| `shared/identity` | `internal-developer-platform-shared-identity` | Cognito user pool + client, identity params in SSM | — |
+| `shared/datadog` | `internal-developer-platform-shared-datadog` | AWS↔Datadog integration role, Datadog API key in SSM | — |
+| `shared/iam-github-oidc` | `internal-developer-platform-iam-github-oidc` | IAM role assumed by GitHub Actions via OIDC | — |
+| `shared/iam-tfc-oidc` | `internal-developer-platform-iam-tfc-oidc` | IAM role assumed by Terraform Cloud via OIDC | — |
+| `provisioner_api/dev` | `internal-developer-platform-provisioner-api-dev` | EKS cluster (Fargate), IRSA scaffolding, AWS Load Balancer Controller, SQS queue, Redis endpoint in SSM, Datadog Lambda forwarder | `/idp/shared/vpc/*`, `/idp/shared/datadog/*` |
+| `provisioner_api_gateway/dev` | `internal-developer-platform-provisioner-api-gateway-dev` | REST API Gateway, VPC Link, Cognito authorizer, WAF Web ACL | `/idp/shared/identity/*`, `data.aws_lb` (NLB by name) |
+
+The two `iam-*-oidc` stacks are bootstrap; they exist so every other stack can authenticate without long-lived credentials. They are deliberately **not** part of the orchestrator chain — the orchestrator itself depends on them.
+
+---
+
+## Key engineering decisions
+
+### 1. SSM Parameter Store as the cross-stack contract
+
+Originally the project used `data.terraform_remote_state` to share IDs between stacks. That created hard coupling — every consumer needed TFC API access to every producer, and circular references (the gateway referenced the EKS stack via the API stack, which referenced the gateway via Cognito) became latent bugs that only surfaced during destroy.
+
+The migration to SSM:
+
+```hcl
+# Producer (modules/aws/vpc/ssm.tf)
+resource "aws_ssm_parameter" "private_subnet_ids" {
+  name  = "/idp/shared/vpc/private_subnet_ids"
+  type  = "StringList"
+  value = join(",", [for s in aws_subnet.private : s.id])
+}
+
+# Consumer (live/provisioner_api/dev/data.tf)
+data "aws_ssm_parameter" "private_subnet_ids" {
+  name = "/idp/shared/vpc/private_subnet_ids"
+}
+# usage: split(",", data.aws_ssm_parameter.private_subnet_ids.value)
+```
+
+The contract is just a path. Anything — Terraform, a CI script, a Lambda — can resolve it.
+
+### 2. Cognito as a standalone shared stack
+
+Cognito used to live inside the `provisioner_api_gateway` stack because the gateway needed it as the authorizer. But the API workload also needs the user pool ARN for IRSA scoping, and shoving Cognito into `provisioner_api_gateway` made the API stack depend on the gateway stack — which already depended on the API stack via the NLB. Promoting Cognito to its own `shared/identity` stack collapses the cycle into a strict DAG.
+
+### 3. EKS on Fargate with IRSA, no node groups
+
+The platform's workload pattern (long-tail traffic, infrequent invocations) is poorly served by EC2 worker nodes — you pay for idle capacity. Fargate per-pod pricing is the right cost model. The trade-offs encoded in the EKS module:
+
+- **CoreDNS patch baked in** — EKS ships CoreDNS with `eks.amazonaws.com/compute-type: ec2`, which prevents Fargate scheduling. A `kubernetes_annotations` resource strips it on apply.
+- **AWS Load Balancer Controller installed via Helm** with an IRSA-backed ServiceAccount and an explicit IAM policy (no AWS-managed policy — minimum permissions matched to the controller's needs).
+- **Access Entries API** (not the legacy `aws-auth` ConfigMap) for granting cluster-admin to operator IAM principals.
+
+### 4. The NLB is a Kubernetes resource, not a Terraform resource
+
+The API's NLB is provisioned by the AWS Load Balancer Controller in response to `k8s/api/service.yaml`. The gateway stack reads it back by name using `data.aws_lb` — Terraform never owns the NLB. This keeps the deploy story (`kubectl apply -f k8s/api/service.yaml`) and the infrastructure story (`terraform apply`) cleanly separated.
+
+### 5. Tight per-resource IAM scoping where it costs nothing
+
+Module IAM policies use concrete ARNs (`aws_ecr_repository.this.arn`, `aws_sqs_queue.this.arn`) rather than `Resource = "*"` whenever the producer Terraform has the ARN in scope. The exception is the AWS Load Balancer Controller policy, which mirrors the upstream-recommended policy — those `*`s are tag-conditioned (`elbv2.k8s.aws/cluster`).
+
+---
+
+## SSM parameter contract
+
+| Path | Type | Producer | Consumers |
+|---|---|---|---|
+| `/idp/shared/vpc/id` | String | `shared/vpc` | `provisioner_api/dev` |
+| `/idp/shared/vpc/cidr_block` | String | `shared/vpc` | — |
+| `/idp/shared/vpc/public_subnet_ids` | StringList | `shared/vpc` | — |
+| `/idp/shared/vpc/private_subnet_ids` | StringList | `shared/vpc` | `provisioner_api/dev` |
+| `/idp/shared/identity/user_pool_id` | String | `shared/identity` | (future workloads) |
+| `/idp/shared/identity/user_pool_arn` | String | `shared/identity` | `provisioner_api_gateway/dev` |
+| `/idp/shared/identity/user_pool_client_id` | String | `shared/identity` | (future workloads) |
+| `/idp/<project>/<env>/datadog/api_key` | SecureString | `shared/datadog` | `provisioner_api/dev` |
+| `/idp/<project>/<env>/ecr/<repo>/repository_url` | String | `shared/ecr` | `api-deploy.yml` (CI) |
+| `/INTERNAL_DEVELOPER_PLATFORM/PROVISIONER_QUEUE_URL` | String | `provisioner_api/dev` (SQS module) | Go API runtime |
+| `/INTERNAL_DEVELOPER_PLATFORM/COGNITO_CLIENT_ID` | String | `shared/identity` (Cognito module) | Go API runtime |
+| `/INTERNAL_DEVELOPER_PLATFORM/REDIS_ADDR` | String | `provisioner_api/dev` | Go API runtime |
+
+The two namespaces reflect a deliberate split:
+
+- `/idp/shared/*` — cross-Terraform-stack contracts. Producers and consumers are both Terraform.
+- `/INTERNAL_DEVELOPER_PLATFORM/*` — Terraform-to-runtime contracts. Consumer is a running service reading SSM at boot.
+
+---
+
+## CI / CD
+
+Two layers:
+
+**Per-stack workflows** (`.github/workflows/infra-aws-*-create.yml` + `*-destroy.yml`) — each stack has a create and destroy workflow. Both `workflow_dispatch` (manual trigger) and `workflow_call` (callable by the orchestrator). Each runs:
+
+1. `actions/checkout`
+2. `hashicorp/setup-terraform` with `cli_config_credentials_token` (TFC token)
+3. `terraform init` / `fmt -check` / `validate` / `plan` / `apply` (against the stack's working directory)
+
+**Orchestrators** (`orchestrate-create.yml`, `orchestrate-destroy.yml`) — chain the stack workflows in dependency order using `needs:` and `uses: ./.github/workflows/<stack>.yml`:
+
+```yaml
+jobs:
+  shared-vpc:
+    uses: ./.github/workflows/infra-aws-vpc-create.yml
+    secrets: inherit
+  shared-identity:
+    needs: [shared-vpc]
+    uses: ./.github/workflows/infra-aws-identity-create.yml
+    secrets: inherit
+  provisioner-api:
+    needs: [shared-vpc, shared-ecr, shared-datadog]
+    uses: ./.github/workflows/infra-aws-api-create.yml
+    secrets: inherit
+  ...
+```
+
+Destroy requires typing `destroy` into a confirmation input — the workflow fails before doing anything if the string doesn't match. Cheap insurance against a stray click.
+
+AWS authentication is OIDC end-to-end:
+
+- GitHub Actions assumes `arn:aws:iam::<account>:role/github-actions-oidc-role` via `aws-actions/configure-aws-credentials@v4`.
+- The trust policy is scoped to `repo:rafaelcmd/internal-developer-platform:ref:refs/heads/main` — only `main`-branch runs of this repo can assume the role.
+- Terraform Cloud uses its own OIDC provider against AWS for plan/apply runs.
+
+---
+
+## Running it
+
+### Prerequisites (one-time)
+
+1. AWS account.
+2. Terraform Cloud organization (`internal-developer-platform-org`).
+3. Apply `shared/iam-tfc-oidc` and `shared/iam-github-oidc` once, locally or by hand, to bootstrap the OIDC trust.
+4. Create each TFC workspace listed in [the eight stacks table](#the-eight-stacks), pointed at this repo with the matching working directory.
+5. Populate GitHub repository secrets: `TF_API_TOKEN`, `DD_API_KEY`. Populate variables: `AWS_REGION`, `AWS_ROLE_ARN`, `AWS_ACCOUNT_ID`.
+
+### Full platform up
+
+GitHub → Actions → **Orchestrate - Create Full Infrastructure** → Run.
+
+End-to-end takes ~15–20 minutes; the EKS control plane dominates.
+
+### Full platform down
+
+GitHub → Actions → **Orchestrate - Destroy Full Infrastructure** → enter `destroy` in the confirmation field → Run.
+
+### Single stack
+
+Each stack workflow is still independently dispatchable. Useful when iterating on, say, the API Gateway module without touching the cluster.
+
+### Local dev
+
+Module work doesn't need a workspace. From any `live/<stack>/` directory:
+
+```bash
+terraform init
+terraform validate
+terraform plan -var-file=dev.tfvars   # if a tfvars file exists
+```
+
+Authoring inside a module is just editing files under `modules/aws/<name>/` — live workspaces pick up changes on next plan because sources are relative.
+
+---
+
+## What's intentionally not here
+
+Decisions I made for scope, with the trade-off I'd revisit at production scale:
+
+- **No multi-environment promotion** (`staging/`, `prod/`). The directory pattern (`live/<stack>/dev/`) is ready for it; the stacks just don't have siblings yet.
+- **No remote backend encryption with a customer-managed KMS key** — TFC handles state at rest with its own KMS. Acceptable for now.
+- **No drift detection cron**. A scheduled `terraform plan` would alert on out-of-band changes; not wired up.
+- **No cost budget alarms / per-stack AWS Budgets**. The whole platform stays under the AWS free-tier ceiling for short-lived study sessions; that wouldn't survive contact with production.
+- **Single AWS account, single region**. No cross-account or DR posture.
+- **The IRSA wiring for the Go API was reverted during the SSM refactor** and will be re-introduced under `live/provisioner_api/dev/` once the SSM-based identity contract has been validated end-to-end.
+
+---
+
+## What I learned building this
+
+- A Terraform "monolith" is much easier to reason about than a graph of remote-state references. Move shared values to a flat key/value store and most of your hidden coupling disappears.
+- Fargate + IRSA collapses three otherwise-significant operational concerns (node lifecycle, instance role sprawl, IMDS access) into zero work. It's the right default for low-volume internal platforms.
+- The AWS Load Balancer Controller's documented IAM policy is non-negotiable — every `Action` it lists exists because something broke without it. Trimming the policy is a false economy.
+- `workflow_call` + `secrets: inherit` is enough to build a real orchestrator without pulling in a workflow engine. The dependency graph is just `needs:`.

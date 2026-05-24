@@ -2,6 +2,10 @@ name: Shared - Destroy AWS VPC
 
 on:
   workflow_dispatch:
+  workflow_call:
+    secrets:
+      TF_API_TOKEN:
+        required: true
 
 permissions:
   id-token: write

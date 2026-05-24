@@ -34,13 +34,46 @@ resource "aws_cognito_user_pool_client" "this" {
   explicit_auth_flows = ["ALLOW_USER_PASSWORD_AUTH", "ALLOW_REFRESH_TOKEN_AUTH", "ALLOW_USER_SRP_AUTH"]
 }
 
-resource "aws_ssm_parameter" "cognito_client_id" {
+locals {
+  cognito_common_tags = merge(var.tags, {
+    Project     = var.project
+    Environment = var.environment
+  })
+}
+
+# Legacy path consumed by the Go API runtime (see application.go).
+resource "aws_ssm_parameter" "cognito_client_id_legacy" {
   name  = "/INTERNAL_DEVELOPER_PLATFORM/COGNITO_CLIENT_ID"
   type  = "String"
   value = aws_cognito_user_pool_client.this.id
 
-  tags = merge(var.tags, {
-    Project     = var.project
-    Environment = var.environment
-  })
+  tags = local.cognito_common_tags
+}
+
+# Normalized identity parameters consumed by sibling Terraform stacks (gateway
+# authorizer, API IRSA scope). Centralizing under /idp/shared/identity/* makes
+# the cross-stack contract explicit and decouples consumers from the producer
+# workspace.
+resource "aws_ssm_parameter" "user_pool_id" {
+  name  = "/idp/shared/identity/user_pool_id"
+  type  = "String"
+  value = aws_cognito_user_pool.this.id
+
+  tags = local.cognito_common_tags
+}
+
+resource "aws_ssm_parameter" "user_pool_arn" {
+  name  = "/idp/shared/identity/user_pool_arn"
+  type  = "String"
+  value = aws_cognito_user_pool.this.arn
+
+  tags = local.cognito_common_tags
+}
+
+resource "aws_ssm_parameter" "user_pool_client_id" {
+  name  = "/idp/shared/identity/user_pool_client_id"
+  type  = "String"
+  value = aws_cognito_user_pool_client.this.id
+
+  tags = local.cognito_common_tags
 }

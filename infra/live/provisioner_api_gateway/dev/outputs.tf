@@ -23,15 +23,6 @@ output "vpc_link_id" {
 }
 
 # =============================================================================
-# COGNITO OUTPUTS
-# =============================================================================
-
-output "cognito_user_pool_arn" {
-  description = "ARN of the Cognito User Pool used as the API Gateway authorizer"
-  value       = module.cognito.user_pool_arn
-}
-
-# =============================================================================
 # NLB LOOKUP (passthrough — useful for debugging the integration)
 # =============================================================================
 

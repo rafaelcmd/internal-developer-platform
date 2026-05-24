@@ -1,31 +1,20 @@
 # =============================================================================
 # DATA SOURCES
-# Remote state data sources for retrieving outputs from other Terraform workspaces
+# Cross-workspace values are sourced from SSM Parameter Store (published by the
+# producer stacks). This decouples workspaces — no terraform_remote_state reads
+# means a consumer never needs TFC access to a producer's state.
 # =============================================================================
 
-# Shared VPC infrastructure
-data "terraform_remote_state" "shared_vpc" {
-  backend = "remote"
-  config = {
-    organization = "internal-developer-platform-org"
-    workspaces = {
-      name = "internal-developer-platform-shared-vpc"
-    }
-  }
+# Shared VPC — published by the shared/vpc workspace
+data "aws_ssm_parameter" "vpc_id" {
+  name = "/idp/shared/vpc/id"
 }
 
-# ECR repository for application images
-data "terraform_remote_state" "internal_developer_platform_ecr_repository" {
-  backend = "remote"
-  config = {
-    organization = "internal-developer-platform-org"
-    workspaces = {
-      name = "internal-developer-platform-shared-ecr"
-    }
-  }
+data "aws_ssm_parameter" "private_subnet_ids" {
+  name = "/idp/shared/vpc/private_subnet_ids"
 }
 
-# Datadog API Key from SSM
+# Datadog API Key (already in SSM, owned outside this stack)
 data "aws_ssm_parameter" "datadog_api_key" {
   name            = "/${var.project}/${var.environment}/datadog/api_key"
   with_decryption = true

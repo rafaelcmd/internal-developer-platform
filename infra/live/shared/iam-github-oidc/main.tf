@@ -3,7 +3,7 @@ data "tls_certificate" "github_oidc" {
 }
 
 module "github_actions_oidc" {
-  source         = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/oidc?ref=main"
+  source         = "../../../modules/aws/oidc"
   url            = "https://token.actions.githubusercontent.com"
   client_id_list = ["sts.amazonaws.com"]
   thumbprint     = data.tls_certificate.github_oidc.certificates[0].sha1_fingerprint

@@ -2,6 +2,10 @@ name: API - Destroy AWS Infrastructure
 
 on:
   workflow_dispatch:
+  workflow_call:
+    secrets:
+      TF_API_TOKEN:
+        required: true
 
 permissions:
   id-token: write
