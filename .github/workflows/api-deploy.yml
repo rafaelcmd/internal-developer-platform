@@ -79,3 +79,21 @@ jobs:
         run: |
           kubectl apply -f k8s/api/deployment.yaml
           kubectl apply -f k8s/api/service.yaml
+
+      - name: Wait for NLB to be provisioned
+        run: |
+          echo "Waiting for NLB 'idp-api-nlb' to be provisioned by the AWS Load Balancer Controller..."
+          for i in $(seq 1 24); do
+            NLB_STATE=$(aws elbv2 describe-load-balancers \
+              --names idp-api-nlb \
+              --query 'LoadBalancers[0].State.Code' \
+              --output text 2>/dev/null || echo "not-found")
+            if [ "$NLB_STATE" = "active" ]; then
+              echo "NLB is active."
+              exit 0
+            fi
+            echo "NLB state: ${NLB_STATE}. Retrying in 15s... ($i/24)"
+            sleep 15
+          done
+          echo "ERROR: NLB was not active after 6 minutes."
+          exit 1
