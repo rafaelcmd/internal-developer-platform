@@ -20,9 +20,6 @@ jobs:
     name: Create AWS Infrastructure
     runs-on: ubuntu-latest
 
-    outputs:
-      datadog_forwarder_arn: ${{ steps.terraform_output.outputs.datadog_forwarder_arn }}
-
     defaults:
       run:
         working-directory: infra/live/provisioner_api/dev
