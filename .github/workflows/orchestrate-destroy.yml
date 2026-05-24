@@ -1,0 +1,70 @@
+name: Orchestrate - Destroy Full Infrastructure
+
+# Single-click destroy for the whole platform — strict reverse of create order.
+# `needs:` enforces the chain so a downstream destroy never starts while its
+# producer still exists.
+#
+#   gateway ──▶ provisioner_api ──▶ identity ──▶ datadog ──▶ ecr ──▶ vpc
+#
+# k8s resources (api, redis) are destroyed implicitly when the EKS cluster
+# goes away in provisioner_api destroy, so no separate jobs for them here.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "destroy" to confirm. Anything else aborts.'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  guard:
+    name: Confirmation guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate input
+        run: |
+          if [ "${{ inputs.confirm }}" != "destroy" ]; then
+            echo "Confirmation phrase did not match 'destroy'. Aborting."
+            exit 1
+          fi
+
+  provisioner-api-gateway:
+    name: Provisioner API Gateway (destroy)
+    needs: [guard]
+    uses: ./.github/workflows/infra-aws-api-gateway-destroy.yml
+    secrets: inherit
+
+  provisioner-api:
+    name: Provisioner API / EKS (destroy)
+    needs: [provisioner-api-gateway]
+    uses: ./.github/workflows/infra-aws-api-destroy.yml
+    secrets: inherit
+
+  shared-identity:
+    name: Shared / Identity (destroy)
+    needs: [provisioner-api]
+    uses: ./.github/workflows/infra-aws-identity-destroy.yml
+    secrets: inherit
+
+  shared-datadog:
+    name: Shared / Datadog (destroy)
+    needs: [provisioner-api]
+    uses: ./.github/workflows/infra-aws-datadog-destroy.yml
+    secrets: inherit
+
+  shared-ecr:
+    name: Shared / ECR (destroy)
+    needs: [shared-datadog, provisioner-api]
+    uses: ./.github/workflows/infra-aws-ecr-destroy.yml
+    secrets: inherit
+
+  shared-vpc:
+    name: Shared / VPC (destroy)
+    needs: [shared-ecr, shared-identity]
+    uses: ./.github/workflows/infra-aws-vpc-destroy.yml
+    secrets: inherit

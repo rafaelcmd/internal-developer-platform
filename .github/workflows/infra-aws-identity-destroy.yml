@@ -1,4 +1,4 @@
-name: Shared - Destroy AWS ECR
+name: Shared - Destroy Identity (Cognito)
 
 on:
   workflow_dispatch:
@@ -12,12 +12,12 @@ permissions:
   contents: read
 
 jobs:
-  destroy-ecr:
-    name: Destroy ECR
+  destroy-identity:
+    name: Destroy Identity
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: infra/live/shared/ecr
+        working-directory: infra/live/shared/identity
         shell: bash
 
     steps:

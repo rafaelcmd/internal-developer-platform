@@ -1,0 +1,71 @@
+name: Orchestrate - Create Full Infrastructure
+
+# Single-click create for the whole platform.
+# Order is encoded by `needs:` and matches the SSM-decoupled stack graph:
+#
+#   shared/vpc ──┐
+#   shared/ecr ──┼─▶ shared/datadog
+#                │
+#                ├─▶ shared/identity
+#                │
+#                └─▶ provisioner_api/dev ─▶ redis-deploy ─┐
+#                                                          ├─▶ api-deploy ──▶ provisioner_api_gateway/dev
+#                                                          │
+# The gateway depends on the NLB, which api-deploy provisions via the k8s
+# Service, so it has to run after api-deploy.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  shared-vpc:
+    name: Shared / VPC
+    uses: ./.github/workflows/infra-aws-vpc-create.yml
+    secrets: inherit
+
+  shared-ecr:
+    name: Shared / ECR
+    uses: ./.github/workflows/infra-aws-ecr-create.yml
+    secrets: inherit
+
+  shared-datadog:
+    name: Shared / Datadog
+    needs: [shared-vpc, shared-ecr]
+    uses: ./.github/workflows/infra-aws-datadog-create.yml
+    secrets: inherit
+
+  shared-identity:
+    name: Shared / Identity (Cognito)
+    needs: [shared-vpc]
+    uses: ./.github/workflows/infra-aws-identity-create.yml
+    secrets: inherit
+
+  provisioner-api:
+    name: Provisioner API / EKS + SQS + Redis SSM
+    needs: [shared-vpc, shared-ecr, shared-datadog]
+    uses: ./.github/workflows/infra-aws-api-create.yml
+    secrets: inherit
+
+  redis-deploy:
+    name: K8s / Redis
+    needs: [provisioner-api]
+    uses: ./.github/workflows/redis-deploy.yml
+    secrets: inherit
+
+  api-deploy:
+    name: K8s / API (also provisions NLB)
+    # shared-identity is required at runtime: the API pod reads the Cognito
+    # client_id from SSM at startup and fatals if it's missing.
+    needs: [provisioner-api, redis-deploy, shared-ecr, shared-identity]
+    uses: ./.github/workflows/api-deploy.yml
+    secrets: inherit
+
+  provisioner-api-gateway:
+    name: Provisioner API Gateway / API Gateway + WAF
+    needs: [api-deploy, shared-identity]
+    uses: ./.github/workflows/infra-aws-api-gateway-create.yml
+    secrets: inherit

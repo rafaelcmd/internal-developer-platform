@@ -11,3 +11,14 @@
 data "aws_lb" "api" {
   name = var.nlb_name
 }
+
+# =============================================================================
+# IDENTITY LOOKUP (SSM)
+# Cognito is owned by the shared/identity workspace, which publishes the user
+# pool ARN to /idp/shared/identity/user_pool_arn. Reading via SSM keeps this
+# workspace decoupled from the producer's state file.
+# =============================================================================
+
+data "aws_ssm_parameter" "cognito_user_pool_arn" {
+  name = "/idp/shared/identity/user_pool_arn"
+}

@@ -3,7 +3,7 @@ data "tls_certificate" "tfc_oidc" {
 }
 
 module "tfc_oidc" {
-  source         = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/oidc?ref=main"
+  source         = "../../../modules/aws/oidc"
   url            = "https://app.terraform.io"
   client_id_list = ["aws.workload.identity"]
   thumbprint     = data.tls_certificate.tfc_oidc.certificates[0].sha1_fingerprint

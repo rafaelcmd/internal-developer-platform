@@ -1,4 +1,4 @@
-name: Shared - Destroy AWS ECR
+name: Shared - Create Identity (Cognito)
 
 on:
   workflow_dispatch:
@@ -12,12 +12,12 @@ permissions:
   contents: read
 
 jobs:
-  destroy-ecr:
-    name: Destroy ECR
+  create-identity:
+    name: Create Identity
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: infra/live/shared/ecr
+        working-directory: infra/live/shared/identity
         shell: bash
 
     steps:
@@ -32,8 +32,14 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
-      - name: Terraform Plan Destroy
-        run: terraform plan -destroy
+      - name: Terraform Format
+        run: terraform fmt -check
 
-      - name: Terraform Destroy
-        run: terraform destroy -auto-approve
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan

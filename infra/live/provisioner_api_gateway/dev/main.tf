@@ -1,11 +1,6 @@
-module "cognito" {
-  source = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/cognito?ref=main"
-
-  user_pool_name = "${var.project}-${var.environment}-user-pool"
-  project        = var.project
-  environment    = var.environment
-  tags           = local.tags
-}
+# NOTE: Cognito moved to the shared/identity workspace.
+# This stack reads the user pool ARN from SSM (see data.aws_ssm_parameter
+# in data.tf) so it stays decoupled from the producer.
 
 # =============================================================================
 # WAF MODULE
@@ -13,7 +8,7 @@ module "cognito" {
 # =============================================================================
 
 module "waf" {
-  source = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/waf?ref=main"
+  source = "../../../modules/aws/waf"
 
   web_acl_name        = "${var.project}-${var.environment}-api-waf"
   web_acl_description = "WAF Web ACL for ${var.project} API Gateway"
@@ -38,7 +33,7 @@ module "waf" {
 }
 
 module "api_gateway" {
-  source = "git::https://github.com/rafaelcmd/internal-developer-platform.git//infra/modules/aws/api_gateway?ref=main"
+  source = "../../../modules/aws/api_gateway"
 
   # API Gateway configuration
   api_name        = var.api_gateway_name
@@ -52,8 +47,9 @@ module "api_gateway" {
   nlb_arn       = data.aws_lb.api.arn
   nlb_dns_name  = data.aws_lb.api.dns_name
 
-  # Cognito authorizer configuration (REST API uses User Pool ARN)
-  cognito_user_pool_arn = module.cognito.user_pool_arn
+  # Cognito authorizer configuration (REST API uses User Pool ARN).
+  # Sourced from the shared/identity workspace via SSM.
+  cognito_user_pool_arn = data.aws_ssm_parameter.cognito_user_pool_arn.value
 
   # Stage configuration
   stage_name = var.api_gateway_stage_name

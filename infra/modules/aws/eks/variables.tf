@@ -43,7 +43,7 @@ variable "cluster_name" {
 variable "cluster_version" {
   description = "Kubernetes version of the EKS control plane"
   type        = string
-  default     = "1.30"
+  default     = "1.33"
 }
 
 variable "endpoint_private_access" {
