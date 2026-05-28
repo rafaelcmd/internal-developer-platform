@@ -26,7 +26,8 @@ module "eks" {
   # Control plane logs
   log_retention_days = var.cluster_log_retention_days
 
-  # AWS Load Balancer Controller (provisions the NLB for the API Service)
+  # AWS Load Balancer Controller (reconciles TargetGroupBinding for pod -> TG
+  # registration; NLB/TG are Terraform-managed in this stack).
   install_aws_load_balancer_controller       = true
   aws_load_balancer_controller_chart_version = var.aws_load_balancer_controller_chart_version
 
@@ -55,6 +56,66 @@ module "sqs" {
   environment = var.environment
 
   # Common tags
+  tags = local.tags
+}
+
+# =============================================================================
+# API NLB (TERRAFORM-MANAGED)
+# Kubernetes binds API pods to this target group via TargetGroupBinding.
+# =============================================================================
+
+module "api_nlb" {
+  source = "../../../modules/aws/nlb"
+
+  nlb_name           = var.api_nlb_name
+  internal           = true
+  load_balancer_type = "network"
+  subnets            = split(",", data.aws_ssm_parameter.private_subnet_ids.value)
+
+  target_group_name     = var.api_target_group_name
+  target_group_port     = var.api_target_group_port
+  target_group_protocol = "TCP"
+  vpc_id                = data.aws_ssm_parameter.vpc_id.value
+  target_type           = "ip"
+
+  health_check_enabled  = true
+  health_check_protocol = "HTTP"
+  health_check_port     = tostring(var.api_target_group_port)
+  health_check_path     = var.api_target_group_health_check_path
+  health_check_interval = 30
+  health_check_timeout  = 6
+  healthy_threshold     = 3
+  unhealthy_threshold   = 3
+
+  listener_port     = var.api_nlb_listener_port
+  listener_protocol = "TCP"
+
+  project     = var.project
+  environment = var.environment
+  tags        = local.tags
+}
+
+resource "aws_ssm_parameter" "api_nlb_arn" {
+  name  = var.api_nlb_arn_ssm_parameter_name
+  type  = "String"
+  value = module.api_nlb.nlb_arn
+
+  tags = local.tags
+}
+
+resource "aws_ssm_parameter" "api_nlb_dns" {
+  name  = var.api_nlb_dns_ssm_parameter_name
+  type  = "String"
+  value = module.api_nlb.nlb_dns_name
+
+  tags = local.tags
+}
+
+resource "aws_ssm_parameter" "api_target_group_arn" {
+  name  = var.api_target_group_arn_ssm_parameter_name
+  type  = "String"
+  value = module.api_nlb.target_group_arn
+
   tags = local.tags
 }
 

@@ -30,13 +30,17 @@ variable "api_version" {
 }
 
 # =============================================================================
-# LOAD BALANCER LOOKUP
-# The NLB is created out-of-band by the AWS Load Balancer Controller from the
-# k8s Service in /k8s/api/service.yaml. This stack only reads it back by name.
+# LOAD BALANCER LOOKUP (SSM)
+# NLB attributes are published by the provisioner_api Terraform stack.
 # =============================================================================
 
-variable "nlb_name" {
-  description = "Name the AWS Load Balancer Controller assigned to the API NLB. Must match the service.beta.kubernetes.io/aws-load-balancer-name annotation in k8s/api/service.yaml."
+variable "api_nlb_arn_ssm_parameter_name" {
+  description = "SSM parameter name containing the API NLB ARN"
+  type        = string
+}
+
+variable "api_nlb_dns_ssm_parameter_name" {
+  description = "SSM parameter name containing the API NLB DNS name"
   type        = string
 }
 

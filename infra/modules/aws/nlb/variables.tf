@@ -76,6 +76,12 @@ variable "health_check_port" {
   default     = "traffic-port"
 }
 
+variable "health_check_path" {
+  description = "The destination path for HTTP/HTTPS health checks"
+  type        = string
+  default     = null
+}
+
 variable "health_check_interval" {
   description = "The interval between health checks (10 or 30 seconds for NLB)"
   type        = number

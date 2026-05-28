@@ -44,24 +44,6 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
-      - name: Delete API Service to drain NLB before destroy
-        run: |
-          aws eks update-kubeconfig --name internal-developer-platform-cluster --region "${{ env.AWS_REGION }}"
-          kubectl delete service internal-developer-platform-api -n default --ignore-not-found
-          echo "Waiting for NLB 'idp-api-nlb' to be deleted by the AWS Load Balancer Controller..."
-          for i in $(seq 1 24); do
-            NLB_COUNT=$(aws elbv2 describe-load-balancers \
-              --names idp-api-nlb \
-              --query 'length(LoadBalancers)' \
-              --output text 2>/dev/null || echo "0")
-            if [ "$NLB_COUNT" = "0" ]; then
-              echo "NLB deleted."
-              break
-            fi
-            echo "NLB still exists. Waiting 15s... ($i/24)"
-            sleep 15
-          done
-
       - name: Terraform Plan Destroy
         run: terraform plan -destroy -input=false -var-file=dev.tfvars
 

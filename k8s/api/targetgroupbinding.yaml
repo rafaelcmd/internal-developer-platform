@@ -1,0 +1,11 @@
+apiVersion: elbv2.k8s.aws/v1beta1
+kind: TargetGroupBinding
+metadata:
+  name: internal-developer-platform-api
+  namespace: default
+spec:
+  targetGroupARN: PLACEHOLDER-TARGET-GROUP-ARN
+  targetType: ip
+  serviceRef:
+    name: internal-developer-platform-api
+    port: 80

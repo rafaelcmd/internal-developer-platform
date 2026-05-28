@@ -19,6 +19,17 @@ cluster_admin_principal_arns = [
   "arn:aws:iam::413703165862:user/rafael",
 ]
 
+# Terraform-managed API NLB + target group consumed by API Gateway and
+# k8s TargetGroupBinding.
+api_nlb_name                         = "idp-api-nlb"
+api_target_group_name                = "idp-api-tg"
+api_nlb_listener_port                = 80
+api_target_group_port                = 8080
+api_target_group_health_check_path   = "/v1/health"
+api_nlb_arn_ssm_parameter_name       = "/internal-developer-platform/provisioner-api/nlb/arn"
+api_nlb_dns_ssm_parameter_name       = "/internal-developer-platform/provisioner-api/nlb/dns_name"
+api_target_group_arn_ssm_parameter_name = "/internal-developer-platform/provisioner-api/nlb/target_group_arn"
+
 lambda_function_name              = "provisioner-api-datadog-forwarder"
 lambda_runtime                    = "python3.9"
 lambda_timeout                    = 120

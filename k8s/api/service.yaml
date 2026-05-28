@@ -3,22 +3,8 @@ kind: Service
 metadata:
   name: internal-developer-platform-api
   namespace: default
-  annotations:
-    # AWS Load Balancer Controller provisions an internal NLB targeting pod IPs.
-    # The name MUST match the nlb_name Terraform variable in
-    # infra/live/provisioner_api/dev — that's what data.aws_lb looks up for the
-    # API Gateway VPC Link.
-    service.beta.kubernetes.io/aws-load-balancer-name: idp-api-nlb
-    service.beta.kubernetes.io/aws-load-balancer-type: external
-    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
-    service.beta.kubernetes.io/aws-load-balancer-scheme: internal
-    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: HTTP
-    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: /v1/health
-    service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "8080"
-    service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags: >
-      Project=internal-developer-platform,Environment=dev,Service=resource-provisioner-api
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app: internal-developer-platform-api
   ports:

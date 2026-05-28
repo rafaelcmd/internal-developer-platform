@@ -1,15 +1,15 @@
 # =============================================================================
-# NLB LOOKUP
-# The NLB is provisioned by the AWS Load Balancer Controller in response to the
-# k8s Service in /k8s/api/service.yaml. This stack runs AFTER `kubectl apply`,
-# so the NLB must already exist in AWS by name before `terraform apply` here.
-#
-# Required annotation on the Service:
-#   service.beta.kubernetes.io/aws-load-balancer-name: ${var.nlb_name}
+# NLB LOOKUP (FROM SSM)
+# The API NLB is Terraform-managed in the provisioner_api stack and published
+# to SSM so this stack stays decoupled from producer state files.
 # =============================================================================
 
-data "aws_lb" "api" {
-  name = var.nlb_name
+data "aws_ssm_parameter" "api_nlb_arn" {
+  name = var.api_nlb_arn_ssm_parameter_name
+}
+
+data "aws_ssm_parameter" "api_nlb_dns_name" {
+  name = var.api_nlb_dns_ssm_parameter_name
 }
 
 # =============================================================================

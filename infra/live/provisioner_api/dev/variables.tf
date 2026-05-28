@@ -82,6 +82,55 @@ variable "cluster_admin_principal_arns" {
 }
 
 # =============================================================================
+# API NLB CONFIGURATION
+# The API NLB and target group are Terraform-managed. Kubernetes binds pods to
+# this target group through a TargetGroupBinding resource.
+# =============================================================================
+
+variable "api_nlb_name" {
+  description = "Name of the Terraform-managed internal NLB for the API"
+  type        = string
+}
+
+variable "api_target_group_name" {
+  description = "Name of the Terraform-managed API target group"
+  type        = string
+}
+
+variable "api_nlb_listener_port" {
+  description = "Listener port for the API NLB"
+  type        = number
+  default     = 80
+}
+
+variable "api_target_group_port" {
+  description = "Port the API target group forwards traffic to"
+  type        = number
+  default     = 8080
+}
+
+variable "api_target_group_health_check_path" {
+  description = "Health check path for API targets"
+  type        = string
+  default     = "/v1/health"
+}
+
+variable "api_nlb_arn_ssm_parameter_name" {
+  description = "SSM parameter name used to publish the API NLB ARN"
+  type        = string
+}
+
+variable "api_nlb_dns_ssm_parameter_name" {
+  description = "SSM parameter name used to publish the API NLB DNS name"
+  type        = string
+}
+
+variable "api_target_group_arn_ssm_parameter_name" {
+  description = "SSM parameter name used to publish the API target group ARN"
+  type        = string
+}
+
+# =============================================================================
 # LAMBDA CONFIGURATION
 # Variables for Lambda function (Datadog forwarder) configuration
 # =============================================================================

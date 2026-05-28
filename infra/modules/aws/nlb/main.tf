@@ -22,6 +22,7 @@ resource "aws_lb_target_group" "this" {
     enabled             = var.health_check_enabled
     protocol            = var.health_check_protocol
     port                = var.health_check_port
+    path                = var.health_check_path
     interval            = var.health_check_interval
     timeout             = var.health_check_timeout
     healthy_threshold   = var.healthy_threshold
