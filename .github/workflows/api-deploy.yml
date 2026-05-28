@@ -12,6 +12,7 @@ env:
   AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
   EKS_CLUSTER_NAME: internal-developer-platform-cluster
   SSM_PARAM_NAME: /internal-developer-platform/shared/ecr/internal-developer-platform-repo/repository_url
+  TG_ARN_SSM_PARAM_NAME: /internal-developer-platform/provisioner-api/nlb/target_group_arn
 
 permissions:
   id-token: write
@@ -42,6 +43,12 @@ jobs:
           echo "ECR_URL=$ECR_URL" >> "$GITHUB_ENV"
           echo "ECR_REGISTRY=$(echo "$ECR_URL" | cut -d/ -f1)" >> "$GITHUB_ENV"
 
+          TARGET_GROUP_ARN=$(aws ssm get-parameter \
+            --name "${{ env.TG_ARN_SSM_PARAM_NAME }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          echo "TARGET_GROUP_ARN=$TARGET_GROUP_ARN" >> "$GITHUB_ENV"
+
       - name: Login to Amazon ECR
         run: |
           aws ecr get-login-password --region "${{ env.AWS_REGION }}" \
@@ -62,6 +69,9 @@ jobs:
       - name: Substitute ECR URL in deployment manifest
         run: sed -i "s|PLACEHOLDER-ECR-REPO|${ECR_URL}|g" k8s/api/deployment.yaml
 
+      - name: Substitute target group ARN in TargetGroupBinding
+        run: sed -i "s|PLACEHOLDER-TARGET-GROUP-ARN|${TARGET_GROUP_ARN}|g" k8s/api/targetgroupbinding.yaml
+
       - name: Update kubeconfig
         run: aws eks update-kubeconfig --name "${{ env.EKS_CLUSTER_NAME }}" --region "${{ env.AWS_REGION }}"
 
@@ -79,21 +89,4 @@ jobs:
         run: |
           kubectl apply -f k8s/api/deployment.yaml
           kubectl apply -f k8s/api/service.yaml
-
-      - name: Wait for NLB to be provisioned
-        run: |
-          echo "Waiting for NLB 'idp-api-nlb' to be provisioned by the AWS Load Balancer Controller..."
-          for i in $(seq 1 24); do
-            NLB_STATE=$(aws elbv2 describe-load-balancers \
-              --names idp-api-nlb \
-              --query 'LoadBalancers[0].State.Code' \
-              --output text 2>/dev/null || echo "not-found")
-            if [ "$NLB_STATE" = "active" ]; then
-              echo "NLB is active."
-              exit 0
-            fi
-            echo "NLB state: ${NLB_STATE}. Retrying in 15s... ($i/24)"
-            sleep 15
-          done
-          echo "ERROR: NLB was not active after 6 minutes."
-          exit 1
+          kubectl apply -f k8s/api/targetgroupbinding.yaml

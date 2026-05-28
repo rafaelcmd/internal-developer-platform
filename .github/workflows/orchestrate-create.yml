@@ -9,10 +9,11 @@ name: Orchestrate - Create Full Infrastructure
 #                ├─▶ shared/identity
 #                │
 #                └─▶ provisioner_api/dev ─▶ redis-deploy ─┐
-#                                                          ├─▶ api-deploy ──▶ provisioner_api_gateway/dev
+#                                        └▶ provisioner_api_gateway/dev
+#                                                          └─▶ api-deploy
 #                                                          │
-# The gateway depends on the NLB, which api-deploy provisions via the k8s
-# Service, so it has to run after api-deploy.
+# The gateway depends on the Terraform-managed NLB from provisioner_api,
+# not on k8s Service reconciliation.
 
 on:
   workflow_dispatch:
@@ -57,7 +58,7 @@ jobs:
     secrets: inherit
 
   api-deploy:
-    name: K8s / API (also provisions NLB)
+    name: K8s / API
     # shared-identity is required at runtime: the API pod reads the Cognito
     # client_id from SSM at startup and fatals if it's missing.
     needs: [provisioner-api, redis-deploy, shared-ecr, shared-identity]
@@ -66,6 +67,6 @@ jobs:
 
   provisioner-api-gateway:
     name: Provisioner API Gateway / API Gateway + WAF
-    needs: [api-deploy, shared-identity]
+    needs: [provisioner-api, shared-identity]
     uses: ./.github/workflows/infra-aws-api-gateway-create.yml
     secrets: inherit

@@ -4,32 +4,31 @@ This is **stage 3 of 3** in the dev environment. It owns the public edge:
 Cognito user pool, WAF web ACL, API Gateway REST API, and the VPC Link that
 points API Gateway at the in-cluster API service.
 
-This stack depends on an NLB that does **not** exist at the moment EKS is
-created — the AWS Load Balancer Controller provisions it lazily from the
-`k8s/api/service.yaml` manifest. That's why edge wiring lives in its own stack:
-`data "aws_lb" "api"` would fail in a single combined apply.
+This stack depends on an NLB that is **Terraform-managed** by
+`infra/live/provisioner_api/dev`. The producer publishes the NLB ARN and DNS
+name to SSM Parameter Store, and this stack reads those values via
+`data.aws_ssm_parameter`.
 
 ## Deploy order
 
 ```
 1. terraform apply (provisioner_api/dev)        → EKS, SQS, Datadog forwarder
-2. kubectl apply -f k8s/redis/  k8s/api/        → LB controller creates the NLB
+2. kubectl apply -f k8s/redis/  k8s/api/        → deploy workloads and bind API service to TG
 3. terraform apply (here)                       → wires API Gateway to the NLB
 ```
 
-The NLB lookup matches by name (`var.nlb_name`), so it has to match the
-`service.beta.kubernetes.io/aws-load-balancer-name` annotation on
-`k8s/api/service.yaml`.
+NLB attributes are read from SSM, so this stack is decoupled from producer
+state files while still avoiding runtime LB discovery races.
 
 ## Prereqs (before applying here)
 
 ```sh
-# The NLB must already exist in AWS:
-aws elbv2 describe-load-balancers --names idp-api-nlb --region us-east-1
+# NLB details should be published by provisioner_api stack:
+aws ssm get-parameter --name /internal-developer-platform/provisioner-api/nlb/arn --region us-east-1
+aws ssm get-parameter --name /internal-developer-platform/provisioner-api/nlb/dns_name --region us-east-1
 ```
 
-If that returns "couldn't find resource", go back to stage 2 (`kubectl get svc`,
-check the AWS Load Balancer Controller logs).
+If those parameters are missing, re-run stage 1 (`provisioner_api/dev`).
 
 ## Usage
 
@@ -52,11 +51,10 @@ terraform apply -var-file=dev.tfvars
 - variables.tf: input schema
 - dev.tfvars: environment values for dev
 - main.tf: Cognito + WAF + API Gateway composition
-- data.tf: NLB lookup by name
+- data.tf: NLB lookup via SSM parameters
 - outputs.tf: API Gateway, Cognito, and NLB outputs
 
 ## Teardown order
 
 Reverse of apply: destroy this stack first (releases the VPC Link), then
-`kubectl delete` the API service (releases the NLB), then destroy the platform
-stack.
+destroy the platform stack (`provisioner_api/dev`) which owns the NLB/TG.

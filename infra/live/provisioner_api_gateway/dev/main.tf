@@ -41,11 +41,10 @@ module "api_gateway" {
   aws_region      = var.aws_region
 
   # VPC Link configuration (REST API uses NLB ARN directly).
-  # The NLB is provisioned by the AWS Load Balancer Controller from the
-  # k8s Service in /k8s/api/service.yaml; we read it back via data.aws_lb.api.
+  # NLB identity is published by the provisioner_api stack into SSM.
   vpc_link_name = var.vpc_link_name
-  nlb_arn       = data.aws_lb.api.arn
-  nlb_dns_name  = data.aws_lb.api.dns_name
+  nlb_arn       = data.aws_ssm_parameter.api_nlb_arn.value
+  nlb_dns_name  = data.aws_ssm_parameter.api_nlb_dns_name.value
 
   # Cognito authorizer configuration (REST API uses User Pool ARN).
   # Sourced from the shared/identity workspace via SSM.

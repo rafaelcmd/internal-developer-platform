@@ -28,10 +28,10 @@ output "vpc_link_id" {
 
 output "nlb_arn" {
   description = "ARN of the NLB the VPC Link targets"
-  value       = data.aws_lb.api.arn
+  value       = data.aws_ssm_parameter.api_nlb_arn.value
 }
 
 output "nlb_dns_name" {
   description = "DNS name of the NLB the VPC Link targets"
-  value       = data.aws_lb.api.dns_name
+  value       = data.aws_ssm_parameter.api_nlb_dns_name.value
 }

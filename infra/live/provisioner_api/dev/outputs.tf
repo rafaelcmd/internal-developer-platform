@@ -19,6 +19,21 @@ output "eks_oidc_provider_arn" {
   value       = module.eks.oidc_provider_arn
 }
 
+output "api_nlb_arn" {
+  description = "ARN of the Terraform-managed API NLB"
+  value       = module.api_nlb.nlb_arn
+}
+
+output "api_nlb_dns_name" {
+  description = "DNS name of the Terraform-managed API NLB"
+  value       = module.api_nlb.nlb_dns_name
+}
+
+output "api_target_group_arn" {
+  description = "ARN of the Terraform-managed API target group"
+  value       = module.api_nlb.target_group_arn
+}
+
 # =============================================================================
 # DATADOG INTEGRATION OUTPUTS
 # =============================================================================
