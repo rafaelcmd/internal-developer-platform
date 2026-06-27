@@ -6,7 +6,7 @@ app_version  = "1.0.0"
 
 # EKS cluster
 cluster_name                               = "internal-developer-platform-cluster"
-cluster_version                            = "1.33"
+cluster_version                            = "1.34"
 cluster_endpoint_public_access             = true
 cluster_public_access_cidrs                = ["0.0.0.0/0"]
 fargate_namespaces                         = ["default", "kube-system"]

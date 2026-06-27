@@ -42,7 +42,7 @@ variable "cluster_name" {
 variable "cluster_version" {
   description = "Kubernetes control-plane version"
   type        = string
-  default     = "1.33"
+  default     = "1.34"
 }
 
 variable "cluster_endpoint_public_access" {
