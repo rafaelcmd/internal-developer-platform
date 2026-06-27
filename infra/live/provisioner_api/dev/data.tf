@@ -19,3 +19,9 @@ data "aws_ssm_parameter" "datadog_api_key" {
   name            = "/${var.project}/${var.environment}/datadog/api_key"
   with_decryption = true
 }
+
+# Cognito user pool ARN — published by the shared/identity workspace. Scoped
+# into the API's IRSA policy so the pod can call cognito-idp for signup/login.
+data "aws_ssm_parameter" "cognito_user_pool_arn" {
+  name = "/idp/shared/identity/user_pool_arn"
+}
