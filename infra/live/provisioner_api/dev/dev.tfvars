@@ -9,9 +9,14 @@ cluster_name                               = "internal-developer-platform-cluste
 cluster_version                            = "1.34"
 cluster_endpoint_public_access             = true
 cluster_public_access_cidrs                = ["0.0.0.0/0"]
-fargate_namespaces                         = ["default", "kube-system"]
+fargate_namespaces                         = ["default", "kube-system", "datadog"]
 cluster_log_retention_days                 = 7
 aws_load_balancer_controller_chart_version = "1.8.1"
+datadog_chart_version                      = "3.115.4"
+
+# Out-of-band alerting destination. SNS topic still gets the alarms even if
+# this is left blank; only the auto-created email subscription is skipped.
+notification_email = "rafaelcmd@gmail.com"
 
 # IAM principals granted cluster-admin via EKS Access Entries. Replace the
 # placeholder with the output of `aws sts get-caller-identity` on your workstation.
