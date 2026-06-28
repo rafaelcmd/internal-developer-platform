@@ -157,7 +157,7 @@ variable "install_datadog_cluster_agent" {
 variable "datadog_chart_version" {
   description = "Version of the datadog/datadog Helm chart"
   type        = string
-  default     = "3.115.4"
+  default     = "3.227.1"
 }
 
 variable "datadog_cluster_agent_namespace" {
