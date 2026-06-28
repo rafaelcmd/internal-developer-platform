@@ -47,7 +47,7 @@ resource "aws_cloudwatch_metric_alarm" "forwarder_no_invocations" {
   statistic   = "Sum"
   period      = 300
   dimensions = {
-    FunctionName = module.datadog_forwarder.datadog_forwarder_name
+    FunctionName = module.datadog_forwarder.function_name
   }
 
   comparison_operator = "LessThanThreshold"
@@ -70,7 +70,7 @@ resource "aws_cloudwatch_metric_alarm" "forwarder_errors" {
   statistic   = "Sum"
   period      = 300
   dimensions = {
-    FunctionName = module.datadog_forwarder.datadog_forwarder_name
+    FunctionName = module.datadog_forwarder.function_name
   }
 
   comparison_operator = "GreaterThanThreshold"
