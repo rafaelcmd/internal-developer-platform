@@ -42,3 +42,13 @@ output "fargate_pod_execution_role_arn" {
   description = "ARN of the role pods running on Fargate assume"
   value       = aws_iam_role.fargate.arn
 }
+
+output "fargate_pod_log_group_name" {
+  description = "Name of the CloudWatch log group receiving Fargate pod logs (only when enable_fargate_logging is true)"
+  value       = var.enable_fargate_logging ? aws_cloudwatch_log_group.fargate_pods[0].name : null
+}
+
+output "fargate_pod_log_group_arn" {
+  description = "ARN of the CloudWatch log group receiving Fargate pod logs (only when enable_fargate_logging is true)"
+  value       = var.enable_fargate_logging ? aws_cloudwatch_log_group.fargate_pods[0].arn : null
+}

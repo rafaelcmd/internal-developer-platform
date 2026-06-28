@@ -75,6 +75,18 @@ variable "aws_load_balancer_controller_chart_version" {
   default     = "1.8.1"
 }
 
+variable "datadog_chart_version" {
+  description = "Helm chart version for the Datadog Cluster Agent (datadog/datadog)"
+  type        = string
+  default     = "3.115.4"
+}
+
+variable "notification_email" {
+  description = "Email address for SNS observability-alert notifications. Empty string disables the email subscription (alarms still fire to the topic)."
+  type        = string
+  default     = ""
+}
+
 variable "cluster_admin_principal_arns" {
   description = "IAM principal ARNs granted cluster-admin via EKS Access Entries. Add operator IAM users/roles here so they can use kubectl against the cluster."
   type        = list(string)

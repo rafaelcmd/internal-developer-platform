@@ -31,6 +31,19 @@ module "eks" {
   install_aws_load_balancer_controller       = true
   aws_load_balancer_controller_chart_version = var.aws_load_balancer_controller_chart_version
 
+  # Datadog Cluster Agent (cluster-level visibility on Fargate — pod inventory,
+  # orchestrator explorer, kube-state-metrics). DD_API_KEY is read from the SSM
+  # parameter that already exists for the Lambda forwarder.
+  install_datadog_cluster_agent = true
+  datadog_chart_version         = var.datadog_chart_version
+  datadog_api_key               = data.aws_ssm_parameter.datadog_api_key.value
+
+  # Fargate pod log routing — managed Fluent Bit ships pod stdout to a single
+  # CloudWatch log group that we subscribe to the Datadog Lambda forwarder
+  # below. Removes the need for a per-pod log-collection sidecar.
+  enable_fargate_logging     = true
+  fargate_log_retention_days = var.cluster_log_retention_days
+
   # Operator IAM principals granted cluster-admin so kubectl works from their workstations.
   cluster_admin_principal_arns = var.cluster_admin_principal_arns
 
