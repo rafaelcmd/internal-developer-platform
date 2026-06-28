@@ -65,9 +65,14 @@ resource "helm_release" "datadog" {
       name  = "datadog.orchestratorExplorer.enabled"
       value = "true"
     },
+    # The legacy bundled kube-state-metrics (v1.9.8) uses 2019-era client-go
+    # and floods logs with "Failed to list *v1beta1.X" errors on modern EKS.
+    # The Cluster Agent's kubernetes_state_core check (kubeStateMetricsCore,
+    # default-enabled in chart 3.x) covers the same metrics with current
+    # client-go, in-process, without a separate pod.
     {
       name  = "datadog.kubeStateMetricsEnabled"
-      value = "true"
+      value = "false"
     },
     {
       name  = "agents.enabled"
