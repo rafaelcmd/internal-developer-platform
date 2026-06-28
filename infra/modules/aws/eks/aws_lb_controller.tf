@@ -332,6 +332,17 @@ resource "helm_release" "aws_load_balancer_controller" {
       name  = "vpcId"
       value = var.vpc_id
     },
+    # The Service mutator webhook only acts on Service type=LoadBalancer (to
+    # set loadBalancerClass). This project routes NLB-to-pod via
+    # TargetGroupBinding and never uses Service type=LoadBalancer, so the
+    # webhook is dead weight — and worse, it races with subsequent Helm
+    # installs (any downstream chart that creates a Service has its create
+    # rejected if the LBC webhook pods aren't ready yet, which on Fargate
+    # they often aren't immediately after the LBC helm release returns).
+    {
+      name  = "enableServiceMutatorWebhook"
+      value = "false"
+    },
   ]
 
   depends_on = [
