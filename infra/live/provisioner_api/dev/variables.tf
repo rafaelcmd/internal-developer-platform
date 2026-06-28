@@ -78,7 +78,7 @@ variable "aws_load_balancer_controller_chart_version" {
 variable "datadog_chart_version" {
   description = "Helm chart version for the Datadog Cluster Agent (datadog/datadog)"
   type        = string
-  default     = "3.115.4"
+  default     = "3.227.1"
 }
 
 variable "notification_email" {
