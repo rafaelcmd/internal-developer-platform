@@ -27,6 +27,10 @@ type RouterConfig struct {
 
 	// IdempotencyTTL controls how long stored responses are replayable.
 	IdempotencyTTL time.Duration
+
+	// MetricsHandler serves the Prometheus scrape endpoint at GET /metrics. If nil,
+	// the route is not registered — useful for tests that don't exercise telemetry.
+	MetricsHandler http.Handler
 }
 
 // DefaultRouterConfig returns default router configuration
@@ -63,6 +67,12 @@ func NewRouterWithConfig(resourceHandler *ResourceHandler, healthHandler *Health
 
 	// Handle GET /v1/health
 	mux.HandleFunc("GET "+APIVersionPrefix+"/health", healthHandler.HealthCheck)
+
+	// Expose Prometheus metrics at the conventional unversioned /metrics path so
+	// standard scrape configurations work without a version prefix.
+	if config.MetricsHandler != nil {
+		mux.Handle("GET /metrics", config.MetricsHandler)
+	}
 
 	// Handle POST /v1/auth/signup
 	mux.HandleFunc("POST "+APIVersionPrefix+"/auth/signup", authHandler.SignUp)
