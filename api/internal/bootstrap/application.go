@@ -21,6 +21,7 @@ import (
 	"github.com/rafaelcmd/internal-developer-platform/api/internal/infrastructure"
 	"github.com/rafaelcmd/internal-developer-platform/api/internal/logger"
 	"github.com/rafaelcmd/internal-developer-platform/api/internal/server"
+	"github.com/rafaelcmd/internal-developer-platform/api/internal/telemetry"
 )
 
 // Application holds all the application dependencies and provides access to them.
@@ -32,6 +33,9 @@ type Application struct {
 	// Infrastructure
 	AWSClients     *infrastructure.AWSClients
 	ParameterStore *infrastructure.ParameterStore
+
+	// Observability
+	Metrics *telemetry.Metrics
 
 	// Runtime configuration (loaded from Parameter Store)
 	ProvisionerQueueURL string
@@ -90,6 +94,11 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*Application, e
 	if cfg.App.EnableTracing {
 		tracer.Start()
 		app.Logger.Info("Datadog tracer initialized")
+	}
+
+	// Initialize the OpenTelemetry metrics provider (Prometheus exporter)
+	if err := app.initializeMetrics(); err != nil {
+		return nil, fmt.Errorf("failed to initialize metrics: %w", err)
 	}
 
 	// Initialize AWS clients
@@ -190,6 +199,22 @@ func (a *Application) initializeRedis(ctx context.Context) error {
 	return nil
 }
 
+// initializeMetrics constructs the OpenTelemetry MeterProvider backed by the
+// Prometheus exporter and registers it as the global provider.
+func (a *Application) initializeMetrics() error {
+	metrics, err := telemetry.NewMetrics(telemetry.MetricsConfig{
+		ServiceName: a.Config.App.ServiceName,
+		Environment: a.Config.App.Environment,
+	})
+	if err != nil {
+		return err
+	}
+
+	a.Metrics = metrics
+	a.Logger.Info("OpenTelemetry metrics provider initialized (prometheus exporter)")
+	return nil
+}
+
 // initializeAdapters initializes all outbound adapters.
 func (a *Application) initializeAdapters(opts Options) {
 	a.SwaggerHandler = apihttp.NewSwaggerHandler(opts.SwaggerPath)
@@ -220,6 +245,7 @@ func (a *Application) initializeServer() error {
 		AllowedOrigins:   a.Config.App.AllowedOrigins,
 		IdempotencyStore: a.IdempotencyStore,
 		IdempotencyTTL:   a.Config.Idempotency.TTL,
+		MetricsHandler:   a.Metrics.Handler(),
 	}
 	router := apihttp.NewRouterWithConfig(
 		a.ResourceHandler,
@@ -273,6 +299,15 @@ func (a *Application) Shutdown() error {
 	if a.RedisClient != nil {
 		if err := a.RedisClient.Close(); err != nil {
 			a.Logger.Warn("Failed to close Redis client", logger.F("error", err.Error()))
+		}
+	}
+
+	// Flush and release the metrics provider
+	if a.Metrics != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), a.Config.Server.ShutdownTimeout)
+		defer cancel()
+		if err := a.Metrics.Shutdown(ctx); err != nil {
+			a.Logger.Warn("Failed to shut down metrics provider", logger.F("error", err.Error()))
 		}
 	}
 
