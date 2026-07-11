@@ -1,6 +1,6 @@
 include:
   - api/docker-compose.dev.yaml
-  - ./resource-provisioner-consumer/docker-compose.dev.yaml
+  - ./services/provisioner/docker-compose.dev.yaml
 
 services:
   kafka:
@@ -60,7 +60,7 @@ services:
     image: prom/prometheus:v2.55.0
     container_name: prometheus
     volumes:
-      - ./resource-provisioner-consumer/prometheus.yaml:/etc/prometheus/prometheus.yml
+      - ./services/provisioner/prometheus.yaml:/etc/prometheus/prometheus.yml
     ports:
       - "9090:9090"
     depends_on:
