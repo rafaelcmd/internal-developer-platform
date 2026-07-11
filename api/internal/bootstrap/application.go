@@ -90,8 +90,8 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*Application, e
 		logger.F("service", cfg.App.ServiceName),
 	)
 
-	// Initialize tracing if enabled
-	if cfg.App.EnableTracing {
+	// Initialize tracing if enabled (skipped in local mode — no Datadog agent)
+	if cfg.App.EnableTracing && !app.isLocalMode() {
 		tracer.Start()
 		app.Logger.Info("Datadog tracer initialized")
 	}
@@ -99,6 +99,13 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*Application, e
 	// Initialize the OpenTelemetry metrics provider (Prometheus exporter)
 	if err := app.initializeMetrics(); err != nil {
 		return nil, fmt.Errorf("failed to initialize metrics: %w", err)
+	}
+
+	// In local mode, skip all AWS-backed wiring (Parameter Store, SQS, Cognito,
+	// Redis) so the service boots for local testing of infra-free endpoints such
+	// as /metrics and /v1/health. See initializeLocal for the caveats.
+	if app.isLocalMode() {
+		return app.initializeLocal(opts)
 	}
 
 	// Initialize AWS clients
@@ -199,6 +206,34 @@ func (a *Application) initializeRedis(ctx context.Context) error {
 	return nil
 }
 
+// isLocalMode reports whether the app is running in local development mode,
+// where AWS-backed dependencies are disabled.
+func (a *Application) isLocalMode() bool {
+	return a.Config.App.Environment == "local"
+}
+
+// initializeLocal wires the minimal set of dependencies that need no external
+// infrastructure, for local development. AWS clients, Parameter Store, SQS,
+// Cognito, and Redis are all skipped, so only infra-free endpoints (/metrics,
+// /v1/health, and swagger) are functional — the resource and auth routes are
+// registered but will return 500 (recovered) if called, since their services
+// are nil.
+func (a *Application) initializeLocal(opts Options) (*Application, error) {
+	a.Logger.Warn("Running in LOCAL mode: AWS, Parameter Store, and Redis are disabled",
+		logger.F("functional_endpoints", "/metrics, /v1/health, /v1/swagger"),
+	)
+
+	a.initializeAdapters(opts)
+	a.initializeHandlers()
+
+	if err := a.initializeServer(); err != nil {
+		return nil, fmt.Errorf("failed to initialize server: %w", err)
+	}
+
+	a.Logger.Info("Application initialized successfully (local mode)")
+	return a, nil
+}
+
 // initializeMetrics constructs the OpenTelemetry MeterProvider backed by the
 // Prometheus exporter and registers it as the global provider.
 func (a *Application) initializeMetrics() error {
@@ -255,9 +290,9 @@ func (a *Application) initializeServer() error {
 		routerConfig,
 	)
 
-	// Wrap with Datadog tracing if enabled
+	// Wrap with Datadog tracing if enabled (skipped in local mode)
 	var handler http.Handler = router
-	if a.Config.App.EnableTracing {
+	if a.Config.App.EnableTracing && !a.isLocalMode() {
 		mux := httptrace.NewServeMux(httptrace.WithServiceName(a.Config.App.ServiceName))
 
 		// Handle routes with environment prefix (for local development)

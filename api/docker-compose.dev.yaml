@@ -3,16 +3,14 @@ services:
     container_name: internal-developer-platform-api
     build:
       args:
-        - GO_VERSION=${GO_VERSION:-1.24}
+        - GO_VERSION=${GO_VERSION:-1.25}
       context: .
       dockerfile: Dockerfile.dev
     ports:
       - "5000:5000"
     environment:
-      - KAFKA_BROKER=kafka:9092
-    depends_on:
-      kafka:
-        condition: service_healthy
+      - ENVIRONMENT=local
+      - PORT=5000
     networks:
       - public-network
       - internal-network
