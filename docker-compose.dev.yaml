@@ -4,7 +4,8 @@ include:
 
 services:
   kafka:
-    image: confluentinc/cp-kafka:latest
+    # Pinned to 7.x: CP 8.x images are KRaft-only and reject KAFKA_ZOOKEEPER_CONNECT.
+    image: confluentinc/cp-kafka:7.7.1
     container_name: kafka
     ports: []
     environment:
@@ -32,7 +33,7 @@ services:
       - internal-network
 
   zookeeper:
-    image: confluentinc/cp-zookeeper:latest
+    image: confluentinc/cp-zookeeper:7.7.1
     container_name: zookeeper
     ports: []
     environment:
