@@ -6,7 +6,7 @@ Monorepo for an internal developer platform that provisions cloud resources and 
 
 Event-driven, multi-service platform on AWS (EKS, SQS, Cognito):
 
-1. **API** (`/api`) — Go 1.24 REST API. Receives resource creation requests, publishes messages to SQS.
+1. **API** (`/api`) — Go 1.25 REST API. Receives resource creation requests, publishes messages to SQS.
 2. **Cost Manager** (`/services/cost-manager`) — Clojure 1.12 service. Consumes SQS messages and tracks costs across AWS/GCP/Azure.
 3. **Provisioner** (`/services/provisioner`) — Go 1.22 service. Provisions cloud resources from SQS messages.
 
@@ -25,8 +25,8 @@ Message flow: API → SQS → Cost Manager / Provisioner
 
 ### API (Go)
 ```bash
-cd api && go run cmd/api/main.go    # run
-cd api && go test ./...             # test
+cd api && go run cmd/server/main.go    # run
+cd api && go test ./...                # test
 ```
 
 ### Cost Manager (Clojure)
@@ -56,5 +56,6 @@ k6/                   - Load testing scripts
 ## Conventions
 
 - Each service has its own `CLAUDE.md` with service-specific details — read it before working on that service.
+- When a change alters a service's architecture, commands, or conventions, update that service's CLAUDE.md in the same commit.
 - Go services use standard `cmd/` and `internal/` layout.
 - Infrastructure follows Terraform `modules/` + `live/` pattern.
