@@ -91,10 +91,12 @@ func NewRouterWithConfig(resourceHandler *ResourceHandler, healthHandler *Health
 
 	// =============================================================================
 	// Middleware Chain
-	// Applied in order: Recovery -> RequestContext -> StandardHeaders -> CORS -> Routes
+	// Applied in order: RequestCounter -> Recovery -> RequestContext -> StandardHeaders -> CORS -> Routes
+	// RequestCounter stays outermost so panics recovered below it are counted as 500s.
 	// =============================================================================
 	return ChainMiddleware(
 		mux,
+		RequestCounterMiddleware,
 		RecoveryMiddleware,
 		RequestContextMiddleware,
 		StandardHeadersMiddleware,
