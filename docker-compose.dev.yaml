@@ -39,6 +39,13 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+    # Persist ZooKeeper state so its cluster.id survives container recreation.
+    # Without this ZooKeeper is ephemeral while kafka-data is durable, so a
+    # recreated ZooKeeper mints a fresh cluster.id and Kafka then aborts with an
+    # "Invalid cluster.id in meta.properties" mismatch against the old volume.
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-log:/var/lib/zookeeper/log
     networks:
       - internal-network
 
@@ -79,3 +86,5 @@ networks:
 
 volumes:
   kafka-data:
+  zookeeper-data:
+  zookeeper-log:
