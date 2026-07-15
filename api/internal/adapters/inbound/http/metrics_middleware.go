@@ -51,6 +51,35 @@ func RequestCounterMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// ActiveRequestsMiddleware tracks the number of in-flight HTTP requests on the
+// OTel UpDownCounter http.server.active_requests: it increments when a request
+// enters and decrements when it returns, so the Prometheus-exported gauge
+// reflects concurrent request load at scrape time. Attributed with the request
+// method only — unlike the request counter, the matched route and status code
+// are not yet known while the request is still being served. Placed near the top
+// of the chain so requests are counted for their whole lifetime; the decrement is
+// deferred so a panic unwinding through this layer still releases the count.
+func ActiveRequestsMiddleware(next http.Handler) http.Handler {
+	gauge, err := otel.Meter(meterName).Int64UpDownCounter(
+		"http.server.active_requests",
+		metric.WithDescription("Number of in-flight HTTP requests"),
+		metric.WithUnit("{request}"),
+	)
+	if err != nil {
+		// Instrument creation only fails on an invalid name; report through the
+		// OTel error handler and serve uninstrumented rather than refuse traffic.
+		otel.Handle(err)
+		return next
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attrs := metric.WithAttributes(semconv.HTTPRequestMethodKey.String(r.Method))
+		gauge.Add(r.Context(), 1, attrs)
+		defer gauge.Add(r.Context(), -1, attrs)
+		next.ServeHTTP(w, r)
+	})
+}
+
 // patternPath strips the optional "METHOD " prefix from a ServeMux pattern,
 // leaving the path part used for the http.route attribute.
 func patternPath(pattern string) string {
