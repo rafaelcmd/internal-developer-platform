@@ -85,6 +85,9 @@ auth routes return 500 because their services are nil. Used by
   names/attributes (`semconv` v1.26.0) for new instruments. Every request is
   counted on `http.server.requests` by `RequestCounterMiddleware` (outermost in
   the chain), labeled with method, matched route, and status code.
+  `ActiveRequestsMiddleware` (alongside the counter) gauges in-flight requests on
+  the `http.server.active_requests` UpDownCounter, labeled with method only
+  (route/status are unknown while the request is still being served).
 - **Tracing:** Datadog APM via `dd-trace-go` (not OTel), wrapped around the
   router in bootstrap.
 

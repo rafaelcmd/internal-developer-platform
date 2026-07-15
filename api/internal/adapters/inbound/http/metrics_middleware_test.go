@@ -76,6 +76,46 @@ func TestRequestCounterMiddleware_CountsUnmatchedRouteWithoutRouteLabel(t *testi
 	assert.NotContains(t, line, "http_route=")
 }
 
+func TestActiveRequestsMiddleware_GaugesInFlightRequests(t *testing.T) {
+	metrics, err := telemetry.NewMetrics(telemetry.MetricsConfig{
+		ServiceName: "test-service",
+		Environment: "test",
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = metrics.Shutdown(t.Context()) })
+
+	// A handler that parks in the middle of serving so the test can observe the
+	// gauge while the request is genuinely in flight.
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	blocking := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(entered)
+		<-release
+		w.WriteHeader(http.StatusOK)
+	})
+	handler := ActiveRequestsMiddleware(blocking)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
+		handler.ServeHTTP(httptest.NewRecorder(), req)
+	}()
+
+	// Assert: with the request parked, the gauge reads 1 for its method.
+	<-entered
+	line := findMetricLine(scrape(t, metrics.Handler()), "http_server_active_requests", `http_request_method="GET"`)
+	require.NotEmpty(t, line, "expected an http_server_active_requests sample while in flight")
+	assert.True(t, strings.HasSuffix(line, " 1"), "expected a gauge of 1 while in flight, got: %s", line)
+
+	// Assert: once the request completes, the gauge is decremented back to 0.
+	close(release)
+	<-done
+	line = findMetricLine(scrape(t, metrics.Handler()), "http_server_active_requests", `http_request_method="GET"`)
+	require.NotEmpty(t, line, "expected an http_server_active_requests sample after completion")
+	assert.True(t, strings.HasSuffix(line, " 0"), "expected a gauge of 0 after completion, got: %s", line)
+}
+
 // findMetricLine returns the first sample line of the given metric that also
 // contains the given label fragment, or "" if none matches.
 func findMetricLine(body, metric, labelFragment string) string {
