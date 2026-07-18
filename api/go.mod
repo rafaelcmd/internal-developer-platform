@@ -17,6 +17,7 @@ require (
 	github.com/swaggo/http-swagger v1.3.4
 	go.opentelemetry.io/otel v1.44.0
 	go.opentelemetry.io/otel/exporters/prometheus v0.66.0
+	go.opentelemetry.io/otel/metric v1.44.0
 	go.opentelemetry.io/otel/sdk v1.44.0
 	go.opentelemetry.io/otel/sdk/metric v1.44.0
 	gopkg.in/DataDog/dd-trace-go.v1 v1.65.1
@@ -80,7 +81,6 @@ require (
 	github.com/swaggo/swag v1.16.6 // indirect
 	github.com/tinylib/msgp v1.1.8 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
-	go.opentelemetry.io/otel/metric v1.44.0 // indirect
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
