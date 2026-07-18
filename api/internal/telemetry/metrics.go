@@ -17,6 +17,16 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
+// requestDurationBuckets are the explicit histogram bucket boundaries (in
+// seconds) for http.server.request.duration, taken from the OTel semantic
+// conventions for HTTP server duration. The SDK default boundaries top out in
+// the thousands, which suits milliseconds; recording in seconds without this
+// View would collapse every realistic request latency into the first bucket and
+// leave histogram_quantile with no resolution below multi-second latencies.
+var requestDurationBuckets = []float64{
+	0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10,
+}
+
 // MetricsConfig holds the configuration for the metrics provider.
 type MetricsConfig struct {
 	// ServiceName identifies this service in exported metric resource attributes.
@@ -59,9 +69,23 @@ func NewMetrics(cfg MetricsConfig) (*Metrics, error) {
 		return nil, fmt.Errorf("building telemetry resource: %w", err)
 	}
 
+	// A View overrides the SDK's default bucket boundaries for the request
+	// duration histogram with seconds-scale boundaries. Bucket policy is an
+	// export concern, so it lives here on the provider rather than being
+	// hard-coded where the instrument is created.
+	durationView := metric.NewView(
+		metric.Instrument{Name: "http.server.request.duration"},
+		metric.Stream{
+			Aggregation: metric.AggregationExplicitBucketHistogram{
+				Boundaries: requestDurationBuckets,
+			},
+		},
+	)
+
 	provider := metric.NewMeterProvider(
 		metric.WithReader(exporter),
 		metric.WithResource(res),
+		metric.WithView(durationView),
 	)
 	otel.SetMeterProvider(provider)
 

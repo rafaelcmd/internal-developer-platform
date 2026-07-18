@@ -82,12 +82,21 @@ auth routes return 500 because their services are nil. Used by
 - **Metrics:** OpenTelemetry with a Prometheus exporter (`internal/telemetry`).
   The MeterProvider is registered as the OTel global in bootstrap, so
   instruments are created via `otel.Meter(...)` anywhere. Follow OTel semconv
-  names/attributes (`semconv` v1.26.0) for new instruments. Every request is
-  counted on `http.server.requests` by `RequestCounterMiddleware` (outermost in
-  the chain), labeled with method, matched route, and status code.
-  `ActiveRequestsMiddleware` (alongside the counter) gauges in-flight requests on
-  the `http.server.active_requests` UpDownCounter, labeled with method only
-  (route/status are unknown while the request is still being served).
+  names/attributes (`semconv` v1.26.0) for new instruments.
+  `RequestDurationMiddleware` records request latency on the
+  `http.server.request.duration` Histogram (unit: seconds), labeled with method,
+  matched route, and status code. It sits above the recovery layer so a recovered
+  panic is timed and recorded as a 500. There is no separate request counter: the
+  histogram's `_count` series already counts every request, so request rate is
+  `rate(http_server_request_duration_seconds_count[...])`. The histogram's bucket
+  boundaries are overridden to semconv seconds-scale values via a View in
+  `internal/telemetry` (the SDK defaults are milliseconds-scale and would collapse
+  every latency into one bucket). `ActiveRequestsMiddleware` (outermost) gauges
+  in-flight requests on the `http.server.active_requests` UpDownCounter, labeled
+  with method only (route/status are unknown while the request is still being
+  served). Both middlewares skip the `/metrics` scrape endpoint (so Prometheus
+  polling doesn't dominate the stats) and normalize the method label to a known
+  set or `_OTHER` (so arbitrary request methods can't blow up cardinality).
 - **Tracing:** Datadog APM via `dd-trace-go` (not OTel), wrapped around the
   router in bootstrap.
 
