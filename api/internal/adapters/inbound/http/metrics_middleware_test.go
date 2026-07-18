@@ -39,7 +39,7 @@ func scrape(t *testing.T, router http.Handler) string {
 	return rec.Body.String()
 }
 
-func TestRequestCounterMiddleware_CountsMatchedRoute(t *testing.T) {
+func TestRequestDurationMiddleware_RecordsMatchedRoute(t *testing.T) {
 	router := newInstrumentedRouter(t)
 
 	// Act: serve a routed request, then scrape.
@@ -50,15 +50,17 @@ func TestRequestCounterMiddleware_CountsMatchedRoute(t *testing.T) {
 
 	body := scrape(t, router)
 
-	// Assert: the counter appears with method, route pattern, and status labels.
-	line := findMetricLine(body, "http_server_requests_total", `http_route="/v1/health"`)
-	require.NotEmpty(t, line, "expected a http_server_requests_total sample for /v1/health, got:\n%s", body)
+	// Assert: the histogram's count series appears with method, route pattern,
+	// and status labels, and reflects the single request served. This _count
+	// series is also the request counter — request rate is rate() of it.
+	line := findMetricLine(body, "http_server_request_duration_seconds_count", `http_route="/v1/health"`)
+	require.NotEmpty(t, line, "expected a http_server_request_duration_seconds_count sample for /v1/health, got:\n%s", body)
 	assert.Contains(t, line, `http_request_method="GET"`)
 	assert.Contains(t, line, `http_response_status_code="200"`)
 	assert.True(t, strings.HasSuffix(line, " 1"), "expected a count of 1, got: %s", line)
 }
 
-func TestRequestCounterMiddleware_CountsUnmatchedRouteWithoutRouteLabel(t *testing.T) {
+func TestRequestDurationMiddleware_RecordsUnmatchedRouteWithoutRouteLabel(t *testing.T) {
 	router := newInstrumentedRouter(t)
 
 	// Act: serve a request that matches no route, then scrape.
@@ -69,11 +71,40 @@ func TestRequestCounterMiddleware_CountsUnmatchedRouteWithoutRouteLabel(t *testi
 
 	body := scrape(t, router)
 
-	// Assert: the 404 is counted but carries no http_route label, since raw
+	// Assert: the 404 is recorded but carries no http_route label, since raw
 	// unmatched paths would create unbounded label cardinality.
-	line := findMetricLine(body, "http_server_requests_total", `http_response_status_code="404"`)
-	require.NotEmpty(t, line, "expected a http_server_requests_total sample for the 404, got:\n%s", body)
+	line := findMetricLine(body, "http_server_request_duration_seconds_count", `http_response_status_code="404"`)
+	require.NotEmpty(t, line, "expected a duration sample for the 404, got:\n%s", body)
 	assert.NotContains(t, line, "http_route=")
+}
+
+func TestRequestDurationMiddleware_NormalizesUnknownMethod(t *testing.T) {
+	router := newInstrumentedRouter(t)
+
+	// Act: serve a request with a bogus, non-standard method, then scrape.
+	req := httptest.NewRequest("FOOBAR", "/v1/health", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	body := scrape(t, router)
+
+	// Assert: the arbitrary method is collapsed to the "_OTHER" sentinel rather
+	// than recorded verbatim, so a client cannot mint unbounded label values.
+	line := findMetricLine(body, "http_server_request_duration_seconds_count", `http_request_method="_OTHER"`)
+	require.NotEmpty(t, line, "expected the unknown method to be recorded as _OTHER, got:\n%s", body)
+	assert.NotContains(t, body, `http_request_method="FOOBAR"`)
+}
+
+func TestMetricsEndpoint_NotInstrumented(t *testing.T) {
+	router := newInstrumentedRouter(t)
+
+	// Act: scrape twice — the first scrape must not show up in the second.
+	scrape(t, router)
+	body := scrape(t, router)
+
+	// Assert: the scrape endpoint is excluded, so no request series carries the
+	// /metrics route (self-monitoring would otherwise dominate the stats).
+	assert.NotContains(t, body, `http_route="/metrics"`)
 }
 
 func TestActiveRequestsMiddleware_GaugesInFlightRequests(t *testing.T) {
