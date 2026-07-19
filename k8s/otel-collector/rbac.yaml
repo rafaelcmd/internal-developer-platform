@@ -1,0 +1,38 @@
+# Cluster-scoped read access the Collector needs to enrich telemetry with
+# Kubernetes metadata:
+#   - k8sattributes processor: resolves pod IP -> pod/namespace/deployment/node
+#     so every span, metric, and log is tagged with its workload without the
+#     app having to know its own pod name.
+#   - prometheus receiver (kubernetes_sd role: pod): discovers scrape targets.
+# All read-only; the Collector never mutates cluster state.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: otel-collector
+  labels:
+    app.kubernetes.io/name: otel-collector
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "namespaces", "nodes", "services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["extensions"]
+    resources: ["replicasets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: otel-collector
+  labels:
+    app.kubernetes.io/name: otel-collector
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: otel-collector
+subjects:
+  - kind: ServiceAccount
+    name: otel-collector
+    namespace: observability

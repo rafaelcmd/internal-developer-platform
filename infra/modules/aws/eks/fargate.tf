@@ -25,8 +25,18 @@ resource "aws_iam_role_policy_attachment" "fargate_execution" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSFargatePodExecutionRolePolicy"
 }
 
+# The OTel Collector namespace is folded in automatically when the Collector is
+# installed, so operators can't forget to give it a profile (no profile => the
+# Collector pod never schedules on Fargate).
+locals {
+  fargate_namespaces = toset(concat(
+    var.fargate_namespaces,
+    var.install_otel_collector ? [var.otel_collector_namespace] : [],
+  ))
+}
+
 resource "aws_eks_fargate_profile" "this" {
-  for_each = toset(var.fargate_namespaces)
+  for_each = local.fargate_namespaces
 
   cluster_name           = aws_eks_cluster.this.name
   fargate_profile_name   = "${var.cluster_name}-${each.value}"

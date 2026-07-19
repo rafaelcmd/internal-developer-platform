@@ -1,0 +1,24 @@
+# Stable in-cluster endpoint every service targets via OTEL_EXPORTER_OTLP_
+# ENDPOINT. Services send to:
+#   http://otel-collector.observability.svc.cluster.local:4318  (OTLP/HTTP)
+#   otel-collector.observability.svc.cluster.local:4317         (OTLP/gRPC)
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-collector
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: otel-collector
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: otel-collector
+  ports:
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+      protocol: TCP
+    - name: otlp-http
+      port: 4318
+      targetPort: 4318
+      protocol: TCP

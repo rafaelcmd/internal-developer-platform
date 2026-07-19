@@ -52,3 +52,8 @@ output "fargate_pod_log_group_arn" {
   description = "ARN of the CloudWatch log group receiving Fargate pod logs (only when enable_fargate_logging is true)"
   value       = var.enable_fargate_logging ? aws_cloudwatch_log_group.fargate_pods[0].arn : null
 }
+
+output "otel_collector_role_arn" {
+  description = "ARN of the OTel Collector's IRSA role (only when install_otel_collector is true). Annotated onto the Terraform-managed ServiceAccount."
+  value       = var.install_otel_collector ? aws_iam_role.otel_collector[0].arn : null
+}
