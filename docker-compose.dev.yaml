@@ -64,20 +64,6 @@ services:
       - public-network
       - internal-network
 
-  prometheus:
-    image: prom/prometheus:v2.55.0
-    container_name: prometheus
-    volumes:
-      - ./services/provisioner/prometheus.yaml:/etc/prometheus/prometheus.yml
-    ports:
-      - "9090:9090"
-    depends_on:
-      kafka:
-        condition: service_healthy
-    networks:
-      - public-network
-      - internal-network
-
 networks:
   internal-network:
     driver: bridge
