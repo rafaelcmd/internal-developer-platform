@@ -96,7 +96,7 @@ Key generation responsibility:
 **Negative:**
 
 - **Does not make the system end-to-end idempotent.** SQS is at-least-once.
-  The Cost Manager and Provisioner consumers will each receive duplicates
+  The Provisioner consumer will receive duplicates
   of legitimately-distinct messages and must dedupe independently (DB
   unique constraint on `(idempotency_key, payload_hash)`). That work is
   out of scope here and will be its own ADR when implemented.
@@ -145,7 +145,7 @@ Key generation responsibility:
 
 - If we build a UI client and need browser-driven idempotency; the optional
   header may need to become required for that surface.
-- If consumer-side dedup goes in (Cost Manager / Provisioner), we should
+- If consumer-side dedup goes in (Provisioner), we should
   document the end-to-end contract in a follow-up ADR rather than leaving
   it scattered.
 - If duplicate publishes at the partial-failure window prove material in

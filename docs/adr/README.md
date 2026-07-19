@@ -16,7 +16,7 @@ service or component boundaries (API + infra + consumers, or contracts that
 clients depend on).
 
 Service-internal decisions can live closer to the code (e.g.
-`services/cost-manager/docs/adr/`) when they don't leak past that service.
+`services/provisioner/docs/adr/`) when they don't leak past that service.
 None exist yet; create them only when the first such decision arises.
 
 ## Index
