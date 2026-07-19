@@ -64,6 +64,24 @@ services:
       - public-network
       - internal-network
 
+  # Vendor-agnostic telemetry seam for local dev. Receives OTLP from the services
+  # and scrapes the API's /metrics; prints via the debug exporter and re-exposes
+  # metrics on :8889. Config: ./otel-collector.dev.yaml. Pinned to match the k8s
+  # collector image.
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.116.0
+    container_name: otel-collector
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./otel-collector.dev.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC (point host-run services here)
+      - "4318:4318"   # OTLP HTTP
+      - "8889:8889"   # Prometheus exposition (curl http://localhost:8889/metrics)
+    networks:
+      - public-network
+      - internal-network
+
 networks:
   internal-network:
     driver: bridge

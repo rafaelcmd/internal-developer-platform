@@ -90,10 +90,18 @@ k6/                   Load-testing scripts
 
 ## Running Locally
 
-Spin up the full stack (Kafka + Zookeeper + services) with Docker Compose:
+Spin up the full stack (Kafka + Zookeeper + services + OTel Collector) with Docker Compose:
 
 ```bash
 docker compose -f docker-compose.dev.yaml up
+```
+
+**Observability locally:** an OpenTelemetry Collector receives OTLP from the
+services and scrapes the API's `/metrics`. Inspect the pipeline with:
+
+```bash
+docker compose -f docker-compose.dev.yaml logs -f otel-collector  # telemetry (debug exporter)
+curl http://localhost:8889/metrics                                # collected metrics
 ```
 
 Run individual services:

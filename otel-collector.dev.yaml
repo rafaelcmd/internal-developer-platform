@@ -1,0 +1,65 @@
+# =============================================================================
+# OpenTelemetry Collector — LOCAL DEV config (docker-compose.dev.yaml).
+#
+# Deliberately simpler than the k8s pipeline (k8s/otel-collector): no Datadog
+# exporter (no API key locally), no k8sattributes (no Kubernetes). It receives
+# OTLP from services and also scrapes the API's /metrics, then prints everything
+# via the debug exporter and re-exposes metrics for local viewing.
+#
+# See it work:
+#   docker compose -f docker-compose.dev.yaml logs -f otel-collector   # debug
+#   curl http://localhost:8889/metrics                                 # metrics
+# =============================================================================
+receivers:
+  # OTLP push path — services send here (OTEL_EXPORTER_OTLP_ENDPOINT).
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+  # Pull path — scrape the API's OTel->Prometheus /metrics. Works even when the
+  # API runs in local mode (which skips OTLP push), so the metrics pipeline is
+  # exercisable offline with no AWS. Mirrors the k8s prometheus receiver.
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: idp-api
+          scrape_interval: 15s
+          metrics_path: /metrics
+          static_configs:
+            - targets: ["internal-developer-platform-api:5000"]
+
+processors:
+  batch:
+    timeout: 5s
+
+exporters:
+  # Print received telemetry to the collector's stdout for local inspection.
+  debug:
+    verbosity: detailed
+
+  # Re-expose scraped/received metrics in Prometheus format on :8889.
+  prometheus:
+    endpoint: 0.0.0.0:8889
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
+    metrics:
+      receivers: [otlp, prometheus]
+      processors: [batch]
+      exporters: [debug, prometheus]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]

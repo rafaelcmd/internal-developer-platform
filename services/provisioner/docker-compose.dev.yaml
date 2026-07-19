@@ -9,9 +9,16 @@ services:
     ports: [ ]
     environment:
       - KAFKA_BROKER=kafka:9092
+      # OTLP egress to the dev Collector. Setup is a no-op if these are unset,
+      # so they are what turns the provisioner's telemetry on locally.
+      - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=true
+      - ENVIRONMENT=dev
     depends_on:
       kafka:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     networks:
       - internal-network
     restart: on-failure
