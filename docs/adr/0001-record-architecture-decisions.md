@@ -6,8 +6,8 @@
 
 ## Context
 
-The Internal Developer Platform spans multiple services (API in Go, Cost
-Manager in Clojure, Provisioner in Go), AWS infrastructure (ECS, SQS,
+The Internal Developer Platform spans multiple services (API in Go,
+Provisioner in Go), AWS infrastructure (ECS, SQS,
 Cognito, API Gateway, WAF), and platform-level contracts that clients depend
 on. Decisions made today — choice of messaging, idempotency strategy, storage
 backends, deployment topology — will be invisible six months from now unless

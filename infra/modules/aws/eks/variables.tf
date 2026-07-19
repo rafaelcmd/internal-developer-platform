@@ -174,6 +174,39 @@ variable "datadog_api_key" {
 }
 
 # =============================================================================
+# OPENTELEMETRY COLLECTOR
+# Cluster-managed prerequisites for the vendor-agnostic telemetry pipeline: the
+# observability namespace, an IRSA-annotated ServiceAccount, and a copy of the
+# Datadog API key secret. The Collector workload itself is raw manifests under
+# /k8s/otel-collector. When enabled, otel_collector_namespace is auto-added to
+# the Fargate profile.
+# =============================================================================
+
+variable "install_otel_collector" {
+  description = "Provision the OTel Collector's cluster prerequisites (namespace, IRSA ServiceAccount, Datadog secret). Reuses datadog_api_key."
+  type        = bool
+  default     = false
+}
+
+variable "otel_collector_namespace" {
+  description = "Namespace the OTel Collector runs in. Auto-added to the Fargate profile when install_otel_collector is true."
+  type        = string
+  default     = "observability"
+}
+
+variable "otel_collector_service_account" {
+  description = "Name of the OTel Collector ServiceAccount (must match serviceAccountName in k8s/otel-collector/deployment.yaml)"
+  type        = string
+  default     = "otel-collector"
+}
+
+variable "amp_workspace_arn" {
+  description = "ARN of an Amazon Managed Prometheus workspace. When set, the Collector's IRSA role is granted aps:RemoteWrite to it. Leave null to use the Datadog exporter only."
+  type        = string
+  default     = null
+}
+
+# =============================================================================
 # TAGS
 # =============================================================================
 

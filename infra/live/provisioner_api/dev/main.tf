@@ -38,6 +38,12 @@ module "eks" {
   datadog_chart_version         = var.datadog_chart_version
   datadog_api_key               = data.aws_ssm_parameter.datadog_api_key.value
 
+  # OTel Collector prerequisites (namespace, IRSA ServiceAccount, Datadog secret
+  # in the observability namespace). The Collector workload is applied from
+  # k8s/otel-collector. Reuses the Datadog API key above. amp_workspace_arn is
+  # left unset — the datadog exporter needs no AWS auth; set it when AMP lands.
+  install_otel_collector = true
+
   # Fargate pod log routing — managed Fluent Bit ships pod stdout to a single
   # CloudWatch log group that we subscribe to the Datadog Lambda forwarder
   # below. Removes the need for a per-pod log-collection sidecar.

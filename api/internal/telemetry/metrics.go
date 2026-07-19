@@ -13,8 +13,6 @@ import (
 	"go.opentelemetry.io/otel"
 	otelprom "go.opentelemetry.io/otel/exporters/prometheus"
 	"go.opentelemetry.io/otel/sdk/metric"
-	"go.opentelemetry.io/otel/sdk/resource"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
 // requestDurationBuckets are the explicit histogram bucket boundaries (in
@@ -31,6 +29,8 @@ var requestDurationBuckets = []float64{
 type MetricsConfig struct {
 	// ServiceName identifies this service in exported metric resource attributes.
 	ServiceName string
+	// ServiceVersion is the running build version (omitted from the resource when empty).
+	ServiceVersion string
 	// Environment is the deployment environment (e.g. "dev", "prod").
 	Environment string
 }
@@ -56,17 +56,9 @@ func NewMetrics(cfg MetricsConfig) (*Metrics, error) {
 		return nil, fmt.Errorf("creating prometheus exporter: %w", err)
 	}
 
-	// NewSchemaless avoids a schema-URL conflict with resource.Default(), which
-	// carries its own semconv schema; the merged resource inherits the default's.
-	res, err := resource.Merge(
-		resource.Default(),
-		resource.NewSchemaless(
-			semconv.ServiceName(cfg.ServiceName),
-			semconv.DeploymentEnvironment(cfg.Environment),
-		),
-	)
+	res, err := newResource(cfg.ServiceName, cfg.ServiceVersion, cfg.Environment)
 	if err != nil {
-		return nil, fmt.Errorf("building telemetry resource: %w", err)
+		return nil, err
 	}
 
 	// A View overrides the SDK's default bucket boundaries for the request

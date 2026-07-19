@@ -1,0 +1,140 @@
+# =============================================================================
+# OpenTelemetry Collector pipeline — THE vendor-agnostic seam.
+#
+# Applications only ever speak OTLP to this Collector. Which backend telemetry
+# lands in (Datadog today; Amazon Managed Prometheus, another APM, etc. later)
+# is decided *here*, in exporter config — never in application code. Swapping or
+# adding a backend is a change to this ConfigMap, not a service redeploy.
+#
+# Fargate note: this runs as a gateway Deployment, not a DaemonSet (Fargate has
+# no nodes to run one on — the same constraint that shapes the Datadog Cluster
+# Agent setup). There is also no EC2 instance metadata (IMDS) on Fargate, so
+# resource detection relies on the `env` detector + k8sattributes, not `ec2`/
+# `eks` cloud detectors.
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector-config
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: otel-collector
+data:
+  config.yaml: |
+    receivers:
+      # Primary path: every service pushes traces / metrics / logs here.
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+
+      # Transitional pull path: scrape the API's existing OTel->Prometheus
+      # /metrics endpoint so today's metrics flow through the same pipeline
+      # with zero app changes. Once services push metrics over OTLP, this
+      # receiver can be dropped. Discovers pods annotated with
+      # prometheus.io/scrape=true (annotations added to the API Deployment in a
+      # later step). role: pod works on Fargate; node-based discovery does not.
+      prometheus:
+        config:
+          scrape_configs:
+            - job_name: kubernetes-pods
+              scrape_interval: 15s
+              kubernetes_sd_configs:
+                - role: pod
+              relabel_configs:
+                - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+                  action: keep
+                  regex: "true"
+                - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+                  action: replace
+                  target_label: __metrics_path__
+                  regex: (.+)
+                - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+                  action: replace
+                  regex: ([^:]+)(?::\d+)?;(\d+)
+                  replacement: $$1:$$2
+                  target_label: __address__
+
+    processors:
+      # First in every pipeline: shed load before the Collector OOMs.
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 80
+        spike_limit_percentage: 25
+
+      # Enrich telemetry with workload identity (pod, namespace, deployment,
+      # node) resolved from the source IP — apps stay ignorant of their own
+      # placement. Needs the ClusterRole in rbac.yaml.
+      k8sattributes:
+        auth_type: serviceAccount
+        passthrough: false
+        extract:
+          metadata:
+            - k8s.namespace.name
+            - k8s.pod.name
+            - k8s.pod.uid
+            - k8s.deployment.name
+            - k8s.node.name
+        pod_association:
+          - sources:
+              - from: resource_attribute
+                name: k8s.pod.ip
+          - sources:
+              - from: connection
+
+      # No IMDS on Fargate, so only the env detector (reads OTEL_RESOURCE_
+      # ATTRIBUTES). Cloud (ec2/eks) detectors would just time out here.
+      resourcedetection:
+        detectors: [env]
+        timeout: 5s
+        override: false
+
+      # Last before export: amortize backend calls.
+      batch:
+        send_batch_size: 8192
+        timeout: 5s
+
+    exporters:
+      # Datadog is just one exporter behind the seam — no dd-trace-go, no
+      # DogStatsD in app code. Datadog maps OTel semconv resource attributes
+      # (service.name, service.version, deployment.environment) onto its
+      # service / version / env unified tags automatically.
+      datadog:
+        api:
+          key: ${env:DATADOG_API_KEY}
+          site: ${env:DATADOG_SITE}
+        # Fargate pods have no meaningful host; tag by workload, not host.
+        host_metadata:
+          enabled: false
+
+      # Local visibility while validating the pipeline. Drop verbosity to
+      # basic (or remove) once traces/logs are confirmed flowing to Datadog.
+      debug:
+        verbosity: normal
+
+    extensions:
+      # Liveness/readiness target for the Deployment probes.
+      health_check:
+        endpoint: 0.0.0.0:13133
+
+    service:
+      extensions: [health_check]
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, k8sattributes, resourcedetection, batch]
+          exporters: [datadog, debug]
+        metrics:
+          receivers: [otlp, prometheus]
+          processors: [memory_limiter, k8sattributes, resourcedetection, batch]
+          exporters: [datadog]
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, k8sattributes, resourcedetection, batch]
+          exporters: [datadog, debug]
+      telemetry:
+        # The Collector's own metrics — scrape-able for self-monitoring.
+        metrics:
+          address: 0.0.0.0:8888

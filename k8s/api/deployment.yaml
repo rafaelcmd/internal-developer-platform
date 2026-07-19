@@ -20,63 +20,18 @@ spec:
         "tags.datadoghq.com/service": resource-provisioner-api
         "tags.datadoghq.com/env": dev
         "tags.datadoghq.com/version": "1.0.0"
+      # The OTel Collector's prometheus receiver scrapes pods carrying these
+      # annotations, bridging the API's existing OTel->Prometheus /metrics
+      # endpoint into the vendor-agnostic pipeline (no scrape config per pod).
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: /metrics
     spec:
       serviceAccountName: internal-developer-platform-api
-      # Native sidecar (K8s 1.28+ GA). The datadog-agent runs as an init
-      # container with restartPolicy: Always — it starts before the API,
-      # auto-restarts on its own, and its lifecycle no longer affects pod
-      # readiness or the NLB target group registration.
-      initContainers:
-        - name: datadog-agent
-          restartPolicy: Always
-          image: public.ecr.aws/datadog/agent:7.62.0
-          imagePullPolicy: IfNotPresent
-          ports:
-            - name: dogstatsd
-              containerPort: 8125
-              protocol: UDP
-            - name: trace
-              containerPort: 8126
-              protocol: TCP
-          env:
-            - name: DD_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: datadog-api-key
-                  key: api-key
-            - name: DD_SITE
-              value: datadoghq.com
-            - name: DD_EKS_FARGATE
-              value: "true"
-            - name: DD_APM_ENABLED
-              value: "true"
-            - name: DD_APM_NON_LOCAL_TRAFFIC
-              value: "true"
-            - name: DD_DOGSTATSD_NON_LOCAL_TRAFFIC
-              value: "true"
-            # Logs are collected by Fargate's managed Fluent Bit and shipped via
-            # CloudWatch + the Datadog forwarder Lambda (see infra/modules/aws/
-            # eks/fargate_logging.tf). The sidecar only handles APM + DogStatsD.
-            - name: DD_LOGS_ENABLED
-              value: "false"
-            - name: DD_TAGS
-              value: "project:internal-developer-platform,environment:dev,cluster:internal-developer-platform-cluster"
-            - name: DD_CLUSTER_NAME
-              value: internal-developer-platform-cluster
-          resources:
-            requests:
-              cpu: 100m
-              memory: 256Mi
-            limits:
-              cpu: 200m
-              memory: 512Mi
-          livenessProbe:
-            exec:
-              command: ["agent", "health"]
-            initialDelaySeconds: 30
-            periodSeconds: 30
-            timeoutSeconds: 5
-            failureThreshold: 6
+      # No Datadog sidecar: traces, metrics, and logs now leave the app as OTLP
+      # to the OTel Collector (observability namespace), which owns all backend
+      # routing including Datadog. See k8s/otel-collector.
       containers:
         - name: internal-developer-platform-api
           image: PLACEHOLDER-ECR-REPO:api-latest
@@ -90,26 +45,19 @@ spec:
               value: "8080"
             - name: ENVIRONMENT
               value: dev
-            - name: DD_SERVICE
+            # Identity — becomes the OTel resource (service.name / service.version
+            # / deployment.environment), which the Collector's datadog exporter
+            # maps onto Datadog's service / version / env unified tags.
+            - name: SERVICE_NAME
               value: resource-provisioner-api
-            - name: DD_ENV
-              value: dev
-            - name: DD_VERSION
+            - name: SERVICE_VERSION
               value: "1.0.0"
-            - name: DD_LOGS_ENABLED
+            # OTLP egress to the Collector. Plaintext is fine in-cluster; the
+            # SDK's trace and log exporters both read these standard vars.
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: otel-collector.observability.svc.cluster.local:4317
+            - name: OTEL_EXPORTER_OTLP_INSECURE
               value: "true"
-            - name: DD_LOGS_INJECTION
-              value: "true"
-            - name: DD_LOGS_SOURCE
-              value: go
-            - name: DD_AGENT_HOST
-              value: localhost
-            - name: DD_TRACE_AGENT_PORT
-              value: "8126"
-            - name: DD_DOGSTATSD_PORT
-              value: "8125"
-            - name: DD_TAGS
-              value: "project:internal-developer-platform,environment:dev,service:resource-provisioner-api"
           resources:
             requests:
               cpu: 250m

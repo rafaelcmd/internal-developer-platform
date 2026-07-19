@@ -2,7 +2,7 @@
 
 > AWS infrastructure for an event-driven internal developer platform. Terraform modules + live workspaces, deployed across decoupled stacks orchestrated by GitHub Actions over OIDC.
 
-This directory is a self-contained Terraform monorepo. It provisions the network, container registry, identity, EKS-on-Fargate cluster, message bus, API gateway and observability that the platform's Go API, Go provisioner, and Clojure cost-manager services run on.
+This directory is a self-contained Terraform monorepo. It provisions the network, container registry, identity, EKS-on-Fargate cluster, message bus, API gateway and observability that the platform's Go API and Go provisioner services run on.
 
 It exists primarily as a study and portfolio artifact: every decision below is one I would defend in a system-design interview.
 
