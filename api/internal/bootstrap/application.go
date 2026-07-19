@@ -8,8 +8,8 @@ import (
 	"net/http"
 
 	"github.com/redis/go-redis/v9"
-	httptrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/net/http"
-	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
+	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	apihttp "github.com/rafaelcmd/internal-developer-platform/api/internal/adapters/inbound/http"
 	"github.com/rafaelcmd/internal-developer-platform/api/internal/adapters/outbound/cognito"
@@ -36,6 +36,8 @@ type Application struct {
 
 	// Observability
 	Metrics *telemetry.Metrics
+	Tracing *telemetry.Tracing
+	Logs    *telemetry.Logs
 
 	// Runtime configuration (loaded from Parameter Store)
 	ProvisionerQueueURL string
@@ -79,21 +81,45 @@ func New(ctx context.Context, cfg *config.Config, opts Options) (*Application, e
 		Config: cfg,
 	}
 
+	// OTLP telemetry export (logs + traces) is enabled outside local mode, where
+	// there is no Collector to receive it. Set up the logs pipeline before the
+	// logger so its OTLP bridge hook can be attached at construction.
+	otlpEnabled := cfg.App.EnableTracing && !app.isLocalMode()
+
+	logCfg := logger.Config{Level: cfg.App.LogLevel, Format: "json"}
+	if otlpEnabled {
+		logs, err := telemetry.NewLogs(ctx, telemetry.LogsConfig{
+			ServiceName:    cfg.App.ServiceName,
+			ServiceVersion: cfg.App.Version,
+			Environment:    cfg.App.Environment,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize logs pipeline: %w", err)
+		}
+		app.Logs = logs
+		logCfg.Hooks = []logrus.Hook{logs.Hook()}
+	}
+
 	// Initialize logger
-	app.Logger = logger.New(logger.Config{
-		Level:  cfg.App.LogLevel,
-		Format: "json",
-	})
+	app.Logger = logger.New(logCfg)
 
 	app.Logger.Info("Initializing application",
 		logger.F("environment", cfg.App.Environment),
 		logger.F("service", cfg.App.ServiceName),
 	)
 
-	// Initialize tracing if enabled (skipped in local mode — no Datadog agent)
-	if cfg.App.EnableTracing && !app.isLocalMode() {
-		tracer.Start()
-		app.Logger.Info("Datadog tracer initialized")
+	// Initialize distributed tracing (OTLP -> Collector; skipped in local mode)
+	if otlpEnabled {
+		tracing, err := telemetry.NewTracing(ctx, telemetry.TracingConfig{
+			ServiceName:    cfg.App.ServiceName,
+			ServiceVersion: cfg.App.Version,
+			Environment:    cfg.App.Environment,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize tracing: %w", err)
+		}
+		app.Tracing = tracing
+		app.Logger.Info("OpenTelemetry tracing initialized (OTLP exporter)")
 	}
 
 	// Initialize the OpenTelemetry metrics provider (Prometheus exporter)
@@ -238,8 +264,9 @@ func (a *Application) initializeLocal(opts Options) (*Application, error) {
 // Prometheus exporter and registers it as the global provider.
 func (a *Application) initializeMetrics() error {
 	metrics, err := telemetry.NewMetrics(telemetry.MetricsConfig{
-		ServiceName: a.Config.App.ServiceName,
-		Environment: a.Config.App.Environment,
+		ServiceName:    a.Config.App.ServiceName,
+		ServiceVersion: a.Config.App.Version,
+		Environment:    a.Config.App.Environment,
 	})
 	if err != nil {
 		return err
@@ -290,10 +317,12 @@ func (a *Application) initializeServer() error {
 		routerConfig,
 	)
 
-	// Wrap with Datadog tracing if enabled (skipped in local mode)
+	// Wrap with OpenTelemetry HTTP instrumentation if enabled (skipped in local
+	// mode). otelhttp starts a server span per request from the propagated
+	// context and hands spans to the global TracerProvider (OTLP -> Collector).
 	var handler http.Handler = router
 	if a.Config.App.EnableTracing && !a.isLocalMode() {
-		mux := httptrace.NewServeMux(httptrace.WithServiceName(a.Config.App.ServiceName))
+		mux := http.NewServeMux()
 
 		// Handle routes with environment prefix (for local development)
 		basePath := fmt.Sprintf("/%s/", a.Config.App.Environment)
@@ -302,7 +331,8 @@ func (a *Application) initializeServer() error {
 
 		// Handle routes without prefix (API Gateway HTTP API strips the stage prefix)
 		mux.Handle("/", router)
-		handler = mux
+
+		handler = otelhttp.NewHandler(mux, "http.server")
 	}
 
 	// Create server
@@ -337,18 +367,25 @@ func (a *Application) Shutdown() error {
 		}
 	}
 
-	// Flush and release the metrics provider
+	ctx, cancel := context.WithTimeout(context.Background(), a.Config.Server.ShutdownTimeout)
+	defer cancel()
+
+	// Flush and release the telemetry providers (metrics, traces, logs). Logs is
+	// shut down last so the preceding shutdown steps can still be logged.
 	if a.Metrics != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), a.Config.Server.ShutdownTimeout)
-		defer cancel()
 		if err := a.Metrics.Shutdown(ctx); err != nil {
 			a.Logger.Warn("Failed to shut down metrics provider", logger.F("error", err.Error()))
 		}
 	}
-
-	// Stop tracer
-	if a.Config.App.EnableTracing {
-		tracer.Stop()
+	if a.Tracing != nil {
+		if err := a.Tracing.Shutdown(ctx); err != nil {
+			a.Logger.Warn("Failed to shut down tracing provider", logger.F("error", err.Error()))
+		}
+	}
+	if a.Logs != nil {
+		if err := a.Logs.Shutdown(ctx); err != nil {
+			a.Logger.Warn("Failed to shut down logs provider", logger.F("error", err.Error()))
+		}
 	}
 
 	return nil
