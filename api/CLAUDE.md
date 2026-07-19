@@ -2,7 +2,7 @@
 
 Go REST API and entry point of the platform: it receives resource provisioning
 requests, authenticates users against Cognito, and publishes provision messages
-to SQS for the downstream services (provisioner, cost-manager).
+to SQS for the downstream provisioner service.
 
 Go version: 1.25 (see `go.mod`). Entry point: `cmd/server/main.go`.
 

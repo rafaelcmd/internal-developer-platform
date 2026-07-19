@@ -38,7 +38,3 @@ go.work.sum
 
 # Kafka data
 /resource-provisioner-consumer/data/
-
-# Clojure editor tooling cache
-.clj-kondo/
-.lsp/
