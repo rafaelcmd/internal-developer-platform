@@ -79,9 +79,19 @@ auth routes return 500 because their services are nil. Used by
 
 ## Observability
 
+All three signals are OpenTelemetry and vendor-agnostic: the app emits to an OTel
+Collector (OTLP) / Prometheus and knows nothing about the backend. Datadog is one
+exporter behind the Collector, not a dependency in this code. The shared OTel
+resource (`internal/telemetry/resource.go`) sets `service.name` / `service.version`
+/ `deployment.environment` from `SERVICE_NAME` / `SERVICE_VERSION` / `ENVIRONMENT`,
+which Datadog maps onto its service/version/env unified tags. All OTLP export is
+gated on `ENABLE_TRACING` and skipped in local mode (no Collector to receive it).
+
 - **Metrics:** OpenTelemetry with a Prometheus exporter (`internal/telemetry`).
   The MeterProvider is registered as the OTel global in bootstrap, so
-  instruments are created via `otel.Meter(...)` anywhere. Follow OTel semconv
+  instruments are created via `otel.Meter(...)` anywhere. Scraped at `/metrics`
+  (pull) — in-cluster, the Collector's prometheus receiver scrapes it via the
+  pod's `prometheus.io/scrape` annotations. Follow OTel semconv
   names/attributes (`semconv` v1.26.0) for new instruments.
   `RequestDurationMiddleware` records request latency on the
   `http.server.request.duration` Histogram (unit: seconds), labeled with method,
@@ -97,8 +107,18 @@ auth routes return 500 because their services are nil. Used by
   served). Both middlewares skip the `/metrics` scrape endpoint (so Prometheus
   polling doesn't dominate the stats) and normalize the method label to a known
   set or `_OTHER` (so arbitrary request methods can't blow up cardinality).
-- **Tracing:** Datadog APM via `dd-trace-go` (not OTel), wrapped around the
-  router in bootstrap.
+- **Tracing:** OpenTelemetry SDK exporting spans over OTLP/gRPC to the Collector
+  (`internal/telemetry/tracing.go`). The router is wrapped with `otelhttp` in
+  bootstrap, which starts a server span per request from the propagated context;
+  W3C trace-context + baggage propagators are installed globally. (Replaced the
+  former `dd-trace-go` APM tracer.)
+- **Logs:** logrus stays the logging API; an OTel bridge hook
+  (`otellogrus`, wired in `internal/telemetry/logs.go`) mirrors every entry onto
+  an OTLP/gRPC log pipeline to the Collector, carrying trace/span IDs from the
+  entry context so logs correlate with traces. The hook is attached at logger
+  construction via `logger.Config.Hooks`.
+- **OTLP endpoint:** `OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_EXPORTER_OTLP_INSECURE`
+  (standard OTel env vars, read directly by the exporters) — not app config.
 
 ## Testing
 

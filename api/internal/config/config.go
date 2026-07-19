@@ -63,6 +63,7 @@ type AppConfig struct {
 	AllowedOrigins []string
 	EnableTracing  bool
 	ServiceName    string
+	Version        string
 }
 
 // Option defines a functional option for Config.
@@ -93,6 +94,7 @@ func NewConfig(opts ...Option) *Config {
 			AllowedOrigins: getSliceEnv("ALLOWED_ORIGINS", []string{"*"}),
 			EnableTracing:  getBoolEnv("ENABLE_TRACING", true),
 			ServiceName:    getEnvOrDefault("SERVICE_NAME", "internal-developer-platform.api"),
+			Version:        getEnvOrDefault("SERVICE_VERSION", ""),
 		},
 		Idempotency: IdempotencyConfig{
 			RedisAddr:     getEnvOrDefault("REDIS_ADDR", ""),
