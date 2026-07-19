@@ -49,6 +49,9 @@ type Config struct {
 	Format     string // "json" or "text"
 	Output     io.Writer
 	TimeFormat string
+	// Hooks are attached to the underlying logrus logger. Used to fan logs out
+	// to additional sinks (e.g. the OTel OTLP bridge) without changing call sites.
+	Hooks []logrus.Hook
 }
 
 // DefaultConfig returns the default logger configuration.
@@ -76,6 +79,11 @@ func New(cfg Config) Logger {
 		level = logrus.InfoLevel
 	}
 	log.SetLevel(level)
+
+	// Attach any hooks (e.g. the OTel OTLP bridge)
+	for _, h := range cfg.Hooks {
+		log.AddHook(h)
+	}
 
 	// Set formatter
 	switch cfg.Format {

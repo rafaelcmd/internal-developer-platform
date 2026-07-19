@@ -1,0 +1,86 @@
+# =============================================================================
+# OpenTelemetry Collector — gateway Deployment on Fargate.
+#
+# Single replica for now. That is deliberate: the `prometheus` receiver scrapes
+# targets, and running N replicas would double-scrape every pod. When throughput
+# demands HA, split into a 1-replica scraping Collector + an N-replica OTLP
+# gateway (or adopt the OTel Operator's target allocator) rather than just
+# bumping replicas here.
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-collector
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: otel-collector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: otel-collector
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: otel-collector
+    spec:
+      serviceAccountName: otel-collector
+      containers:
+        - name: otel-collector
+          # contrib image: the datadog exporter and k8sattributes processor
+          # live in -contrib, not the core distro. Pin and bump deliberately.
+          image: otel/opentelemetry-collector-contrib:0.116.0
+          imagePullPolicy: IfNotPresent
+          args: ["--config=/etc/otelcol-contrib/config.yaml"]
+          ports:
+            - name: otlp-grpc
+              containerPort: 4317
+              protocol: TCP
+            - name: otlp-http
+              containerPort: 4318
+              protocol: TCP
+            - name: metrics
+              containerPort: 8888
+              protocol: TCP
+            - name: health
+              containerPort: 13133
+              protocol: TCP
+          env:
+            - name: DATADOG_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  # Created in the observability namespace by the Terraform step
+                  # (same key material as the existing datadog-api-key secret).
+                  name: datadog-api-key
+                  key: api-key
+            - name: DATADOG_SITE
+              value: datadoghq.com
+          resources:
+            requests:
+              cpu: 200m
+              memory: 400Mi
+            limits:
+              cpu: 500m
+              memory: 800Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 13133
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 13133
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: config
+              mountPath: /etc/otelcol-contrib
+      volumes:
+        - name: config
+          configMap:
+            name: otel-collector-config
+            items:
+              - key: config.yaml
+                path: config.yaml
