@@ -23,6 +23,17 @@ type Config struct {
 
 	// Redis-backed idempotency layer
 	Idempotency IdempotencyConfig
+
+	// Messaging transport (Kafka in local dev, SQS otherwise)
+	Messaging MessagingConfig
+}
+
+// MessagingConfig holds the local Kafka transport settings. In local mode the
+// resource publisher writes to Kafka instead of SQS, so the whole
+// API -> queue -> provisioner flow runs offline without AWS.
+type MessagingConfig struct {
+	KafkaBrokers []string
+	KafkaTopic   string
 }
 
 // ServerConfig holds HTTP server configuration.
@@ -95,6 +106,10 @@ func NewConfig(opts ...Option) *Config {
 			EnableTracing:  getBoolEnv("ENABLE_TRACING", true),
 			ServiceName:    getEnvOrDefault("SERVICE_NAME", "internal-developer-platform.api"),
 			Version:        getEnvOrDefault("SERVICE_VERSION", ""),
+		},
+		Messaging: MessagingConfig{
+			KafkaBrokers: getSliceEnv("KAFKA_BROKERS", nil),
+			KafkaTopic:   getEnvOrDefault("KAFKA_TOPIC", "resource-provisioning"),
 		},
 		Idempotency: IdempotencyConfig{
 			RedisAddr:     getEnvOrDefault("REDIS_ADDR", ""),
