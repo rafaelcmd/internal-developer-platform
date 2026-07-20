@@ -30,9 +30,11 @@ internal/
     ports/outbound/             - driven-side interfaces (ResourcePublisher, AuthProvider, IdempotencyStore)
   application/service/          - use-case implementations of the inbound ports
   adapters/
-    inbound/http/               - router, handlers, middleware (request counter, recovery,
+    inbound/http/               - router, handlers, middleware (active-requests +
+                                  duration metrics, request logging, recovery,
                                   request context, standard headers, CORS, idempotency)
-    outbound/sqs/               - ResourcePublisher -> SQS
+    outbound/sqs/               - ResourcePublisher -> SQS (dev/prod)
+    outbound/kafka/             - ResourcePublisher -> Kafka (local mode)
     outbound/cognito/           - AuthProvider -> Cognito
     outbound/idempotency/       - IdempotencyStore -> Redis
   infrastructure/               - AWS SDK clients, Parameter Store, Redis client
@@ -50,8 +52,9 @@ handlers or services.
 
 ## Routes
 
-- `POST /v1/provision` — publish a resource request to SQS; deduped by the
-  idempotency middleware when an `X-Idempotency-Key` header is sent (Redis-backed).
+- `POST /v1/provision` — publish a resource request to the queue (SQS in
+  dev/prod, Kafka in local mode); deduped by the idempotency middleware when an
+  `X-Idempotency-Key` header is sent (Redis-backed).
 - `POST /v1/auth/signup | signin | confirm` — Cognito flows.
 - `GET /v1/health` — liveness.
 - `GET /metrics` — Prometheus scrape endpoint (unversioned by convention).
@@ -66,16 +69,20 @@ Store at boot. Key vars:
 
 - `ENVIRONMENT` — `dev` (default), `prod`, or `local` (see below)
 - `PORT` (default 8080), `LOG_LEVEL`, `SERVICE_NAME`
-- `ENABLE_TRACING` — Datadog APM tracer (default true, skipped in local mode)
+- `ENABLE_TRACING` — OTLP trace/log export (default true, skipped in local mode)
 - `REDIS_ADDR` — overrides Parameter Store for local compose; empty + no param
   key means the idempotency layer is silently disabled
+- `KAFKA_BROKERS` (comma-separated), `KAFKA_TOPIC` (default `resource-provisioning`)
+  — the local-mode queue transport; must match the provisioner's topic
 
 ## Local mode
 
-`ENVIRONMENT=local` boots the API with no AWS, Parameter Store, Redis, or
-Datadog. Only `/metrics`, `/v1/health`, and swagger are functional; resource and
-auth routes return 500 because their services are nil. Used by
-`docker-compose.dev.yaml`.
+`ENVIRONMENT=local` boots the API with no AWS, Parameter Store, or Cognito. The
+queue transport switches from SQS to **Kafka** (`internal/adapters/outbound/kafka`),
+so `POST /v1/provision` works end-to-end offline (API -> Kafka -> provisioner) as
+long as `KAFKA_BROKERS` is set — otherwise the resource route is disabled. Auth
+routes still return 500 (Cognito is skipped). `/metrics`, `/v1/health`, and
+swagger work regardless. Used by `docker-compose.dev.yaml`.
 
 ## Observability
 
@@ -117,6 +124,11 @@ gated on `ENABLE_TRACING` and skipped in local mode (no Collector to receive it)
   an OTLP/gRPC log pipeline to the Collector, carrying trace/span IDs from the
   entry context so logs correlate with traces. The hook is attached at logger
   construction via `logger.Config.Hooks`.
+  `RequestLoggingMiddleware` emits one structured line per request for every
+  endpoint (method, matched route, status, `duration_ms`, `request_id`), attaching
+  the request context so lines correlate with the request's trace; it skips
+  `/metrics`. `RecoveryMiddleware` logs any recovered panic with a stack trace.
+  Both take the logger threaded through `RouterConfig.Logger`.
 - **OTLP endpoint:** `OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_EXPORTER_OTLP_INSECURE`
   (standard OTel env vars, read directly by the exporters) — not app config.
 

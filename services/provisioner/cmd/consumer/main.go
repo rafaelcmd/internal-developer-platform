@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -15,9 +17,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/rafaelcmd/internal-developer-platform/resource-provisioner-service/internal/consumer"
 	"github.com/rafaelcmd/internal-developer-platform/resource-provisioner-service/internal/telemetry"
 )
 
@@ -26,7 +28,7 @@ const serviceName = "resource-provisioner-consumer"
 var errEmptyQueueURL = errors.New("SQS queue URL is empty")
 
 func main() {
-	// Root context cancels on SIGINT/SIGTERM so the poll loop drains and the
+	// Root context cancels on SIGINT/SIGTERM so the consumer drains and the
 	// telemetry batch exporters flush before exit.
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -47,76 +49,46 @@ func main() {
 		}
 	}()
 
+	tracer := otel.Tracer(serviceName)
+	metrics := consumer.NewMetrics(otel.Meter(serviceName))
+
+	// Kafka is the local-dev transport: when brokers are configured we consume
+	// from Kafka and never touch AWS. Otherwise fall back to SQS.
+	if brokers := splitBrokers(os.Getenv("KAFKA_BROKERS")); len(brokers) > 0 {
+		cfg := consumer.KafkaConfig{
+			Brokers: brokers,
+			Topic:   envOrDefault("KAFKA_TOPIC", "resource-provisioning"),
+			GroupID: envOrDefault("KAFKA_GROUP_ID", "resource-provisioner"),
+		}
+		if err := consumer.RunKafka(ctx, cfg, tracer, metrics); err != nil && ctx.Err() == nil {
+			log.Fatalf("Kafka consumer error, %v", err)
+		}
+		return
+	}
+
+	if err := runSQS(ctx, tracer, metrics); err != nil && ctx.Err() == nil {
+		log.Fatalf("SQS consumer error, %v", err)
+	}
+}
+
+// runSQS loads AWS config, resolves the queue URL from Parameter Store, and
+// consumes from SQS. Isolated from the Kafka path so local dev needs no AWS.
+func runSQS(ctx context.Context, tracer trace.Tracer, metrics consumer.Metrics) error {
 	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion("us-east-1"))
 	if err != nil {
-		log.Fatalf("Unable to load AWS config, %v", err)
+		return fmt.Errorf("load AWS config: %w", err)
 	}
 	// Instrument every AWS SDK call with an OTel span (replaces xray.Client).
 	otelaws.AppendMiddlewares(&cfg.APIOptions)
 
-	sqsClient := sqs.NewFromConfig(cfg)
 	ssmClient := ssm.NewFromConfig(cfg)
-
-	tracer := otel.Tracer(serviceName)
-	meter := otel.Meter(serviceName)
-	messagesReceived, _ := meter.Int64Counter("provisioner.messages.received",
-		metric.WithDescription("SQS messages received from the provisioning queue"))
-	messagesProcessed, _ := meter.Int64Counter("provisioner.messages.processed",
-		metric.WithDescription("SQS messages processed and deleted successfully"))
-	messagesFailed, _ := meter.Int64Counter("provisioner.messages.failed",
-		metric.WithDescription("SQS messages that failed to delete after processing"))
+	sqsClient := sqs.NewFromConfig(cfg)
 
 	queueURL, err := getQueueURL(ctx, tracer, ssmClient)
 	if err != nil {
-		log.Fatalf("Unable to get SQS queue URL from Parameter Store, %v", err)
+		return err
 	}
-
-	log.Println("Polling messages from SQS queue:", queueURL)
-
-	for ctx.Err() == nil {
-		pollCtx, pollSpan := tracer.Start(ctx, "PollSQSMessages")
-
-		output, err := sqsClient.ReceiveMessage(pollCtx, &sqs.ReceiveMessageInput{
-			QueueUrl:            aws.String(queueURL),
-			MaxNumberOfMessages: 5,
-			WaitTimeSeconds:     10,
-		})
-		if err != nil {
-			pollSpan.RecordError(err)
-			pollSpan.End()
-			// A cancelled context is a clean shutdown, not a poll failure.
-			if ctx.Err() != nil {
-				break
-			}
-			log.Printf("Failed to receive messages, %v", err)
-			continue
-		}
-		messagesReceived.Add(pollCtx, int64(len(output.Messages)))
-
-		for _, message := range output.Messages {
-			processCtx, span := tracer.Start(pollCtx, "ProcessMessage")
-			log.Printf("Received message: %s", aws.ToString(message.Body))
-
-			// Save message data in RDS
-
-			// Delete the message after processing
-			_, err := sqsClient.DeleteMessage(processCtx, &sqs.DeleteMessageInput{
-				QueueUrl:      aws.String(queueURL),
-				ReceiptHandle: message.ReceiptHandle,
-			})
-			if err != nil {
-				messagesFailed.Add(processCtx, 1)
-				span.RecordError(err)
-				log.Printf("Failed to delete message, %v", err)
-			} else {
-				messagesProcessed.Add(processCtx, 1)
-				log.Println("Message deleted successfully")
-			}
-			span.End()
-		}
-
-		pollSpan.End()
-	}
+	return consumer.RunSQS(ctx, sqsClient, queueURL, tracer, metrics)
 }
 
 // getQueueURL reads the provisioning queue URL from Parameter Store within its
@@ -145,4 +117,15 @@ func envOrDefault(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// splitBrokers parses a comma-separated broker list, trimming blanks.
+func splitBrokers(csv string) []string {
+	var brokers []string
+	for _, b := range strings.Split(csv, ",") {
+		if b = strings.TrimSpace(b); b != "" {
+			brokers = append(brokers, b)
+		}
+	}
+	return brokers
 }

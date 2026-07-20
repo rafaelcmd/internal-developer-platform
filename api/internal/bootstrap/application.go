@@ -5,6 +5,7 @@ package bootstrap
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/redis/go-redis/v9"
@@ -14,6 +15,7 @@ import (
 	apihttp "github.com/rafaelcmd/internal-developer-platform/api/internal/adapters/inbound/http"
 	"github.com/rafaelcmd/internal-developer-platform/api/internal/adapters/outbound/cognito"
 	"github.com/rafaelcmd/internal-developer-platform/api/internal/adapters/outbound/idempotency"
+	kafkaadapter "github.com/rafaelcmd/internal-developer-platform/api/internal/adapters/outbound/kafka"
 	sqsadapter "github.com/rafaelcmd/internal-developer-platform/api/internal/adapters/outbound/sqs"
 	"github.com/rafaelcmd/internal-developer-platform/api/internal/application/service"
 	"github.com/rafaelcmd/internal-developer-platform/api/internal/config"
@@ -47,6 +49,9 @@ type Application struct {
 	// Idempotency layer
 	RedisClient      *redis.Client
 	IdempotencyStore outbound.IdempotencyStore
+
+	// Messaging
+	ResourcePublisher outbound.ResourcePublisher
 
 	// Services
 	ResourceService *service.ResourceService
@@ -239,17 +244,17 @@ func (a *Application) isLocalMode() bool {
 }
 
 // initializeLocal wires the minimal set of dependencies that need no external
-// infrastructure, for local development. AWS clients, Parameter Store, SQS,
-// Cognito, and Redis are all skipped, so only infra-free endpoints (/metrics,
-// /v1/health, and swagger) are functional — the resource and auth routes are
-// registered but will return 500 (recovered) if called, since their services
-// are nil.
+// infrastructure, for local development. AWS clients, Parameter Store, and
+// Cognito are skipped. The resource route works via Kafka (see
+// initializeKafkaResourceService) so the end-to-end provisioning flow runs
+// offline; auth routes still return 500 (recovered) since Cognito is skipped.
 func (a *Application) initializeLocal(opts Options) (*Application, error) {
-	a.Logger.Warn("Running in LOCAL mode: AWS, Parameter Store, and Redis are disabled",
-		logger.F("functional_endpoints", "/metrics, /v1/health, /v1/swagger"),
+	a.Logger.Warn("Running in LOCAL mode: AWS, Parameter Store, and Cognito are disabled; queue transport is Kafka",
+		logger.F("functional_endpoints", "/v1/provision, /metrics, /v1/health, /v1/swagger"),
 	)
 
 	a.initializeAdapters(opts)
+	a.initializeKafkaResourceService()
 	a.initializeHandlers()
 
 	if err := a.initializeServer(); err != nil {
@@ -284,13 +289,33 @@ func (a *Application) initializeAdapters(opts Options) {
 
 // initializeServices initializes all application services.
 func (a *Application) initializeServices() {
-	// Resource service with SQS publisher
-	resourcePublisher := sqsadapter.NewResourcePublisher(a.AWSClients.SQS, a.ProvisionerQueueURL)
-	a.ResourceService = service.NewResourceService(resourcePublisher)
+	// Resource service, publishing to SQS (non-local) or Kafka (local mode)
+	a.ResourcePublisher = sqsadapter.NewResourcePublisher(a.AWSClients.SQS, a.ProvisionerQueueURL)
+	a.ResourceService = service.NewResourceService(a.ResourcePublisher)
 
 	// Auth service with Cognito provider
 	authProvider := cognito.NewCognitoAuthProvider(a.AWSClients.Cognito, a.CognitoClientID)
 	a.AuthService = service.NewAuthService(authProvider)
+}
+
+// initializeKafkaResourceService wires the resource service to Kafka. Used in
+// local mode so the API -> queue -> provisioner flow works offline without AWS.
+// Leaves the service nil (route returns 500) when no brokers are configured.
+func (a *Application) initializeKafkaResourceService() {
+	if len(a.Config.Messaging.KafkaBrokers) == 0 {
+		a.Logger.Warn("Resource publishing disabled: KAFKA_BROKERS not set in local mode")
+		return
+	}
+
+	a.ResourcePublisher = kafkaadapter.NewResourcePublisher(
+		a.Config.Messaging.KafkaBrokers,
+		a.Config.Messaging.KafkaTopic,
+	)
+	a.ResourceService = service.NewResourceService(a.ResourcePublisher)
+	a.Logger.Info("Resource service enabled (kafka, local mode)",
+		logger.F("brokers", a.Config.Messaging.KafkaBrokers),
+		logger.F("topic", a.Config.Messaging.KafkaTopic),
+	)
 }
 
 // initializeHandlers initializes all HTTP handlers.
@@ -308,6 +333,7 @@ func (a *Application) initializeServer() error {
 		IdempotencyStore: a.IdempotencyStore,
 		IdempotencyTTL:   a.Config.Idempotency.TTL,
 		MetricsHandler:   a.Metrics.Handler(),
+		Logger:           a.Logger,
 	}
 	router := apihttp.NewRouterWithConfig(
 		a.ResourceHandler,
@@ -364,6 +390,14 @@ func (a *Application) Shutdown() error {
 	if a.RedisClient != nil {
 		if err := a.RedisClient.Close(); err != nil {
 			a.Logger.Warn("Failed to close Redis client", logger.F("error", err.Error()))
+		}
+	}
+
+	// Close the resource publisher (the Kafka writer holds connections; the SQS
+	// publisher is not a Closer and is skipped).
+	if closer, ok := a.ResourcePublisher.(io.Closer); ok {
+		if err := closer.Close(); err != nil {
+			a.Logger.Warn("Failed to close resource publisher", logger.F("error", err.Error()))
 		}
 	}
 

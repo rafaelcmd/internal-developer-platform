@@ -11,6 +11,13 @@ services:
     environment:
       - ENVIRONMENT=local
       - PORT=5000
+      # Local mode publishes /v1/provision requests to Kafka instead of SQS, so
+      # the full API -> queue -> provisioner flow runs offline without AWS.
+      - KAFKA_BROKERS=kafka:9092
+      - KAFKA_TOPIC=resource-provisioning
+    depends_on:
+      kafka:
+        condition: service_healthy
     networks:
       - public-network
       - internal-network
