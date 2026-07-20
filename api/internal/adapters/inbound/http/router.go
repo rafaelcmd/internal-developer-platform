@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/rafaelcmd/internal-developer-platform/api/internal/domain/ports/outbound"
+	"github.com/rafaelcmd/internal-developer-platform/api/internal/logger"
 )
 
 // API version prefix for path-based versioning
@@ -31,6 +32,10 @@ type RouterConfig struct {
 	// MetricsHandler serves the Prometheus scrape endpoint at GET /metrics. If nil,
 	// the route is not registered — useful for tests that don't exercise telemetry.
 	MetricsHandler http.Handler
+
+	// Logger backs the request-logging and recovery middleware. If nil, a no-op
+	// logger is used — useful for tests that don't assert on logs.
+	Logger logger.Logger
 }
 
 // DefaultRouterConfig returns default router configuration
@@ -89,18 +94,28 @@ func NewRouterWithConfig(resourceHandler *ResourceHandler, healthHandler *Health
 	mux.Handle("GET "+APIVersionPrefix+"/swagger", swaggerUI)
 	mux.Handle("GET "+APIVersionPrefix+"/swagger/", swaggerUI)
 
+	// A nil logger (e.g. in tests) degrades to a no-op rather than panicking.
+	log := config.Logger
+	if log == nil {
+		log = logger.NopLogger{}
+	}
+
 	// =============================================================================
 	// Middleware Chain
-	// Applied in order: ActiveRequests -> RequestDuration -> Recovery -> RequestContext -> StandardHeaders -> CORS -> Routes
-	// ActiveRequests is outermost so in-flight requests are gauged for their whole lifetime.
-	// RequestDuration sits above Recovery so a recovered panic is timed and recorded as a 500;
-	// its histogram _count series doubles as the request counter (request rate = rate of _count).
+	// Applied in order (outermost first):
+	//   ActiveRequests -> RequestDuration -> RequestLogging -> Recovery ->
+	//   RequestContext -> StandardHeaders -> CORS -> Routes
+	// ActiveRequests is outermost so in-flight requests are gauged for their whole
+	// lifetime. RequestLogging and RequestDuration sit above Recovery so a
+	// recovered panic is logged and timed with the 500 that layer writes; the
+	// histogram _count series doubles as the request counter (rate = rate of _count).
 	// =============================================================================
 	return ChainMiddleware(
 		mux,
 		ActiveRequestsMiddleware,
 		RequestDurationMiddleware,
-		RecoveryMiddleware,
+		RequestLoggingMiddleware(log),
+		RecoveryMiddleware(log),
 		RequestContextMiddleware,
 		StandardHeadersMiddleware,
 		CORSMiddleware(config.AllowedOrigins),

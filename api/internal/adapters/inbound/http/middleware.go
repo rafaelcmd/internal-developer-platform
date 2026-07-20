@@ -1,10 +1,14 @@
 package http
 
 import (
+	"fmt"
 	"net/http"
+	"runtime/debug"
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/rafaelcmd/internal-developer-platform/api/internal/logger"
 )
 
 // =============================================================================
@@ -102,22 +106,70 @@ func RequestContextMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// RecoveryMiddleware catches panics and returns a 500 error
-func RecoveryMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer func() {
-			if err := recover(); err != nil {
-				requestID := r.Header.Get("X-Request-Id")
-				RespondWithError(w, http.StatusInternalServerError, ErrorResponse{
-					Code:      ErrCodeInternalError,
-					Message:   "An unexpected error occurred",
-					RequestID: requestID,
-				})
+// RequestLoggingMiddleware emits one structured log line per request — for
+// every endpoint — with method, matched route, status, latency, and request ID.
+// It wraps the response writer to capture the final status (including a 500 the
+// recovery layer below writes) and logs after the handler returns. The request
+// context is attached so the OTel log bridge correlates the line with the
+// request's trace/span. The /metrics scrape endpoint is skipped so Prometheus
+// polling doesn't flood the logs.
+func RequestLoggingMiddleware(log logger.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == metricsPath {
+				next.ServeHTTP(w, r)
+				return
 			}
-		}()
 
-		next.ServeHTTP(w, r)
-	})
+			start := time.Now()
+			rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+			next.ServeHTTP(rec, r)
+
+			// ServeMux sets Pattern while routing; fall back to the raw path for
+			// unmatched requests (404/405). Unlike metrics, logs can carry the
+			// raw path — there is no cardinality budget to protect.
+			route := patternPath(r.Pattern)
+			if route == "" {
+				route = r.URL.Path
+			}
+
+			log.WithContext(r.Context()).Info("http request",
+				logger.F("method", r.Method),
+				logger.F("route", route),
+				logger.F("status", rec.status),
+				logger.F("duration_ms", float64(time.Since(start).Microseconds())/1000),
+				logger.F("request_id", r.Header.Get("X-Request-Id")),
+			)
+		})
+	}
+}
+
+// RecoveryMiddleware catches panics, logs them with a stack trace, and returns a
+// 500 error. Without the log, a panic on any route would 500 silently.
+func RecoveryMiddleware(log logger.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			defer func() {
+				if err := recover(); err != nil {
+					requestID := r.Header.Get("X-Request-Id")
+					log.WithContext(r.Context()).Error("http request panic recovered",
+						logger.F("error", fmt.Sprintf("%v", err)),
+						logger.F("method", r.Method),
+						logger.F("path", r.URL.Path),
+						logger.F("request_id", requestID),
+						logger.F("stack", string(debug.Stack())),
+					)
+					RespondWithError(w, http.StatusInternalServerError, ErrorResponse{
+						Code:      ErrCodeInternalError,
+						Message:   "An unexpected error occurred",
+						RequestID: requestID,
+					})
+				}
+			}()
+
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 // ChainMiddleware chains multiple middleware functions together

@@ -55,7 +55,7 @@ spec:
             # OTLP egress to the Collector. Plaintext is fine in-cluster; the
             # SDK's trace and log exporters both read these standard vars.
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: otel-collector.observability.svc.cluster.local:4317
+              value: http://otel-collector.observability.svc.cluster.local:4317
             - name: OTEL_EXPORTER_OTLP_INSECURE
               value: "true"
           resources:
