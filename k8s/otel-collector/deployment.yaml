@@ -29,7 +29,8 @@ spec:
         - name: otel-collector
           # contrib image: the datadog exporter and k8sattributes processor
           # live in -contrib, not the core distro. Pin and bump deliberately.
-          image: otel/opentelemetry-collector-contrib:0.116.0
+          # (Avoid 0.116.0 — that published image is broken and won't exec.)
+          image: otel/opentelemetry-collector-contrib:0.119.0
           imagePullPolicy: IfNotPresent
           args: ["--config=/etc/otelcol-contrib/config.yaml"]
           ports:
