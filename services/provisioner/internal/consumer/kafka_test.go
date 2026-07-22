@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel"
+
+	"github.com/rafaelcmd/internal-developer-platform/resource-provisioner-service/internal/logger"
 )
 
 // RunKafka must return promptly when the context is already cancelled, without
@@ -21,7 +23,7 @@ func TestRunKafka_CancelledContextReturnsPromptly(t *testing.T) {
 			Brokers: []string{"127.0.0.1:9092"},
 			Topic:   "test-topic",
 			GroupID: "test-group",
-		}, otel.Tracer("test"), metrics)
+		}, otel.Tracer("test"), metrics, logger.NopLogger{})
 	}()
 
 	select {
