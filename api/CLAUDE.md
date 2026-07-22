@@ -118,7 +118,11 @@ gated on `ENABLE_TRACING` and skipped in local mode (no Collector to receive it)
   (`internal/telemetry/tracing.go`). The router is wrapped with `otelhttp` in
   bootstrap, which starts a server span per request from the propagated context;
   W3C trace-context + baggage propagators are installed globally. (Replaced the
-  former `dd-trace-go` APM tracer.)
+  former `dd-trace-go` APM tracer.) On publish, the resource publishers
+  (`outbound/sqs`, `outbound/kafka`) inject the active trace context into the
+  outgoing message (SQS message attributes / Kafka headers) so the provisioner
+  extracts it and continues the trace — one distributed trace across API → queue →
+  provisioner. Injection is a no-op when tracing is off (local mode).
 - **Logs:** logrus stays the logging API; an OTel bridge hook
   (`otellogrus`, wired in `internal/telemetry/logs.go`) mirrors every entry onto
   an OTLP/gRPC log pipeline to the Collector, carrying trace/span IDs from the
@@ -129,6 +133,12 @@ gated on `ENABLE_TRACING` and skipped in local mode (no Collector to receive it)
   the request context so lines correlate with the request's trace; it skips
   `/metrics`. `RecoveryMiddleware` logs any recovered panic with a stack trace.
   Both take the logger threaded through `RouterConfig.Logger`.
+  `ResourceService.SendProvisioningRequest` logs the provisioning payload
+  (`resource_id`, `resource_type`, `body`) with the request context attached — the
+  request-body counterpart to the provisioner's received-message log, so the same
+  body shows on both ends of the queue under one `trace_id`. Bodies are logged only
+  on this deliberate provisioning path, not by the global middleware (which would
+  capture auth-route credentials).
 - **OTLP endpoint:** `OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_EXPORTER_OTLP_INSECURE`
   (standard OTel env vars, read directly by the exporters) — not app config.
 

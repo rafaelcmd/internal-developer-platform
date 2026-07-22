@@ -2,17 +2,18 @@ package consumer
 
 import (
 	"context"
-	"log"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/rafaelcmd/internal-developer-platform/resource-provisioner-service/internal/logger"
 )
 
 // RunSQS long-polls the queue and deletes each message after processing
 // (at-least-once) until the context is cancelled.
-func RunSQS(ctx context.Context, client *sqs.Client, queueURL string, tracer trace.Tracer, metrics Metrics) error {
-	log.Println("Polling messages from SQS queue:", queueURL)
+func RunSQS(ctx context.Context, client *sqs.Client, queueURL string, tracer trace.Tracer, metrics Metrics, log logger.Logger) error {
+	log.WithContext(ctx).Info("polling messages from SQS queue", logger.F("queue_url", queueURL))
 
 	for ctx.Err() == nil {
 		pollCtx, pollSpan := tracer.Start(ctx, "PollSQSMessages")
@@ -21,6 +22,9 @@ func RunSQS(ctx context.Context, client *sqs.Client, queueURL string, tracer tra
 			QueueUrl:            aws.String(queueURL),
 			MaxNumberOfMessages: 5,
 			WaitTimeSeconds:     10,
+			// Ask SQS to return the trace-context attributes the API injected on
+			// publish; without this they are dropped and the trace breaks.
+			MessageAttributeNames: []string{"All"},
 		})
 		if err != nil {
 			pollSpan.RecordError(err)
@@ -29,14 +33,19 @@ func RunSQS(ctx context.Context, client *sqs.Client, queueURL string, tracer tra
 			if ctx.Err() != nil {
 				break
 			}
-			log.Printf("Failed to receive messages, %v", err)
+			log.WithContext(pollCtx).Error("failed to receive messages", logger.F("error", err.Error()))
 			continue
 		}
 		metrics.Received.Add(pollCtx, int64(len(output.Messages)))
 
 		for _, message := range output.Messages {
-			processCtx, span := tracer.Start(pollCtx, "ProcessMessage")
-			log.Printf("Received message: %s", aws.ToString(message.Body))
+			// Continue the API's trace: the producer span it injected into the
+			// message attributes becomes the parent of ProcessMessage, so the
+			// whole provisioning flow is one distributed trace and the logs
+			// below share the API's trace_id.
+			msgCtx := extractSQS(pollCtx, message.MessageAttributes)
+			processCtx, span := tracer.Start(msgCtx, "ProcessMessage")
+			log.WithContext(processCtx).Info("received message", logger.F("body", aws.ToString(message.Body)))
 
 			// Save message data in RDS
 
@@ -48,10 +57,10 @@ func RunSQS(ctx context.Context, client *sqs.Client, queueURL string, tracer tra
 			if err != nil {
 				metrics.Failed.Add(processCtx, 1)
 				span.RecordError(err)
-				log.Printf("Failed to delete message, %v", err)
+				log.WithContext(processCtx).Error("failed to delete message", logger.F("error", err.Error()))
 			} else {
 				metrics.Processed.Add(processCtx, 1)
-				log.Println("Message deleted successfully")
+				log.WithContext(processCtx).Info("message deleted")
 			}
 			span.End()
 		}

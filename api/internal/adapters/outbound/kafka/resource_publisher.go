@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/segmentio/kafka-go"
+	"go.opentelemetry.io/otel"
 
 	"github.com/rafaelcmd/internal-developer-platform/api/internal/domain/errors"
 	"github.com/rafaelcmd/internal-developer-platform/api/internal/domain/model"
@@ -49,9 +50,17 @@ func (p *ResourcePublisher) Publish(ctx context.Context, resource model.Resource
 		)
 	}
 
+	// Inject the active trace context (W3C traceparent/tracestate/baggage) into
+	// the message headers so the provisioner can continue this trace: its
+	// ProcessMessage span becomes a child of this producer span and both
+	// services' logs share one trace_id. No-op when tracing is disabled.
+	var headers []kafka.Header
+	otel.GetTextMapPropagator().Inject(ctx, kafkaHeaderCarrier{headers: &headers})
+
 	err = p.writer.WriteMessages(ctx, kafka.Message{
-		Key:   []byte(resource.ID),
-		Value: body,
+		Key:     []byte(resource.ID),
+		Value:   body,
+		Headers: headers,
 	})
 	if err != nil {
 		return errors.NewDomainError(
@@ -67,4 +76,37 @@ func (p *ResourcePublisher) Publish(ctx context.Context, resource model.Resource
 // Close flushes and releases the underlying Kafka writer.
 func (p *ResourcePublisher) Close() error {
 	return p.writer.Close()
+}
+
+// kafkaHeaderCarrier adapts Kafka message headers to OTel's TextMapCarrier so
+// the global propagator can write trace context onto an outgoing message.
+type kafkaHeaderCarrier struct {
+	headers *[]kafka.Header
+}
+
+func (c kafkaHeaderCarrier) Get(key string) string {
+	for _, h := range *c.headers {
+		if h.Key == key {
+			return string(h.Value)
+		}
+	}
+	return ""
+}
+
+func (c kafkaHeaderCarrier) Set(key, value string) {
+	for i := range *c.headers {
+		if (*c.headers)[i].Key == key {
+			(*c.headers)[i].Value = []byte(value)
+			return
+		}
+	}
+	*c.headers = append(*c.headers, kafka.Header{Key: key, Value: []byte(value)})
+}
+
+func (c kafkaHeaderCarrier) Keys() []string {
+	keys := make([]string, 0, len(*c.headers))
+	for _, h := range *c.headers {
+		keys = append(keys, h.Key)
+	}
+	return keys
 }

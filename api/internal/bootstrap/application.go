@@ -291,7 +291,7 @@ func (a *Application) initializeAdapters(opts Options) {
 func (a *Application) initializeServices() {
 	// Resource service, publishing to SQS (non-local) or Kafka (local mode)
 	a.ResourcePublisher = sqsadapter.NewResourcePublisher(a.AWSClients.SQS, a.ProvisionerQueueURL)
-	a.ResourceService = service.NewResourceService(a.ResourcePublisher)
+	a.ResourceService = service.NewResourceService(a.ResourcePublisher, a.Logger)
 
 	// Auth service with Cognito provider
 	authProvider := cognito.NewCognitoAuthProvider(a.AWSClients.Cognito, a.CognitoClientID)
@@ -311,7 +311,7 @@ func (a *Application) initializeKafkaResourceService() {
 		a.Config.Messaging.KafkaBrokers,
 		a.Config.Messaging.KafkaTopic,
 	)
-	a.ResourceService = service.NewResourceService(a.ResourcePublisher)
+	a.ResourceService = service.NewResourceService(a.ResourcePublisher, a.Logger)
 	a.Logger.Info("Resource service enabled (kafka, local mode)",
 		logger.F("brokers", a.Config.Messaging.KafkaBrokers),
 		logger.F("topic", a.Config.Messaging.KafkaTopic),
