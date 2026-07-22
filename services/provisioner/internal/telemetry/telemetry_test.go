@@ -11,7 +11,7 @@ import (
 func TestSetup_NoEndpoint_IsNoop(t *testing.T) {
 	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 
-	shutdown, err := Setup(context.Background(), Config{ServiceName: "test", Environment: "test"})
+	shutdown, _, err := Setup(context.Background(), Config{ServiceName: "test", Environment: "test"})
 	if err != nil {
 		t.Fatalf("Setup returned error: %v", err)
 	}
@@ -30,7 +30,7 @@ func TestSetup_WithEndpoint_ConstructsAndShutsDown(t *testing.T) {
 	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317")
 	t.Setenv("OTEL_EXPORTER_OTLP_INSECURE", "true")
 
-	shutdown, err := Setup(context.Background(), Config{
+	shutdown, _, err := Setup(context.Background(), Config{
 		ServiceName: "test",
 		Version:     "1.2.3",
 		Environment: "test",

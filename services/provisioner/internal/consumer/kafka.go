@@ -2,10 +2,11 @@ package consumer
 
 import (
 	"context"
-	"log"
 
 	"github.com/segmentio/kafka-go"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/rafaelcmd/internal-developer-platform/resource-provisioner-service/internal/logger"
 )
 
 // KafkaConfig configures the Kafka consumer.
@@ -18,7 +19,7 @@ type KafkaConfig struct {
 // RunKafka consumes the provisioning topic with a consumer group until the
 // context is cancelled. Offsets are committed only after a message is processed
 // (at-least-once), mirroring the SQS delete-after-process semantics.
-func RunKafka(ctx context.Context, cfg KafkaConfig, tracer trace.Tracer, metrics Metrics) error {
+func RunKafka(ctx context.Context, cfg KafkaConfig, tracer trace.Tracer, metrics Metrics, log logger.Logger) error {
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers: cfg.Brokers,
 		Topic:   cfg.Topic,
@@ -26,7 +27,10 @@ func RunKafka(ctx context.Context, cfg KafkaConfig, tracer trace.Tracer, metrics
 	})
 	defer reader.Close()
 
-	log.Printf("Consuming messages from Kafka topic %q (group %q)", cfg.Topic, cfg.GroupID)
+	log.WithContext(ctx).Info("consuming messages from Kafka",
+		logger.F("topic", cfg.Topic),
+		logger.F("group", cfg.GroupID),
+	)
 
 	for ctx.Err() == nil {
 		message, err := reader.FetchMessage(ctx)
@@ -35,13 +39,18 @@ func RunKafka(ctx context.Context, cfg KafkaConfig, tracer trace.Tracer, metrics
 			if ctx.Err() != nil {
 				break
 			}
-			log.Printf("Failed to fetch message, %v", err)
+			log.WithContext(ctx).Error("failed to fetch message", logger.F("error", err.Error()))
 			continue
 		}
 		metrics.Received.Add(ctx, 1)
 
-		processCtx, span := tracer.Start(ctx, "ProcessMessage")
-		log.Printf("Received message: %s", string(message.Value))
+		// Continue the API's trace: the producer span it injected into the
+		// message headers becomes the parent of ProcessMessage, so the whole
+		// provisioning flow is one distributed trace and the logs below share
+		// the API's trace_id.
+		msgCtx := extractKafka(ctx, message.Headers)
+		processCtx, span := tracer.Start(msgCtx, "ProcessMessage")
+		log.WithContext(processCtx).Info("received message", logger.F("body", string(message.Value)))
 
 		// Save message data in RDS
 
@@ -49,10 +58,10 @@ func RunKafka(ctx context.Context, cfg KafkaConfig, tracer trace.Tracer, metrics
 		if err := reader.CommitMessages(processCtx, message); err != nil {
 			metrics.Failed.Add(processCtx, 1)
 			span.RecordError(err)
-			log.Printf("Failed to commit message, %v", err)
+			log.WithContext(processCtx).Error("failed to commit message", logger.F("error", err.Error()))
 		} else {
 			metrics.Processed.Add(processCtx, 1)
-			log.Println("Message committed successfully")
+			log.WithContext(processCtx).Info("message committed")
 		}
 		span.End()
 	}
