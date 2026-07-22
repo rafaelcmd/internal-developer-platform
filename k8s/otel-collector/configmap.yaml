@@ -91,6 +91,19 @@ data:
         timeout: 5s
         override: false
 
+      # Logs only: stamp Datadog's `ddsource` from the OTel service.name so logs
+      # facet by service in Datadog and get the matching integration parsing
+      # pipeline (otherwise they land under a generic "otlp" source). service /
+      # env / version tags already come for free from the semconv resource
+      # attributes the exporter maps; trace<->log correlation is automatic via
+      # the trace/span IDs on each record. This is UX polish, not a delivery
+      # requirement — logs flow without it.
+      transform/datadog_logs:
+        log_statements:
+          - context: log
+            statements:
+              - set(attributes["ddsource"], resource.attributes["service.name"])
+
       # Last before export: amortize backend calls.
       batch:
         send_batch_size: 8192
@@ -132,7 +145,7 @@ data:
           exporters: [datadog]
         logs:
           receivers: [otlp]
-          processors: [memory_limiter, k8sattributes, resourcedetection, batch]
+          processors: [memory_limiter, k8sattributes, resourcedetection, transform/datadog_logs, batch]
           exporters: [datadog, debug]
       telemetry:
         # The Collector's own metrics — scrape-able for self-monitoring.

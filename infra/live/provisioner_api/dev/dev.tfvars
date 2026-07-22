@@ -26,28 +26,14 @@ cluster_admin_principal_arns = [
 
 # Terraform-managed API NLB + target group consumed by API Gateway and
 # k8s TargetGroupBinding.
-api_nlb_name                         = "idp-api-nlb"
-api_target_group_name                = "idp-api-tg"
-api_nlb_listener_port                = 80
-api_target_group_port                = 8080
-api_target_group_health_check_path   = "/v1/health"
-api_nlb_arn_ssm_parameter_name       = "/internal-developer-platform/provisioner-api/nlb/arn"
-api_nlb_dns_ssm_parameter_name       = "/internal-developer-platform/provisioner-api/nlb/dns_name"
+api_nlb_name                            = "idp-api-nlb"
+api_target_group_name                   = "idp-api-tg"
+api_nlb_listener_port                   = 80
+api_target_group_port                   = 8080
+api_target_group_health_check_path      = "/v1/health"
+api_nlb_arn_ssm_parameter_name          = "/internal-developer-platform/provisioner-api/nlb/arn"
+api_nlb_dns_ssm_parameter_name          = "/internal-developer-platform/provisioner-api/nlb/dns_name"
 api_target_group_arn_ssm_parameter_name = "/internal-developer-platform/provisioner-api/nlb/target_group_arn"
-
-lambda_function_name              = "provisioner-api-datadog-forwarder"
-lambda_runtime                    = "python3.9"
-lambda_timeout                    = 120
-lambda_memory_size                = 1024
-archive_type                      = "zip"
-archive_output_path_prefix        = "."
-iam_role_name_suffix              = "-role"
-lambda_basic_execution_policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-additional_policy_name_suffix     = "-additional-policy"
-permission_statement_id           = "AllowExecutionFromCloudWatchLogs"
-permission_action                 = "lambda:InvokeFunction"
-permission_principal              = "logs.amazonaws.com"
-log_group_name_prefix             = "/aws/lambda"
 
 queue_name                = "provisioner_queue"
 delay_seconds             = 0

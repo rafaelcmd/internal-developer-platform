@@ -33,17 +33,3 @@ output "api_target_group_arn" {
   description = "ARN of the Terraform-managed API target group"
   value       = module.api_nlb.target_group_arn
 }
-
-# =============================================================================
-# DATADOG INTEGRATION OUTPUTS
-# =============================================================================
-
-output "datadog_forwarder_arn" {
-  description = "The ARN of the Datadog Lambda forwarder"
-  value       = module.datadog_forwarder.datadog_forwarder_arn
-}
-
-output "datadog_forwarder_name" {
-  description = "The name of the Datadog Lambda forwarder"
-  value       = module.datadog_forwarder.function_name
-}
