@@ -11,7 +11,7 @@ import (
 func TestSendProvisioningRequest_Success(t *testing.T) {
 	// Arrange
 	fakePublisher := &mocks.FakeResourcePublisher{}
-	service := NewResourceService(fakePublisher)
+	service := NewResourceService(fakePublisher, nil)
 
 	resource := model.Resource{
 		ID:            "123",
@@ -35,7 +35,7 @@ func TestSendProvisioningRequest_Error(t *testing.T) {
 	fakePublisher := &mocks.FakeResourcePublisher{
 		ErrToReturn: assert.AnError,
 	}
-	service := NewResourceService(fakePublisher)
+	service := NewResourceService(fakePublisher, nil)
 
 	resource := model.Resource{
 		ID:            "123",
