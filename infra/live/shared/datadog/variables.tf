@@ -26,12 +26,6 @@ variable "datadog_app_key" {
   sensitive   = true
 }
 
-variable "datadog_api_url" {
-  description = "Datadog API URL, selecting the site the org lives on (e.g. https://api.datadoghq.eu/ for EU, https://api.us3.datadoghq.com/ for US3). Defaults to US1."
-  type        = string
-  default     = "https://api.datadoghq.com/"
-}
-
 # =============================================================================
 # IAM ROLE CONFIGURATION
 # Variables for Datadog AWS integration IAM role setup

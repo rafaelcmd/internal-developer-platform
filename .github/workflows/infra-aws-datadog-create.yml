@@ -51,7 +51,7 @@ jobs:
         run: terraform validate
 
       - name: Terraform Plan
-        run: terraform plan -input=false -var="datadog_api_key=${{ secrets.DATADOG_API_KEY }}" -var="datadog_app_key=${{ secrets.DATADOG_APP_KEY_PROV_API }}" -var="datadog_api_url=${{ vars.DATADOG_API_URL }}"
+        run: terraform plan -input=false -var="datadog_api_key=${{ secrets.DATADOG_API_KEY }}" -var="datadog_app_key=${{ secrets.DATADOG_APP_KEY_PROV_API }}"
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve -input=false -var="datadog_api_key=${{ secrets.DATADOG_API_KEY }}" -var="datadog_app_key=${{ secrets.DATADOG_APP_KEY_PROV_API }}" -var="datadog_api_url=${{ vars.DATADOG_API_URL }}"
+        run: terraform apply -auto-approve -input=false -var="datadog_api_key=${{ secrets.DATADOG_API_KEY }}" -var="datadog_app_key=${{ secrets.DATADOG_APP_KEY_PROV_API }}"
