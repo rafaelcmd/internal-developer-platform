@@ -45,7 +45,7 @@ jobs:
         run: terraform init
 
       - name: Terraform Plan Destroy
-        run: terraform plan -destroy -input=false -var="datadog_api_key=${{ secrets.DATADOG_API_KEY }}" -var="datadog_app_key=${{ secrets.DATADOG_APP_KEY_PROV_API }}"
+        run: terraform plan -destroy -input=false -var="datadog_api_key=${{ secrets.DATADOG_API_KEY }}" -var="datadog_app_key=${{ secrets.DATADOG_APP_KEY_PROV_API }}" -var="datadog_api_url=${{ vars.DATADOG_API_URL }}"
 
       - name: Terraform Destroy
-        run: terraform destroy -auto-approve -input=false -var="datadog_api_key=${{ secrets.DATADOG_API_KEY }}" -var="datadog_app_key=${{ secrets.DATADOG_APP_KEY_PROV_API }}"
+        run: terraform destroy -auto-approve -input=false -var="datadog_api_key=${{ secrets.DATADOG_API_KEY }}" -var="datadog_app_key=${{ secrets.DATADOG_APP_KEY_PROV_API }}" -var="datadog_api_url=${{ vars.DATADOG_API_URL }}"
