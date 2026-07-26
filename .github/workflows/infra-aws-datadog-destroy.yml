@@ -10,9 +10,6 @@ on:
 env:
   AWS_REGION: ${{ vars.AWS_REGION }}
   AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
-  # Falls back to US1 when the DATADOG_API_URL repo variable is unset, so an
-  # empty variable never overrides the provider default with "".
-  TF_VAR_datadog_api_url: ${{ vars.DATADOG_API_URL || 'https://api.datadoghq.com/' }}
 
 permissions:
   id-token: write
@@ -48,7 +45,7 @@ jobs:
         run: terraform init
 
       - name: Terraform Plan Destroy
-        run: terraform plan -destroy -input=false -var="datadog_api_key=${{ secrets.DATADOG_API_KEY }}" -var="datadog_app_key=${{ secrets.DATADOG_APP_KEY_PROV_API }}"
+        run: terraform plan -destroy -input=false -var="datadog_api_key=${{ secrets.DATADOG_API_KEY }}" -var="datadog_app_key=${{ secrets.DATADOG_APP_KEY_PROV_API }}" -var="datadog_api_url=${{ vars.DATADOG_API_URL }}"
 
       - name: Terraform Destroy
-        run: terraform destroy -auto-approve -input=false -var="datadog_api_key=${{ secrets.DATADOG_API_KEY }}" -var="datadog_app_key=${{ secrets.DATADOG_APP_KEY_PROV_API }}"
+        run: terraform destroy -auto-approve -input=false -var="datadog_api_key=${{ secrets.DATADOG_API_KEY }}" -var="datadog_app_key=${{ secrets.DATADOG_APP_KEY_PROV_API }}" -var="datadog_api_url=${{ vars.DATADOG_API_URL }}"
