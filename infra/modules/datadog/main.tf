@@ -1,8 +1,3 @@
-# Local values for better organization and validation
-locals {
-  enable_log_forwarder = var.datadog_forwarder_arn != null && var.datadog_forwarder_arn != ""
-}
-
 # Module for AWS IAM Role
 module "aws_integration" {
   source = "../aws/datadog_integration"
@@ -28,10 +23,13 @@ resource "datadog_integration_aws_account" "this" {
     }
   }
 
+  # Log collection via the Datadog Lambda forwarder is retired — logs now reach
+  # Datadog through the OTel Collector's `datadog` exporter. The provider still
+  # requires this block, so keep it with no forwarder configured.
   logs_config {
     lambda_forwarder {
-      lambdas = local.enable_log_forwarder ? [var.datadog_forwarder_arn] : []
-      sources = ["s3", "elb", "elbv2", "cloudfront", "redshift", "lambda"]
+      lambdas = []
+      sources = []
     }
   }
 
