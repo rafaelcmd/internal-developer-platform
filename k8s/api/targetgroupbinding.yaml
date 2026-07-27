@@ -9,3 +9,19 @@ spec:
   serviceRef:
     name: internal-developer-platform-api
     port: 80
+  # The NLB (idp-api-nlb) carries no security groups, so its health checks and
+  # forwarded traffic originate from NLB ENI IPs in the private subnets. The
+  # aws-load-balancer-controller reads this block and manages the matching
+  # ingress rules on the pod ENI security group (the EKS cluster SG, which
+  # otherwise only allows traffic from itself — dropping NLB health checks and
+  # marking every target unhealthy, which surfaces as API Gateway 500s).
+  networking:
+    ingress:
+      - from:
+          - ipBlock:
+              cidr: 10.0.10.0/24
+          - ipBlock:
+              cidr: 10.0.11.0/24
+        ports:
+          - protocol: TCP
+            port: 8080
