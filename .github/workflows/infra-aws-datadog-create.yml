@@ -29,6 +29,26 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # TEMPORARY diagnostic — remove once the Datadog 403 is root-caused.
+      # Runs before the AWS OIDC step (needs no AWS access) so it produces
+      # output even when run from a branch the IAM trust policy rejects.
+      # Prints, without revealing the keys: which Datadog site (if any) accepts
+      # the CI credentials, plus length/sha256 of each key so they can be
+      # compared against known-good local values.
+      - name: Diagnose Datadog credentials (temporary)
+        env:
+          DD_API_KEY: ${{ secrets.DATADOG_API_KEY }}
+          DD_APP_KEY: ${{ secrets.DATADOG_APP_KEY_PROV_API }}
+        run: |
+          for site in https://api.datadoghq.com https://api.datadoghq.eu https://api.us3.datadoghq.com https://api.us5.datadoghq.com https://api.ap1.datadoghq.com; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$site/api/v1/validate" -H "DD-API-KEY: ${DD_API_KEY}")
+            echo "validate @ $site -> $code"
+          done
+          echo "api_key length: $(printf '%s' "$DD_API_KEY" | wc -c) (Datadog API keys are 32 chars; more usually means pasted whitespace/newline)"
+          echo "api_key sha256: $(printf '%s' "$DD_API_KEY" | sha256sum | cut -d' ' -f1)"
+          echo "app_key length: $(printf '%s' "$DD_APP_KEY" | wc -c) (Datadog app keys are 40 chars)"
+          echo "app_key sha256: $(printf '%s' "$DD_APP_KEY" | sha256sum | cut -d' ' -f1)"
+
       - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -49,24 +69,6 @@ jobs:
 
       - name: Terraform Validate
         run: terraform validate
-
-      # TEMPORARY diagnostic — remove once the Datadog 403 is root-caused.
-      # Prints, without revealing the keys: which Datadog site (if any) accepts
-      # the CI credentials, plus length/sha256 of each key so they can be
-      # compared against known-good local values.
-      - name: Diagnose Datadog credentials (temporary)
-        env:
-          DD_API_KEY: ${{ secrets.DATADOG_API_KEY }}
-          DD_APP_KEY: ${{ secrets.DATADOG_APP_KEY_PROV_API }}
-        run: |
-          for site in https://api.datadoghq.com https://api.datadoghq.eu https://api.us3.datadoghq.com https://api.us5.datadoghq.com https://api.ap1.datadoghq.com; do
-            code=$(curl -s -o /dev/null -w "%{http_code}" "$site/api/v1/validate" -H "DD-API-KEY: ${DD_API_KEY}")
-            echo "validate @ $site -> $code"
-          done
-          echo "api_key length: $(printf '%s' "$DD_API_KEY" | wc -c) (Datadog API keys are 32 chars; more usually means pasted whitespace/newline)"
-          echo "api_key sha256: $(printf '%s' "$DD_API_KEY" | sha256sum | cut -d' ' -f1)"
-          echo "app_key length: $(printf '%s' "$DD_APP_KEY" | wc -c) (Datadog app keys are 40 chars)"
-          echo "app_key sha256: $(printf '%s' "$DD_APP_KEY" | sha256sum | cut -d' ' -f1)"
 
       - name: Terraform Plan
         run: terraform plan -input=false -var="datadog_api_key=${{ secrets.DATADOG_API_KEY }}" -var="datadog_app_key=${{ secrets.DATADOG_APP_KEY_PROV_API }}"
