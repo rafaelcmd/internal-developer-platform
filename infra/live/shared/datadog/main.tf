@@ -1,12 +1,11 @@
 module "datadog" {
   source = "../../../modules/datadog"
 
-  aws_region            = var.aws_region
-  role_name             = var.role_name
-  external_id           = var.external_id
-  environment           = var.environment
-  project               = var.project
-  datadog_forwarder_arn = var.datadog_forwarder_arn
+  aws_region  = var.aws_region
+  role_name   = var.role_name
+  external_id = var.external_id
+  environment = var.environment
+  project     = var.project
 }
 
 resource "aws_ssm_parameter" "datadog_api_key" {

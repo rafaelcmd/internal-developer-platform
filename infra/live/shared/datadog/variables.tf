@@ -59,19 +59,3 @@ variable "project" {
   type        = string
   default     = "internal-developer-platform"
 }
-
-# =============================================================================
-# LOG FORWARDING CONFIGURATION
-# Variables for Datadog log collection and Lambda forwarder integration
-# =============================================================================
-
-variable "datadog_forwarder_arn" {
-  description = "ARN of the Datadog Lambda forwarder for log collection. If empty, logs_config will not be configured."
-  type        = string
-  default     = ""
-
-  validation {
-    condition     = var.datadog_forwarder_arn == "" || can(regex("^arn:aws:lambda:[a-z0-9-]+:[0-9]{12}:function:[a-zA-Z0-9-_]+$", var.datadog_forwarder_arn))
-    error_message = "The datadog_forwarder_arn must be a valid Lambda function ARN or an empty string."
-  }
-}
