@@ -4,7 +4,7 @@ variable "role_name" {
 }
 
 variable "external_id" {
-  description = "External ID for Datadog integration role"
+  description = "Datadog-generated External ID (from datadog_integration_aws_account) required in the role's trust policy"
   type        = string
 }
 
