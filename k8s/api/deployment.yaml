@@ -20,6 +20,11 @@ spec:
         "tags.datadoghq.com/service": resource-provisioner-api
         "tags.datadoghq.com/env": dev
         "tags.datadoghq.com/version": "1.0.0"
+        # Opts into datadog-agent sidecar injection by the Cluster Agent's
+        # Admission Controller — the sidecar reports live pod status to the
+        # Datadog K8s Explorer (a node agent can't run on Fargate). App
+        # telemetry does NOT go through it; see the OTLP note below.
+        "agent.datadoghq.com/sidecar": fargate
       # The OTel Collector's prometheus receiver scrapes pods carrying these
       # annotations, bridging the API's existing OTel->Prometheus /metrics
       # endpoint into the vendor-agnostic pipeline (no scrape config per pod).
@@ -29,9 +34,10 @@ spec:
         prometheus.io/path: /metrics
     spec:
       serviceAccountName: internal-developer-platform-api
-      # No Datadog sidecar: traces, metrics, and logs now leave the app as OTLP
-      # to the OTel Collector (observability namespace), which owns all backend
-      # routing including Datadog. See k8s/otel-collector.
+      # Traces, metrics, and logs leave the app as OTLP to the OTel Collector
+      # (observability namespace), which owns all backend routing including
+      # Datadog. See k8s/otel-collector. The injected datadog-agent sidecar
+      # (label above) only reports pod/container status for the K8s Explorer.
       containers:
         - name: internal-developer-platform-api
           image: PLACEHOLDER-ECR-REPO:api-latest

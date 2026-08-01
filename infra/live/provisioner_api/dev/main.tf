@@ -38,6 +38,16 @@ module "eks" {
   datadog_chart_version         = var.datadog_chart_version
   datadog_api_key               = data.aws_ssm_parameter.datadog_api_key.value
 
+  # Fargate sidecar injection: pods in these namespaces labeled
+  # `agent.datadoghq.com/sidecar: fargate` (see k8s/api, k8s/redis) get a
+  # datadog-agent sidecar injected so the K8s Explorer shows live pod status.
+  # The listed ServiceAccounts back those pods and receive kubelet-read RBAC.
+  datadog_sidecar_namespaces = ["default"]
+  datadog_sidecar_service_accounts = [
+    { namespace = "default", name = "internal-developer-platform-api" },
+    { namespace = "default", name = "default" }, # redis runs on the default SA
+  ]
+
   # OTel Collector prerequisites (namespace, IRSA ServiceAccount, Datadog secret
   # in the observability namespace). The Collector workload is applied from
   # k8s/otel-collector. Reuses the Datadog API key above. amp_workspace_arn is
