@@ -141,11 +141,12 @@ variable "aws_load_balancer_controller_namespace" {
 }
 
 # =============================================================================
-# DATADOG CLUSTER AGENT
+# DATADOG CLUSTER AGENT + FARGATE SIDECAR INJECTION
 # Cluster-level visibility (pod inventory, orchestrator explorer) on Fargate.
-# Fargate can't run a DataDog node-agent DaemonSet, so the Cluster Agent is
-# the only path to a populated K8s page in Datadog. Per-pod metrics/traces/
-# logs still come from the datadog-agent sidecar inside each app pod.
+# Fargate can't run a Datadog node-agent DaemonSet; the Cluster Agent covers
+# cluster-scoped objects, and its Admission Controller injects a datadog-agent
+# sidecar into labeled pods so running pods report live status. App telemetry
+# (traces/metrics/logs) still flows via OTLP to the OTel Collector.
 # =============================================================================
 
 variable "install_datadog_cluster_agent" {
@@ -171,6 +172,21 @@ variable "datadog_api_key" {
   type        = string
   default     = null
   sensitive   = true
+}
+
+variable "datadog_sidecar_namespaces" {
+  description = "Namespaces hosting pods labeled for datadog-agent sidecar injection. A `datadog-secret` copy is created in each (the injected sidecar resolves it in the pod's own namespace)."
+  type        = list(string)
+  default     = []
+}
+
+variable "datadog_sidecar_service_accounts" {
+  description = "ServiceAccounts of sidecar-labeled pods. Each is bound to a ClusterRole granting the kubelet-read access the injected agent needs on Fargate."
+  type = list(object({
+    namespace = string
+    name      = string
+  }))
+  default = []
 }
 
 # =============================================================================
