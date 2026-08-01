@@ -1,11 +1,20 @@
 # =============================================================================
-# DATADOG CLUSTER AGENT
-# Runs as a single-replica Deployment on Fargate. This is the entity that
-# talks to the Kubernetes API to enumerate pods, nodes, and workloads — the
-# data Datadog needs to power its K8s inventory pages. Since Fargate clusters
-# can't run the upstream Datadog node-agent DaemonSet, the Cluster Agent is
-# the only path to cluster-level visibility here. Per-pod metrics/traces/logs
-# still come from the datadog-agent sidecar in each application pod.
+# DATADOG CLUSTER AGENT + FARGATE SIDECAR INJECTION
+# The Cluster Agent (single-replica Deployment) talks to the Kubernetes API to
+# enumerate cluster-scoped objects and unscheduled pods. On its own it can NOT
+# report the live status of running pods — on Fargate that job belongs to a
+# datadog-agent sidecar inside each application pod (a DaemonSet is
+# impossible). The Cluster Agent's Admission Controller injects that sidecar
+# into any pod labeled `agent.datadoghq.com/sidecar: fargate`; without it the
+# Kubernetes Explorer freezes pods at their last reported state (Pending /
+# Terminating).
+#
+# The injected sidecar resolves, by convention, a secret literally named
+# `datadog-secret` (keys `api-key` and `token`) in the *application pod's*
+# namespace — hence the per-namespace secret copies below. The `token` key is
+# the shared Cluster Agent auth token the sidecar uses to forward orchestrator
+# data. App telemetry (traces/metrics/logs) is NOT the sidecar's job — that
+# still leaves the apps as OTLP to the OTel Collector.
 # =============================================================================
 
 resource "kubernetes_namespace" "datadog" {
@@ -21,19 +30,95 @@ resource "kubernetes_namespace" "datadog" {
   depends_on = [aws_eks_fargate_profile.this]
 }
 
-resource "kubernetes_secret" "datadog_api_key" {
+# Shared auth token between the Cluster Agent and injected sidecars. Generated
+# here (not by the chart) so it can be replicated into app namespaces.
+resource "random_password" "datadog_cluster_agent_token" {
+  count = var.install_datadog_cluster_agent ? 1 : 0
+
+  length  = 32
+  special = false
+}
+
+# Secret consumed by the chart itself (apiKeyExistingSecret +
+# clusterAgent.tokenExistingSecret) in the release namespace.
+resource "kubernetes_secret" "datadog_secret" {
   count = var.install_datadog_cluster_agent ? 1 : 0
 
   metadata {
-    name      = "datadog-api-key"
+    name      = "datadog-secret"
     namespace = kubernetes_namespace.datadog[0].metadata[0].name
   }
 
   data = {
     api-key = var.datadog_api_key
+    token   = random_password.datadog_cluster_agent_token[0].result
   }
 
   type = "Opaque"
+}
+
+# Copies of the secret in every namespace hosting sidecar-labeled pods — the
+# injected container's secretKeyRef only resolves within its own namespace.
+resource "kubernetes_secret" "datadog_secret_sidecar" {
+  for_each = var.install_datadog_cluster_agent ? toset(var.datadog_sidecar_namespaces) : toset([])
+
+  metadata {
+    name      = "datadog-secret"
+    namespace = each.value
+  }
+
+  data = {
+    api-key = var.datadog_api_key
+    token   = random_password.datadog_cluster_agent_token[0].result
+  }
+
+  type = "Opaque"
+}
+
+# The injected sidecar queries the local kubelet with the *application pod's*
+# ServiceAccount token, so each SA behind a labeled pod needs kubelet-read
+# access (per Datadog's EKS Fargate docs).
+resource "kubernetes_cluster_role" "datadog_sidecar" {
+  count = var.install_datadog_cluster_agent && length(var.datadog_sidecar_service_accounts) > 0 ? 1 : 0
+
+  metadata {
+    name = "datadog-fargate-sidecar"
+  }
+
+  rule {
+    api_groups = [""]
+    resources  = ["nodes", "namespaces", "endpoints"]
+    verbs      = ["get", "list"]
+  }
+
+  rule {
+    api_groups = [""]
+    resources  = ["nodes/metrics", "nodes/spec", "nodes/stats", "nodes/proxy", "nodes/pods", "nodes/healthz"]
+    verbs      = ["get"]
+  }
+}
+
+resource "kubernetes_cluster_role_binding" "datadog_sidecar" {
+  count = var.install_datadog_cluster_agent && length(var.datadog_sidecar_service_accounts) > 0 ? 1 : 0
+
+  metadata {
+    name = "datadog-fargate-sidecar"
+  }
+
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "ClusterRole"
+    name      = kubernetes_cluster_role.datadog_sidecar[0].metadata[0].name
+  }
+
+  dynamic "subject" {
+    for_each = var.datadog_sidecar_service_accounts
+    content {
+      kind      = "ServiceAccount"
+      name      = subject.value.name
+      namespace = subject.value.namespace
+    }
+  }
 }
 
 resource "helm_release" "datadog" {
@@ -51,7 +136,7 @@ resource "helm_release" "datadog" {
   set = [
     {
       name  = "datadog.apiKeyExistingSecret"
-      value = kubernetes_secret.datadog_api_key[0].metadata[0].name
+      value = kubernetes_secret.datadog_secret[0].metadata[0].name
     },
     {
       name  = "datadog.clusterName"
@@ -86,6 +171,24 @@ resource "helm_release" "datadog" {
       name  = "clusterAgent.replicas"
       value = "1"
     },
+    # Fixed token (instead of chart-generated) so sidecars in app namespaces
+    # can authenticate to the Cluster Agent with the replicated secret.
+    {
+      name  = "clusterAgent.tokenExistingSecret"
+      value = kubernetes_secret.datadog_secret[0].metadata[0].name
+    },
+    # Admission Controller webhook injects the datadog-agent sidecar into pods
+    # labeled `agent.datadoghq.com/sidecar: fargate` at creation time; the
+    # `fargate` provider preset wires DD_EKS_FARGATE and the Cluster Agent
+    # connection for orchestrator data.
+    {
+      name  = "clusterAgent.admissionController.agentSidecarInjection.enabled"
+      value = "true"
+    },
+    {
+      name  = "clusterAgent.admissionController.agentSidecarInjection.provider"
+      value = "fargate"
+    },
     {
       name  = "clusterChecksRunner.enabled"
       value = "false"
@@ -94,6 +197,6 @@ resource "helm_release" "datadog" {
 
   depends_on = [
     aws_eks_fargate_profile.this,
-    kubernetes_secret.datadog_api_key,
+    kubernetes_secret.datadog_secret,
   ]
 }

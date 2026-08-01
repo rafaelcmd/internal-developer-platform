@@ -20,6 +20,9 @@ spec:
     metadata:
       labels:
         app: redis
+        # Datadog Cluster Agent Admission Controller injects a datadog-agent
+        # sidecar so the pod reports live status to the K8s Explorer.
+        "agent.datadoghq.com/sidecar": fargate
     spec:
       containers:
         - name: redis
