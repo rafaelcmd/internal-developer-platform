@@ -1,17 +1,15 @@
-# Module for AWS IAM Role
-module "aws_integration" {
-  source = "../aws/datadog_integration"
+data "aws_caller_identity" "current" {}
 
-  role_name   = var.role_name
-  external_id = var.external_id
-  environment = var.environment
-  project     = var.project
-}
+data "aws_partition" "current" {}
 
-# Datadog AWS Integration
+# Datadog AWS Integration. Created BEFORE the IAM role: it references the role
+# only by name (a plain string), and Datadog responds with the External ID it
+# will present when assuming that role. The role's trust policy is then built
+# from that generated ID — a role created first with a self-chosen ID would
+# reject Datadog's AssumeRole calls.
 resource "datadog_integration_aws_account" "this" {
-  aws_account_id = module.aws_integration.account_id
-  aws_partition  = module.aws_integration.partition
+  aws_account_id = data.aws_caller_identity.current.account_id
+  aws_partition  = data.aws_partition.current.partition
 
   aws_regions {
     include_only = [var.aws_region]
@@ -19,7 +17,7 @@ resource "datadog_integration_aws_account" "this" {
 
   auth_config {
     aws_auth_config_role {
-      role_name = module.aws_integration.role_name
+      role_name = var.role_name
     }
   }
 
@@ -42,25 +40,41 @@ resource "datadog_integration_aws_account" "this" {
   metrics_config {
     namespace_filters {
       include_only = [
-        "AWS/ECS",
+        "AWS/ApiGateway",
         "AWS/ApplicationELB",
-        "AWS/Lambda",
+        "AWS/AutoScaling",
+        "AWS/Cognito",
+        "AWS/DynamoDB",
         "AWS/EC2",
+        "AWS/ELB",
+        "AWS/Lambda",
+        "AWS/NetworkELB",
         "AWS/RDS",
         "AWS/S3",
-        "AWS/SQS",
         "AWS/SNS",
-        "AWS/DynamoDB",
-        "AWS/ELB",
-        "AWS/AutoScaling"
+        "AWS/SQS",
+        "AWS/Usage"
       ]
     }
   }
 
+  # extended_collection populates Datadog's Resource Catalog. It additionally
+  # needs the SecurityAudit managed policy, attached in the aws_integration
+  # module.
   resources_config {
     cloud_security_posture_management_collection = false
-    extended_collection                          = false
+    extended_collection                          = true
   }
+}
 
-  depends_on = [module.aws_integration]
+# IAM role Datadog assumes to crawl the account. Its trust policy pins
+# sts:ExternalId to the Datadog-generated value exported by the integration
+# resource above.
+module "aws_integration" {
+  source = "../aws/datadog_integration"
+
+  role_name   = var.role_name
+  external_id = datadog_integration_aws_account.this.auth_config.aws_auth_config_role.external_id
+  environment = var.environment
+  project     = var.project
 }
