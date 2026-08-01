@@ -3,7 +3,6 @@ module "datadog" {
 
   aws_region  = var.aws_region
   role_name   = var.role_name
-  external_id = var.external_id
   environment = var.environment
   project     = var.project
 }
