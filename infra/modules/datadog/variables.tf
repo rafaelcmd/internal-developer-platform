@@ -20,12 +20,6 @@ variable "role_name" {
   default     = "DatadogIntegrationRole"
 }
 
-variable "external_id" {
-  description = "External ID for Datadog integration role"
-  type        = string
-  default     = "datadog-integration-external-id"
-}
-
 # =============================================================================
 # PROJECT AND ENVIRONMENT CONFIGURATION
 # Variables for project identification and environment setup
