@@ -8,10 +8,9 @@ name: Orchestrate - Create Full Infrastructure
 #                │
 #                ├─▶ shared/identity
 #                │
-#                └─▶ provisioner_api/dev ─▶ redis-deploy ─┐
-#                                        └▶ provisioner_api_gateway/dev
-#                                                          └─▶ api-deploy
-#                                                          │
+#                └─▶ provisioner_api/dev ─┬▶ redis-deploy ──────────┬▶ api-deploy
+#                                         ├▶ otel-collector-deploy ─┘
+#                                         └▶ provisioner_api_gateway/dev
 # The gateway depends on the Terraform-managed NLB from provisioner_api,
 # not on k8s Service reconciliation.
 
@@ -57,11 +56,22 @@ jobs:
     uses: ./.github/workflows/redis-deploy.yml
     secrets: inherit
 
+  otel-collector-deploy:
+    name: K8s / OTel Collector
+    # Needs the Terraform-owned prerequisites from provisioner-api: the
+    # observability namespace, IRSA ServiceAccount, datadog-api-key secret,
+    # and the namespace's Fargate profile.
+    needs: [provisioner-api]
+    uses: ./.github/workflows/otel-collector-deploy.yml
+    secrets: inherit
+
   api-deploy:
     name: K8s / API
     # shared-identity is required at runtime: the API pod reads the Cognito
     # client_id from SSM at startup and fatals if it's missing.
-    needs: [provisioner-api, redis-deploy, shared-ecr, shared-identity]
+    # otel-collector-deploy ordering keeps the API from exporting OTLP into
+    # the void on a fresh environment (the exporter drops silently).
+    needs: [provisioner-api, redis-deploy, otel-collector-deploy, shared-ecr, shared-identity]
     uses: ./.github/workflows/api-deploy.yml
     secrets: inherit
 
