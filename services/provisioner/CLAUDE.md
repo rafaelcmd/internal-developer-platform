@@ -31,7 +31,9 @@ EC2 host with no Collector route, so its telemetry never left the box.)
 
 Chosen at startup: **Kafka when `KAFKA_BROKERS` is set** (local dev — never
 touches AWS), else **SQS** (dev/prod, resolves the queue URL from Parameter
-Store). Both loops live in `internal/consumer` and share the same spans +
+Store: `PROVISIONER_QUEUE_PARAM_KEY`, default
+`/INTERNAL_DEVELOPER_PLATFORM/PROVISIONER_QUEUE_URL` — the key the SQS
+Terraform module publishes and the API also reads). Both loops live in `internal/consumer` and share the same spans +
 counters; only the ack differs (Kafka offset commit vs SQS delete). The Kafka
 `KAFKA_TOPIC` (default `resource-provisioning`) must match the API's.
 
