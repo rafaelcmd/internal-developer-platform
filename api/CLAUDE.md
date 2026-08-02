@@ -131,7 +131,8 @@ gated on `ENABLE_TRACING` and skipped in local mode (no Collector to receive it)
   `RequestLoggingMiddleware` emits one structured line per request for every
   endpoint (method, matched route, status, `duration_ms`, `request_id`), attaching
   the request context so lines correlate with the request's trace; it skips
-  `/metrics`. `RecoveryMiddleware` logs any recovered panic with a stack trace.
+  `/metrics` and `/v1/health` (kubelet + NLB probes would otherwise dominate log
+  volume — failures surface via the probes, not logs). `RecoveryMiddleware` logs any recovered panic with a stack trace.
   Both take the logger threaded through `RouterConfig.Logger`.
   `ResourceService.SendProvisioningRequest` logs the provisioning payload
   (`resource_id`, `resource_type`, `body`) with the request context attached — the

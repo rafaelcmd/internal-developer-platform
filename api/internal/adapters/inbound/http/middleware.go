@@ -106,17 +106,24 @@ func RequestContextMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// healthPath is the liveness endpoint (router.go), excluded from request
+// logging: the kubelet probes and the NLB health checker hit it every few
+// seconds, which adds up to tens of thousands of identical lines per day —
+// pure noise that also eats the Datadog index's daily quota. Failures still
+// surface through the probes themselves (restarts / target health), not logs.
+const healthPath = "/v1/health"
+
 // RequestLoggingMiddleware emits one structured log line per request — for
 // every endpoint — with method, matched route, status, latency, and request ID.
 // It wraps the response writer to capture the final status (including a 500 the
 // recovery layer below writes) and logs after the handler returns. The request
 // context is attached so the OTel log bridge correlates the line with the
 // request's trace/span. The /metrics scrape endpoint is skipped so Prometheus
-// polling doesn't flood the logs.
+// polling doesn't flood the logs, and /v1/health likewise (see healthPath).
 func RequestLoggingMiddleware(log logger.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path == metricsPath {
+			if r.URL.Path == metricsPath || r.URL.Path == healthPath {
 				next.ServeHTTP(w, r)
 				return
 			}
