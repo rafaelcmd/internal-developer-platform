@@ -8,8 +8,9 @@ name: Orchestrate - Create Full Infrastructure
 #                │
 #                ├─▶ shared/identity
 #                │
-#                └─▶ provisioner_api/dev ─┬▶ redis-deploy ──────────┬▶ api-deploy
-#                                         ├▶ otel-collector-deploy ─┘
+#                └─▶ provisioner_api/dev ─┬▶ redis-deploy ─────────────▶ api-deploy
+#                                         ├▶ otel-collector-deploy ─┬─▶ api-deploy
+#                                         │                         └─▶ provisioner-deploy
 #                                         └▶ provisioner_api_gateway/dev
 # The gateway depends on the Terraform-managed NLB from provisioner_api,
 # not on k8s Service reconciliation.
@@ -73,6 +74,15 @@ jobs:
     # the void on a fresh environment (the exporter drops silently).
     needs: [provisioner-api, redis-deploy, otel-collector-deploy, shared-ecr, shared-identity]
     uses: ./.github/workflows/api-deploy.yml
+    secrets: inherit
+
+  provisioner-deploy:
+    name: K8s / Provisioner
+    # provisioner-api owns the Terraform prerequisites (IRSA ServiceAccount,
+    # SQS queue + SSM parameter); otel-collector-deploy ordering keeps the
+    # consumer from exporting OTLP into the void on a fresh environment.
+    needs: [provisioner-api, otel-collector-deploy, shared-ecr]
+    uses: ./.github/workflows/provisioner-deploy.yml
     secrets: inherit
 
   provisioner-api-gateway:
