@@ -45,6 +45,15 @@ func TestRequestLoggingMiddleware_SkipsMetricsEndpoint(t *testing.T) {
 	assert.Empty(t, buf.String(), "the /metrics scrape endpoint must not be logged")
 }
 
+func TestRequestLoggingMiddleware_SkipsHealthEndpoint(t *testing.T) {
+	buf, log := newBufferLogger()
+
+	handler := RequestLoggingMiddleware(log)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/v1/health", nil))
+
+	assert.Empty(t, buf.String(), "the /v1/health probe endpoint must not be logged")
+}
+
 func TestRecoveryMiddleware_LogsPanicAndReturns500(t *testing.T) {
 	buf, log := newBufferLogger()
 
