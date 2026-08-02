@@ -45,6 +45,7 @@ module "eks" {
   datadog_sidecar_namespaces = ["default"]
   datadog_sidecar_service_accounts = [
     { namespace = "default", name = "internal-developer-platform-api" },
+    { namespace = "default", name = "internal-developer-platform-provisioner" },
     { namespace = "default", name = "default" }, # redis runs on the default SA
   ]
 
