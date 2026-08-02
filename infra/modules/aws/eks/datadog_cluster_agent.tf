@@ -130,12 +130,24 @@ resource "helm_release" "datadog" {
   namespace  = kubernetes_namespace.datadog[0].metadata[0].name
   version    = var.datadog_chart_version
 
+  # Every rescheduled pod on Fargate waits on a fresh microVM (1-3 min each);
+  # the 5-minute default has proven too tight for multi-deployment rollouts.
+  timeout = 600
+
   # Fargate layout: no DaemonSet (Fargate can't run them), single-replica
   # Cluster Agent, orchestrator explorer on for live pod inventory in Datadog,
   # kube-state-metrics subchart enabled for resource state metrics.
   set = [
     {
       name  = "datadog.apiKeyExistingSecret"
+      value = kubernetes_secret.datadog_secret[0].metadata[0].name
+    },
+    # The bundled datadog-operator subchart does NOT inherit
+    # datadog.apiKeyExistingSecret — when its own value is unset it falls back
+    # to a secret named `<release>-api-key` (datadog-api-key), which no longer
+    # exists. Point it at the same secret explicitly.
+    {
+      name  = "operator.apiKeyExistingSecret"
       value = kubernetes_secret.datadog_secret[0].metadata[0].name
     },
     {
