@@ -108,13 +108,14 @@ func runSQS(ctx context.Context, tracer trace.Tracer, metrics consumer.Metrics, 
 }
 
 // getQueueURL reads the provisioning queue URL from Parameter Store within its
-// own span.
+// own span. The parameter key matches what the SQS Terraform module publishes
+// and what the API reads (PROVISIONER_QUEUE_PARAM_KEY there too).
 func getQueueURL(ctx context.Context, tracer trace.Tracer, ssmClient *ssm.Client) (string, error) {
 	ctx, span := tracer.Start(ctx, "GetSQSQueueURL")
 	defer span.End()
 
 	param, err := ssmClient.GetParameter(ctx, &ssm.GetParameterInput{
-		Name: aws.String("/INTERNAL_DEVELOPER_PLATFORM/SQS_QUEUE_URL"),
+		Name: aws.String(envOrDefault("PROVISIONER_QUEUE_PARAM_KEY", "/INTERNAL_DEVELOPER_PLATFORM/PROVISIONER_QUEUE_URL")),
 	})
 	if err != nil {
 		span.RecordError(err)
