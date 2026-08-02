@@ -19,8 +19,10 @@ Dockerfile.dev, docker-compose.dev.yaml - local run (Kafka-based dev stack)
 
 Runs on the EKS cluster alongside the API: `k8s/provisioner/deployment.yaml`
 (default namespace, Fargate), deployed by the `provisioner-deploy.yml` workflow
-(build + push to the shared ECR repo as `provisioner-latest`, apply, rollout
-restart). AWS access (SQS consume, SSM read) comes from the IRSA-annotated
+(build + push to the shared ECR repo as immutable `provisioner-<sha>` — also
+tagged `provisioner-latest` for convenience — then apply; the sha tag makes the
+apply itself roll the Deployment). AWS access (SQS consume, SSM read) comes
+from the IRSA-annotated
 ServiceAccount `internal-developer-platform-provisioner`
 (`infra/live/provisioner_api/dev/provisioner_irsa.tf`). The Deployment sets
 `OTEL_EXPORTER_OTLP_ENDPOINT` to the in-cluster OTel Collector Service, which

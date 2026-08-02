@@ -66,8 +66,12 @@ jobs:
           docker push "$ECR_URL:api-latest"
           docker push "$ECR_URL:api-${{ github.sha }}"
 
-      - name: Substitute ECR URL in deployment manifest
-        run: sed -i "s|PLACEHOLDER-ECR-REPO|${ECR_URL}|g" k8s/api/deployment.yaml
+      # Immutable tag: the manifest gets the api-<sha> image just pushed, so
+      # `kubectl apply` sees a real spec change and rolls the Deployment itself
+      # (a stable tag like api-latest applies as a no-op and leaves the old
+      # build running). Also makes `kubectl rollout undo` a true rollback.
+      - name: Substitute image in deployment manifest
+        run: sed -i "s|PLACEHOLDER-API-IMAGE|${ECR_URL}:api-${{ github.sha }}|g" k8s/api/deployment.yaml
 
       - name: Substitute target group ARN in TargetGroupBinding
         run: sed -i "s|PLACEHOLDER-TARGET-GROUP-ARN|${TARGET_GROUP_ARN}|g" k8s/api/targetgroupbinding.yaml
@@ -90,3 +94,8 @@ jobs:
           kubectl apply -f k8s/api/deployment.yaml
           kubectl apply -f k8s/api/service.yaml
           kubectl apply -f k8s/api/targetgroupbinding.yaml
+
+      # Fargate scheduling + image pull take a few minutes; failing here (not
+      # silently succeeding with the old pod still running) is the point.
+      - name: Wait for rollout
+        run: kubectl rollout status deployment/internal-developer-platform-api -n default --timeout=10m
