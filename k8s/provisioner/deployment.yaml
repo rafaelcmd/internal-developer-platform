@@ -1,0 +1,62 @@
+# Provisioner consumer — SQS-driven, no inbound traffic, so there is no
+# Service/ports/HTTP probes here (the process has no HTTP server; liveness is
+# "the container is running"). Single replica: SQS visibility timeout handles
+# redelivery, but the service is not yet idempotent per message, so don't scale
+# this out without checking the processing side.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: internal-developer-platform-provisioner
+  namespace: default
+  labels:
+    app: internal-developer-platform-provisioner
+    "tags.datadoghq.com/service": resource-provisioner-consumer
+    "tags.datadoghq.com/env": dev
+    "tags.datadoghq.com/version": "1.0.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: internal-developer-platform-provisioner
+  template:
+    metadata:
+      labels:
+        app: internal-developer-platform-provisioner
+        "tags.datadoghq.com/service": resource-provisioner-consumer
+        "tags.datadoghq.com/env": dev
+        "tags.datadoghq.com/version": "1.0.0"
+        # Opts into datadog-agent sidecar injection (live pod status in the
+        # K8s Explorer — see k8s/api/deployment.yaml for the full note). The
+        # SA below is registered for the sidecar's kubelet-read RBAC in
+        # infra/live/provisioner_api/dev/main.tf.
+        "agent.datadoghq.com/sidecar": fargate
+    spec:
+      serviceAccountName: internal-developer-platform-provisioner
+      # Telemetry (traces/metrics/logs) leaves the app as OTLP to the OTel
+      # Collector, same seam as the API. With no KAFKA_BROKERS set the consumer
+      # runs in SQS mode: queue URL from Parameter Store, AWS access via the
+      # IRSA role on the ServiceAccount.
+      containers:
+        - name: internal-developer-platform-provisioner
+          image: PLACEHOLDER-ECR-REPO:provisioner-latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: ENVIRONMENT
+              value: dev
+            # Feeds the OTel resource (service.version -> Datadog version tag);
+            # service.name is fixed in code (resource-provisioner-consumer).
+            - name: SERVICE_VERSION
+              value: "1.0.0"
+            # OTLP egress to the Collector; telemetry.Setup is a no-op when
+            # this is unset, so it must be present for logs to ship.
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel-collector.observability.svc.cluster.local:4317
+            - name: OTEL_EXPORTER_OTLP_INSECURE
+              value: "true"
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

@@ -13,13 +13,19 @@ internal/consumer/      - the consume loops: kafka.go, sqs.go, shared metrics.go
                           queue trace-context extraction (propagation.go)
 internal/telemetry/    - OpenTelemetry setup (OTLP traces, metrics, logs)
 internal/logger/       - logrus-backed JSON logger behind a small interface
-infra/terraform/       - the EC2 host this runs on (standalone, not on EKS)
 db/                    - RDS init
 Dockerfile.dev, docker-compose.dev.yaml - local run (Kafka-based dev stack)
 ```
 
-Runs standalone on its own EC2 instance (see `infra/terraform`), **not** on the
-EKS cluster — so telemetry targets a Collector via env, not in-cluster DNS.
+Runs on the EKS cluster alongside the API: `k8s/provisioner/deployment.yaml`
+(default namespace, Fargate), deployed by the `provisioner-deploy.yml` workflow
+(build + push to the shared ECR repo as `provisioner-latest`, apply, rollout
+restart). AWS access (SQS consume, SSM read) comes from the IRSA-annotated
+ServiceAccount `internal-developer-platform-provisioner`
+(`infra/live/provisioner_api/dev/provisioner_irsa.tf`). The Deployment sets
+`OTEL_EXPORTER_OTLP_ENDPOINT` to the in-cluster OTel Collector Service, which
+is what ships logs/traces/metrics to Datadog. (Previously ran on a standalone
+EC2 host with no Collector route, so its telemetry never left the box.)
 
 ## Message transport
 
