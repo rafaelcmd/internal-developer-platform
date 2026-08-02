@@ -63,6 +63,19 @@ spec:
             limits:
               cpu: 500m
               memory: 800Mi
+          # Startup on Fargate is slow: the datadog exporter's hostname-source
+          # detection walks a provider chain whose EC2 step waits out IMDS
+          # timeouts (no IMDS on Fargate) — ~50s observed before the
+          # health_check extension binds its port. Without this startupProbe,
+          # the liveness probe's third failure (~40s) kills the container
+          # every attempt -> permanent CrashLoopBackOff. Grace: 36 x 5s = 3m,
+          # then the steady-state probes below take over.
+          startupProbe:
+            httpGet:
+              path: /
+              port: 13133
+            periodSeconds: 5
+            failureThreshold: 36
           livenessProbe:
             httpGet:
               path: /
