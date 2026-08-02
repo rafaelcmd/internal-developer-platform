@@ -1,0 +1,55 @@
+name: Shared - Deploy OTel Collector to EKS
+
+# Applies the OTel Collector workload manifests (k8s/otel-collector). The
+# Terraform-owned prerequisites — observability namespace, IRSA ServiceAccount,
+# datadog-api-key secret, Fargate profile — come from the provisioner_api stack
+# (infra/modules/aws/eks/otel_collector.tf), so this must run after
+# infra-aws-api-create.
+
+on:
+  workflow_dispatch:
+  workflow_call: {}
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+  EKS_CLUSTER_NAME: internal-developer-platform-cluster
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy OTel Collector to EKS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          role-session-name: github-actions-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name "${{ env.EKS_CLUSTER_NAME }}" --region "${{ env.AWS_REGION }}"
+
+      - name: Apply manifests
+        run: |
+          kubectl apply -f k8s/otel-collector/configmap.yaml
+          kubectl apply -f k8s/otel-collector/rbac.yaml
+          kubectl apply -f k8s/otel-collector/deployment.yaml
+          kubectl apply -f k8s/otel-collector/service.yaml
+
+      # A ConfigMap-only change doesn't restart the pod (the config is mounted,
+      # but the Collector doesn't hot-reload it). Force a rollout so every run
+      # deploys the config it just applied. Fargate pod scheduling takes a few
+      # minutes; the timeout accounts for image pull + probe warmup.
+      - name: Restart and wait for rollout
+        run: |
+          kubectl rollout restart deployment/otel-collector -n observability
+          kubectl rollout status deployment/otel-collector -n observability --timeout=10m
