@@ -1,7 +1,7 @@
 # Internal Developer Platform
 
 > A cloud-native, event-driven platform that lets engineering teams self-service cloud
-> infrastructure — provisioning resources on demand while tracking their cost in real time.
+> infrastructure — provisioning resources on demand through a single REST API.
 
 Built as a microservices system on AWS, this project demonstrates production-grade
 patterns in distributed systems design: asynchronous messaging, service decoupling,
@@ -16,7 +16,7 @@ resources without sacrificing control or visibility. This IDP tackles that probl
 
 - **Self-service provisioning** — developers request resources through a single REST API instead of filing tickets or writing Terraform by hand.
 - **Event-driven decoupling** — the API never blocks on slow cloud operations; work is handed off through a durable message queue.
-- **Cost accountability** — every provisioned resource is tracked for spend across AWS, GCP, and Azure, so cost is a first-class signal, not an afterthought.
+- **Production-grade observability** — metrics, logs, and distributed traces flow through an OpenTelemetry Collector into Datadog, so every request is traceable end to end.
 
 ---
 
@@ -26,7 +26,7 @@ An event-driven system designed for resilience and independent scaling.
 
 ```
                          ┌──────────────────┐
-   Developer ──HTTP──▶   │       API        │   (Go 1.24)
+   Developer ──HTTP──▶   │       API        │   (Go 1.25)
                          │  REST interface  │
                          └────────┬─────────┘
                                   │ publish
@@ -120,3 +120,10 @@ Run the test suites:
 cd api && go test ./...
 cd services/provisioner && go test ./...
 ```
+
+---
+
+## Roadmap
+
+- **Multi-cloud provisioning** — the API already validates requests for AWS, Azure, and GCP; the Provisioner currently targets AWS, with the other providers planned.
+- **Cost tracking** — per-resource spend reporting, making cost a first-class signal alongside provisioning.
