@@ -8,6 +8,11 @@
 *.so
 *.dylib
 
+# Compiled Go binaries (extensionless, from `go build`)
+/api/server
+/services/provisioner/consumer
+bin/
+
 # Test binary, built with `go test -c`
 *.test
 
