@@ -9,7 +9,7 @@
 *.dylib
 
 # Compiled Go binaries (extensionless, from `go build`)
-/api/server
+/services/api/server
 /services/provisioner/consumer
 bin/
 
