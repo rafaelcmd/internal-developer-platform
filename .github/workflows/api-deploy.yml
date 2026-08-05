@@ -55,7 +55,7 @@ jobs:
             | docker login --username AWS --password-stdin "$ECR_REGISTRY"
 
       - name: Build and push API image
-        working-directory: api
+        working-directory: services/api
         run: |
           docker build \
             --platform linux/amd64 \
