@@ -5,7 +5,7 @@
 # =============================================================================
 
 locals {
-  openapi_spec_path = "${path.module}/../../../../api/docs/swagger.yaml"
+  openapi_spec_path = "${path.module}/../../../../services/api/docs/swagger.yaml"
 
   # API Versioning Configuration
   # This API uses path-based versioning (e.g., /v1/resources)
