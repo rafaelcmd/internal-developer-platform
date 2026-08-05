@@ -6,7 +6,7 @@ Monorepo for an internal developer platform that provisions cloud resources.
 
 Event-driven, multi-service platform on AWS (EKS, SQS, Cognito):
 
-1. **API** (`/api`) — Go 1.25 REST API. Receives resource creation requests, publishes messages to SQS.
+1. **API** (`/services/api`) — Go 1.25 REST API. Receives resource creation requests, publishes messages to SQS.
 2. **Provisioner** (`/services/provisioner`) — Go 1.25 service. Provisions cloud resources from SQS messages.
 
 Message flow: API → SQS → Provisioner
