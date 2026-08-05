@@ -77,8 +77,8 @@ service scales, deploys, and fails independently — a core tenet of reliable di
 ## Repository Layout
 
 ```
-api/                  Go REST API — accepts requests, publishes to SQS
 services/
+  api/                Go REST API — accepts requests, publishes to SQS
   provisioner/        Go service — provisions cloud resources from SQS
 infra/                Terraform modules and live environments
 k8s/                  Kubernetes manifests
@@ -108,7 +108,7 @@ Run individual services:
 
 ```bash
 # API (Go)
-cd api && go run cmd/server/main.go
+cd services/api && go run cmd/server/main.go
 
 # Provisioner (Go)
 cd services/provisioner && go run cmd/consumer/main.go
@@ -117,6 +117,6 @@ cd services/provisioner && go run cmd/consumer/main.go
 Run the test suites:
 
 ```bash
-cd api && go test ./...
+cd services/api && go test ./...
 cd services/provisioner && go test ./...
 ```

@@ -1,5 +1,5 @@
 include:
-  - api/docker-compose.dev.yaml
+  - services/api/docker-compose.dev.yaml
   - ./services/provisioner/docker-compose.dev.yaml
 
 services:
