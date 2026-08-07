@@ -3,8 +3,8 @@ name: Shared - Deploy OTel Collector to EKS
 # Applies the OTel Collector workload manifests (k8s/otel-collector). The
 # Terraform-owned prerequisites — observability namespace, IRSA ServiceAccount,
 # datadog-api-key secret, Fargate profile — come from the provisioner_api stack
-# (infra/modules/aws/eks/otel_collector.tf), so this must run after
-# infra-aws-api-create.
+# (infra/modules/aws/eks/otel_collector.tf), so this must run after the
+# api component's terraform apply.
 
 on:
   workflow_dispatch:

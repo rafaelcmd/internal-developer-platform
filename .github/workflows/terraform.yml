@@ -1,0 +1,138 @@
+name: Terraform (reusable)
+
+# One parameterized pipeline for every infra/live component — replaces the
+# twelve infra-aws-<component>-{create,destroy} workflows. All component
+# knowledge (directory, var-file, post-apply steps) lives here, so callers
+# pass only component + action. Manual runs go through infra.yml; the
+# orchestrate-create/destroy workflows call this directly per component.
+
+on:
+  workflow_call:
+    inputs:
+      component:
+        description: "Component: vpc | ecr | datadog | identity | api | api-gateway"
+        type: string
+        required: true
+      action:
+        description: "Terraform action: apply | destroy"
+        type: string
+        required: true
+    secrets:
+      TF_API_TOKEN:
+        required: true
+      DATADOG_API_KEY:
+        required: false
+      DATADOG_APP_KEY_PROV_API:
+        required: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+  # TF_VAR_* env vars are silently ignored by configurations that don't
+  # declare the variable, so these are safe for every component and keep
+  # the Datadog secrets out of CLI arguments.
+  TF_VAR_datadog_api_key: ${{ secrets.DATADOG_API_KEY }}
+  TF_VAR_datadog_app_key: ${{ secrets.DATADOG_APP_KEY_PROV_API }}
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  params:
+    name: Resolve component
+    runs-on: ubuntu-latest
+    outputs:
+      dir: ${{ steps.map.outputs.dir }}
+      var_flags: ${{ steps.map.outputs.var_flags }}
+    steps:
+      - name: Map component to working directory
+        id: map
+        run: |
+          case "${{ inputs.component }}" in
+            vpc)         dir=infra/live/shared/vpc ;;
+            ecr)         dir=infra/live/shared/ecr ;;
+            datadog)     dir=infra/live/shared/datadog ;;
+            identity)    dir=infra/live/shared/identity ;;
+            api)         dir=infra/live/provisioner_api/dev;         var_flags="-var-file=dev.tfvars" ;;
+            api-gateway) dir=infra/live/provisioner_api_gateway/dev; var_flags="-var-file=dev.tfvars" ;;
+            *) echo "Unknown component: ${{ inputs.component }}"; exit 1 ;;
+          esac
+          if [ "${{ inputs.action }}" != "apply" ] && [ "${{ inputs.action }}" != "destroy" ]; then
+            echo "Unknown action: ${{ inputs.action }}"; exit 1
+          fi
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+          echo "var_flags=${var_flags:-}" >> "$GITHUB_OUTPUT"
+
+  terraform:
+    name: Terraform ${{ inputs.action }} — ${{ inputs.component }}
+    needs: [params]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ needs.params.outputs.dir }}
+        shell: bash
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          role-session-name: github-actions-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Format
+        if: inputs.action == 'apply'
+        run: terraform fmt -check
+
+      - name: Terraform Validate
+        if: inputs.action == 'apply'
+        run: terraform validate
+
+      - name: Terraform Plan
+        if: inputs.action == 'apply'
+        run: terraform plan -input=false ${{ needs.params.outputs.var_flags }} -out=tfplan
+
+      - name: Terraform Apply
+        if: inputs.action == 'apply'
+        run: terraform apply -auto-approve -input=false tfplan
+
+      - name: Terraform Plan Destroy
+        if: inputs.action == 'destroy'
+        run: terraform plan -destroy -input=false ${{ needs.params.outputs.var_flags }}
+
+      - name: Terraform Destroy
+        if: inputs.action == 'destroy'
+        run: terraform destroy -auto-approve -input=false ${{ needs.params.outputs.var_flags }}
+
+      # CoreDNS pods created before the Fargate profile exists stay Pending
+      # forever; a restart reschedules them onto Fargate.
+      - name: Restart CoreDNS to schedule on Fargate
+        if: inputs.action == 'apply' && inputs.component == 'api'
+        run: |
+          aws eks update-kubeconfig --name internal-developer-platform-cluster --region "${{ env.AWS_REGION }}"
+          kubectl rollout restart deployment/coredns -n kube-system
+          kubectl rollout status deployment/coredns -n kube-system --timeout=5m
+
+      # Mirror the Datadog agent into the private registry so cluster pulls
+      # don't hit public-registry rate limits.
+      - name: Push Datadog Agent Image
+        if: inputs.action == 'apply' && inputs.component == 'ecr'
+        run: |
+          ECR_URL=$(terraform output -raw repository_url)
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin $ECR_URL
+          aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
+          docker pull public.ecr.aws/datadog/agent:latest
+          docker tag public.ecr.aws/datadog/agent:latest $ECR_URL:datadog-agent
+          docker push $ECR_URL:datadog-agent

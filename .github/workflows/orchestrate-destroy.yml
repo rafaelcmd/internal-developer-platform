@@ -36,35 +36,41 @@ jobs:
   provisioner-api-gateway:
     name: Provisioner API Gateway (destroy)
     needs: [guard]
-    uses: ./.github/workflows/infra-aws-api-gateway-destroy.yml
+    uses: ./.github/workflows/terraform.yml
+    with: { component: api-gateway, action: destroy }
     secrets: inherit
 
   provisioner-api:
     name: Provisioner API / EKS (destroy)
     needs: [provisioner-api-gateway]
-    uses: ./.github/workflows/infra-aws-api-destroy.yml
+    uses: ./.github/workflows/terraform.yml
+    with: { component: api, action: destroy }
     secrets: inherit
 
   shared-identity:
     name: Shared / Identity (destroy)
     needs: [provisioner-api]
-    uses: ./.github/workflows/infra-aws-identity-destroy.yml
+    uses: ./.github/workflows/terraform.yml
+    with: { component: identity, action: destroy }
     secrets: inherit
 
   shared-datadog:
     name: Shared / Datadog (destroy)
     needs: [provisioner-api]
-    uses: ./.github/workflows/infra-aws-datadog-destroy.yml
+    uses: ./.github/workflows/terraform.yml
+    with: { component: datadog, action: destroy }
     secrets: inherit
 
   shared-ecr:
     name: Shared / ECR (destroy)
     needs: [shared-datadog, provisioner-api]
-    uses: ./.github/workflows/infra-aws-ecr-destroy.yml
+    uses: ./.github/workflows/terraform.yml
+    with: { component: ecr, action: destroy }
     secrets: inherit
 
   shared-vpc:
     name: Shared / VPC (destroy)
     needs: [shared-ecr, shared-identity]
-    uses: ./.github/workflows/infra-aws-vpc-destroy.yml
+    uses: ./.github/workflows/terraform.yml
+    with: { component: vpc, action: destroy }
     secrets: inherit

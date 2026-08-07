@@ -25,30 +25,35 @@ permissions:
 jobs:
   shared-vpc:
     name: Shared / VPC
-    uses: ./.github/workflows/infra-aws-vpc-create.yml
+    uses: ./.github/workflows/terraform.yml
+    with: { component: vpc, action: apply }
     secrets: inherit
 
   shared-ecr:
     name: Shared / ECR
-    uses: ./.github/workflows/infra-aws-ecr-create.yml
+    uses: ./.github/workflows/terraform.yml
+    with: { component: ecr, action: apply }
     secrets: inherit
 
   shared-datadog:
     name: Shared / Datadog
     needs: [shared-vpc, shared-ecr]
-    uses: ./.github/workflows/infra-aws-datadog-create.yml
+    uses: ./.github/workflows/terraform.yml
+    with: { component: datadog, action: apply }
     secrets: inherit
 
   shared-identity:
     name: Shared / Identity (Cognito)
     needs: [shared-vpc]
-    uses: ./.github/workflows/infra-aws-identity-create.yml
+    uses: ./.github/workflows/terraform.yml
+    with: { component: identity, action: apply }
     secrets: inherit
 
   provisioner-api:
     name: Provisioner API / EKS + SQS + Redis SSM
     needs: [shared-vpc, shared-ecr, shared-datadog]
-    uses: ./.github/workflows/infra-aws-api-create.yml
+    uses: ./.github/workflows/terraform.yml
+    with: { component: api, action: apply }
     secrets: inherit
 
   redis-deploy:
@@ -88,5 +93,6 @@ jobs:
   provisioner-api-gateway:
     name: Provisioner API Gateway / API Gateway + WAF
     needs: [provisioner-api, shared-identity]
-    uses: ./.github/workflows/infra-aws-api-gateway-create.yml
+    uses: ./.github/workflows/terraform.yml
+    with: { component: api-gateway, action: apply }
     secrets: inherit

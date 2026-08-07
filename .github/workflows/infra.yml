@@ -1,0 +1,40 @@
+name: Infra - Terraform
+
+# Manual entry point for a single infra component. Pick a component and
+# apply/destroy; the pipeline itself lives in the reusable terraform.yml.
+# Full-platform runs go through orchestrate-create / orchestrate-destroy.
+
+on:
+  workflow_dispatch:
+    inputs:
+      component:
+        description: Component to operate on
+        required: true
+        type: choice
+        options:
+          - vpc
+          - ecr
+          - datadog
+          - identity
+          - api
+          - api-gateway
+      action:
+        description: Terraform action
+        required: true
+        type: choice
+        options:
+          - apply
+          - destroy
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  terraform:
+    name: ${{ inputs.action }} / ${{ inputs.component }}
+    uses: ./.github/workflows/terraform.yml
+    with:
+      component: ${{ inputs.component }}
+      action: ${{ inputs.action }}
+    secrets: inherit
