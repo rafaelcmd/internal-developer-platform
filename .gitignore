@@ -40,6 +40,7 @@ go.work.sum
 *.tfstate.backup
 *.tfstate.backup.*
 *.tfplan
+tfplan
 
 # Kafka data
 /resource-provisioner-consumer/data/
