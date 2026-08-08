@@ -76,6 +76,27 @@ resource "aws_iam_policy" "pipeline_api" {
           }
         }
       },
+      # Same parent-resource rule as security groups: EKS authorizes profile,
+      # addon and access-entry creation against the cluster that contains them.
+      # The cluster is pre-existing in those calls, so request tags never apply.
+      {
+        Sid    = "EKSSubresourcesOnProjectCluster"
+        Effect = "Allow"
+        Action = [
+          "eks:CreateFargateProfile",
+          "eks:CreateAddon",
+          "eks:CreateAccessEntry",
+          "eks:AssociateAccessPolicy",
+          "eks:AssociateIdentityProviderConfig",
+          "eks:TagResource"
+        ]
+        Resource = "arn:aws:eks:*:*:cluster/*"
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/Project" = var.project
+          }
+        }
+      },
       {
         Sid    = "IAMOpenIDConnectProviderForIRSA"
         Effect = "Allow"
@@ -164,6 +185,24 @@ resource "aws_iam_policy" "pipeline_api" {
         Condition = {
           StringEquals = {
             "aws:RequestTag/Project" = var.project
+          }
+        }
+      },
+      # ec2:CreateSecurityGroup is authorized against two resources: the group
+      # being created and the VPC it goes into. The statement above covers the
+      # first through its request tags; the VPC already exists and carries no
+      # request tag, so it needs its own grant keyed on the tag it does have.
+      {
+        Sid    = "CreateSecurityGroupInProjectVpc"
+        Effect = "Allow"
+        Action = ["ec2:CreateSecurityGroup"]
+        Resource = [
+          "arn:aws:ec2:*:*:vpc/*",
+          "arn:aws:ec2:*:*:security-group/*"
+        ]
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/Project" = var.project
           }
         }
       },
