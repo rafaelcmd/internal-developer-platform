@@ -18,6 +18,12 @@ on:
       - "infra/live/**"
       - "infra/modules/**"
 
+# One group per PR; a new push cancels the previous run — a superseded
+# commit's plan is worthless, and plans are read-only so cancelling is safe.
+concurrency:
+  group: infra-plan-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   id-token: write
   contents: read
@@ -32,7 +38,7 @@ jobs:
     steps:
       - name: Match changed paths to components
         id: filter
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         with:
           filters: |
             vpc:

@@ -16,6 +16,11 @@ on:
       - "infra/live/**"
       - "infra/modules/**"
 
+# Serialize merge-triggered applies; never cancel one mid-apply.
+concurrency:
+  group: infra-apply-main
+  cancel-in-progress: false
+
 permissions:
   id-token: write
   contents: read
@@ -31,11 +36,11 @@ jobs:
       # push events give paths-filter no base to diff against unless the
       # repo is checked out and a base is named.
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Match changed paths to components
         id: filter
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         with:
           base: main
           filters: |
