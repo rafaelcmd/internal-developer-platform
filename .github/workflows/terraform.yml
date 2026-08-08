@@ -34,7 +34,10 @@ on:
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION }}
-  AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+  # Each component assumes a role scoped to the services it provisions,
+  # addressed by naming convention (see infra/live/shared/iam-github-oidc/
+  # roles.tf) so a new component needs no new repo variable.
+  AWS_ROLE_ARN: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/github-actions-tf-${{ inputs.component }}
   # TF_VAR_* env vars are silently ignored by configurations that don't
   # declare the variable, so these are safe for every component and keep
   # the Datadog secrets out of CLI arguments.

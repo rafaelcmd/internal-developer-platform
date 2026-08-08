@@ -6,7 +6,9 @@ on:
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION }}
-  AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+  # Deploy workflows run kubectl and push images; they assume the deploy
+  # role rather than any Terraform component role.
+  AWS_ROLE_ARN: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/github-actions-deploy
   EKS_CLUSTER_NAME: internal-developer-platform-cluster
 
 # One deploy of this workload at a time; never cancel one mid-rollout.

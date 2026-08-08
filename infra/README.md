@@ -216,9 +216,13 @@ Destroy requires typing `destroy` into a confirmation input — the workflow fai
 
 AWS authentication is OIDC end-to-end:
 
-- GitHub Actions assumes `arn:aws:iam::<account>:role/github-actions-oidc-role` via `aws-actions/configure-aws-credentials@v4`.
-- The trust policy is scoped to `repo:rafaelcmd/internal-developer-platform:ref:refs/heads/main` — only `main`-branch runs of this repo can assume the role.
-- Terraform Cloud uses its own OIDC provider against AWS for plan/apply runs.
+- No long-lived AWS keys exist in CI; every job exchanges a GitHub OIDC token for temporary credentials via `aws-actions/configure-aws-credentials`.
+- Each Terraform component assumes its own role, `github-actions-tf-<component>`, carrying only the services that component provisions (`infra/live/shared/iam-github-oidc/policy_*.tf`). Workflows build the ARN from the component name plus the `AWS_ACCOUNT_ID` variable, so a new component needs no new repo configuration.
+- Workload deploys assume `github-actions-deploy` — SSM reads, ECR push, and cluster auth only. It appears in `cluster_admin_principal_arns` so EKS grants it kubectl access through an access entry.
+- Pull-request plans assume `github-actions-oidc-plan-role`, which holds `ReadOnlyAccess`: unmerged code can compute a diff but never mutate AWS.
+- Trust policies allow two subjects — `...:ref:refs/heads/main` and `...:environment:dev` — so write-capable credentials are only issued to jobs on `main` or inside the reviewer-gated environment. Pull requests match neither.
+- Component policies authorize creation on the `Project` request tag and mutation on the `Project` resource tag, so a role cannot modify resources outside this project even within its own services.
+- Terraform Cloud uses its own OIDC provider against AWS for remote runs.
 
 ---
 
