@@ -1,7 +1,8 @@
 name: Infra - Terraform
 
-# Manual entry point for a single infra component. Pick a component and
-# apply/destroy; the pipeline itself lives in the reusable terraform.yml.
+# Manual entry point for a single infra component: pick a component and
+# plan/apply/destroy. The pipeline itself lives in the reusable
+# terraform.yml; apply and destroy pause at the `dev` environment gate.
 # Full-platform runs go through orchestrate-create / orchestrate-destroy.
 
 on:
@@ -23,12 +24,14 @@ on:
         required: true
         type: choice
         options:
+          - plan
           - apply
           - destroy
 
 permissions:
   id-token: write
   contents: read
+  pull-requests: write
 
 jobs:
   terraform:

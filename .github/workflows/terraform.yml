@@ -1,10 +1,17 @@
 name: Terraform (reusable)
 
-# One parameterized pipeline for every infra/live component — replaces the
-# twelve infra-aws-<component>-{create,destroy} workflows. All component
-# knowledge (directory, var-file, post-apply steps) lives here, so callers
-# pass only component + action. Manual runs go through infra.yml; the
-# orchestrate-create/destroy workflows call this directly per component.
+# One parameterized pipeline for every infra/live component. Callers pass a
+# component and an action (plan | apply | destroy); component knowledge —
+# working directory, var-file, post-apply steps — lives here.
+#
+# Plan and apply are separate jobs: plan saves tfplan and uploads it as an
+# artifact (posting the readable output as a PR comment on pull_request
+# events), and apply executes that exact artifact behind the `dev`
+# environment gate, so the reviewed plan is what runs. Pull-request plans
+# assume a read-only role (vars.AWS_PLAN_ROLE_ARN, defined in
+# infra/live/shared/iam-github-oidc/plan_role.tf) — the main role's OIDC
+# trust is main-branch-only, and unmerged code should never hold write
+# credentials.
 
 on:
   workflow_call:
@@ -14,7 +21,7 @@ on:
         type: string
         required: true
       action:
-        description: "Terraform action: apply | destroy"
+        description: "Terraform action: plan | apply | destroy"
         type: string
         required: true
     secrets:
@@ -37,6 +44,7 @@ env:
 permissions:
   id-token: write
   contents: read
+  pull-requests: write
 
 jobs:
   params:
@@ -58,16 +66,95 @@ jobs:
             api-gateway) dir=infra/live/provisioner_api_gateway/dev; var_flags="-var-file=dev.tfvars" ;;
             *) echo "Unknown component: ${{ inputs.component }}"; exit 1 ;;
           esac
-          if [ "${{ inputs.action }}" != "apply" ] && [ "${{ inputs.action }}" != "destroy" ]; then
-            echo "Unknown action: ${{ inputs.action }}"; exit 1
-          fi
+          case "${{ inputs.action }}" in
+            plan|apply|destroy) ;;
+            *) echo "Unknown action: ${{ inputs.action }}"; exit 1 ;;
+          esac
           echo "dir=$dir" >> "$GITHUB_OUTPUT"
           echo "var_flags=${var_flags:-}" >> "$GITHUB_OUTPUT"
 
-  terraform:
-    name: Terraform ${{ inputs.action }} — ${{ inputs.component }}
+  plan:
+    name: Terraform plan — ${{ inputs.component }}
+    if: inputs.action == 'plan' || inputs.action == 'apply'
     needs: [params]
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ needs.params.outputs.dir }}
+        shell: bash
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ github.event_name == 'pull_request' && vars.AWS_PLAN_ROLE_ARN || env.AWS_ROLE_ARN }}
+          role-session-name: github-actions-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # The wrapper intercepts stdout, which would break capturing the plan
+      # output to a file below.
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Format
+        run: terraform fmt -check
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      # tee preserves terraform's exit code (bash runs with pipefail here);
+      # plan.txt feeds the PR comment below.
+      - name: Terraform Plan
+        run: terraform plan -input=false -no-color ${{ needs.params.outputs.var_flags }} -out=tfplan 2>&1 | tee plan.txt
+
+      # The artifact name embeds the component because one orchestrator run
+      # produces several plans in the same workflow run.
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ inputs.component }}
+          path: |
+            ${{ needs.params.outputs.dir }}/tfplan
+            ${{ needs.params.outputs.dir }}/plan.txt
+          retention-days: 5
+
+      # Upserts one comment per component, found again via the marker on the
+      # first line, so repeated pushes update in place instead of stacking.
+      - name: Comment plan on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- tf-plan:${{ inputs.component }} -->';
+            const plan = fs.readFileSync('${{ needs.params.outputs.dir }}/plan.txt', 'utf8');
+            const body = marker + '\n### Terraform plan — `${{ inputs.component }}`\n\n```\n'
+              + plan.slice(-60000) + '\n```';
+            const { data: comments } = await github.rest.issues.listComments({
+              ...context.repo, issue_number: context.issue.number,
+            });
+            const prev = comments.find(c => c.body.startsWith(marker));
+            if (prev) {
+              await github.rest.issues.updateComment({ ...context.repo, comment_id: prev.id, body });
+            } else {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
+            }
+
+  apply:
+    name: Terraform apply — ${{ inputs.component }}
+    if: inputs.action == 'apply'
+    needs: [params, plan]
+    runs-on: ubuntu-latest
+    environment: dev
     defaults:
       run:
         working-directory: ${{ needs.params.outputs.dir }}
@@ -88,38 +175,25 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+          terraform_wrapper: false
 
+      # A fresh runner needs the providers/modules the saved plan expects.
       - name: Terraform Init
         run: terraform init
 
-      - name: Terraform Format
-        if: inputs.action == 'apply'
-        run: terraform fmt -check
+      - name: Download plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-${{ inputs.component }}
+          path: ${{ needs.params.outputs.dir }}
 
-      - name: Terraform Validate
-        if: inputs.action == 'apply'
-        run: terraform validate
-
-      - name: Terraform Plan
-        if: inputs.action == 'apply'
-        run: terraform plan -input=false ${{ needs.params.outputs.var_flags }} -out=tfplan
-
-      - name: Terraform Apply
-        if: inputs.action == 'apply'
-        run: terraform apply -auto-approve -input=false tfplan
-
-      - name: Terraform Plan Destroy
-        if: inputs.action == 'destroy'
-        run: terraform plan -destroy -input=false ${{ needs.params.outputs.var_flags }}
-
-      - name: Terraform Destroy
-        if: inputs.action == 'destroy'
-        run: terraform destroy -auto-approve -input=false ${{ needs.params.outputs.var_flags }}
+      - name: Terraform Apply (saved plan)
+        run: terraform apply -input=false tfplan
 
       # CoreDNS pods created before the Fargate profile exists stay Pending
       # forever; a restart reschedules them onto Fargate.
       - name: Restart CoreDNS to schedule on Fargate
-        if: inputs.action == 'apply' && inputs.component == 'api'
+        if: inputs.component == 'api'
         run: |
           aws eks update-kubeconfig --name internal-developer-platform-cluster --region "${{ env.AWS_REGION }}"
           kubectl rollout restart deployment/coredns -n kube-system
@@ -128,7 +202,7 @@ jobs:
       # Mirror the Datadog agent into the private registry so cluster pulls
       # don't hit public-registry rate limits.
       - name: Push Datadog Agent Image
-        if: inputs.action == 'apply' && inputs.component == 'ecr'
+        if: inputs.component == 'ecr'
         run: |
           ECR_URL=$(terraform output -raw repository_url)
           aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin $ECR_URL
@@ -136,3 +210,42 @@ jobs:
           docker pull public.ecr.aws/datadog/agent:latest
           docker tag public.ecr.aws/datadog/agent:latest $ECR_URL:datadog-agent
           docker push $ECR_URL:datadog-agent
+
+  # Destroy plans can't be saved and applied like create plans, so this stays
+  # a single plan-then-destroy job, gated by the same environment as apply.
+  destroy:
+    name: Terraform destroy — ${{ inputs.component }}
+    if: inputs.action == 'destroy'
+    needs: [params]
+    runs-on: ubuntu-latest
+    environment: dev
+    defaults:
+      run:
+        working-directory: ${{ needs.params.outputs.dir }}
+        shell: bash
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          role-session-name: github-actions-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan Destroy
+        run: terraform plan -destroy -input=false ${{ needs.params.outputs.var_flags }}
+
+      - name: Terraform Destroy
+        run: terraform destroy -auto-approve -input=false ${{ needs.params.outputs.var_flags }}

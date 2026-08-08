@@ -1,0 +1,73 @@
+name: Infra - Plan on PR
+
+# Runs `terraform plan` for every component a pull request touches and posts
+# each plan as a PR comment (via the reusable terraform.yml), so infra PRs
+# are reviewed against the real diff rather than the HCL alone.
+#
+# paths-filter matches the PR's changed files against the per-component
+# lists below and outputs the matching filter names as a JSON array, which
+# feeds the matrix — only affected components are planned. A shared module
+# can appear in several components' lists; editing it plans every consumer.
+#
+# These runs authenticate with the read-only plan role, so a pull request
+# can read AWS to compute the diff but can never mutate it.
+
+on:
+  pull_request:
+    paths:
+      - "infra/live/**"
+      - "infra/modules/**"
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  detect-changes:
+    name: Detect affected components
+    runs-on: ubuntu-latest
+    outputs:
+      components: ${{ steps.filter.outputs.changes }}
+    steps:
+      - name: Match changed paths to components
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            vpc:
+              - 'infra/live/shared/vpc/**'
+              - 'infra/modules/aws/vpc/**'
+            ecr:
+              - 'infra/live/shared/ecr/**'
+              - 'infra/modules/aws/ecr/**'
+            datadog:
+              - 'infra/live/shared/datadog/**'
+              - 'infra/modules/datadog/**'
+              - 'infra/modules/aws/datadog_integration/**'
+            identity:
+              - 'infra/live/shared/identity/**'
+              - 'infra/modules/aws/cognito/**'
+            api:
+              - 'infra/live/provisioner_api/**'
+              - 'infra/modules/aws/eks/**'
+              - 'infra/modules/aws/sqs/**'
+              - 'infra/modules/aws/nlb/**'
+            api-gateway:
+              - 'infra/live/provisioner_api_gateway/**'
+              - 'infra/modules/aws/api_gateway/**'
+              - 'infra/modules/aws/waf/**'
+
+  plan:
+    name: Plan / ${{ matrix.component }}
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.components != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        component: ${{ fromJSON(needs.detect-changes.outputs.components) }}
+    uses: ./.github/workflows/terraform.yml
+    with:
+      component: ${{ matrix.component }}
+      action: plan
+    secrets: inherit
