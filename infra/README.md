@@ -183,26 +183,31 @@ The two namespaces reflect a deliberate split:
 
 Two layers:
 
-**Per-stack workflows** (`.github/workflows/infra-aws-*-create.yml` + `*-destroy.yml`) — each stack has a create and destroy workflow. Both `workflow_dispatch` (manual trigger) and `workflow_call` (callable by the orchestrator). Each runs:
+**Reusable Terraform workflow** (`.github/workflows/terraform.yml`) — one parameterized pipeline for every stack, taking `component` (vpc, ecr, datadog, identity, api, api-gateway) and `action` (apply, destroy) as inputs. It maps the component to its working directory and var-file, then runs:
 
 1. `actions/checkout`
 2. `hashicorp/setup-terraform` with `cli_config_credentials_token` (TFC token)
-3. `terraform init` / `fmt -check` / `validate` / `plan` / `apply` (against the stack's working directory)
+3. `terraform init` / `fmt -check` / `validate` / `plan` / `apply` (or `plan -destroy` / `destroy`)
 
-**Orchestrators** (`orchestrate-create.yml`, `orchestrate-destroy.yml`) — chain the stack workflows in dependency order using `needs:` and `uses: ./.github/workflows/<stack>.yml`:
+Component-specific post-apply steps (CoreDNS restart for `api`, Datadog agent image mirror for `ecr`) live behind `if:` conditions in the same file. Manual single-stack runs go through `infra.yml`, a thin `workflow_dispatch` wrapper with component/action dropdowns.
+
+**Orchestrators** (`orchestrate-create.yml`, `orchestrate-destroy.yml`) — chain the stacks in dependency order using `needs:`, each job calling the reusable workflow:
 
 ```yaml
 jobs:
   shared-vpc:
-    uses: ./.github/workflows/infra-aws-vpc-create.yml
+    uses: ./.github/workflows/terraform.yml
+    with: { component: vpc, action: apply }
     secrets: inherit
   shared-identity:
     needs: [shared-vpc]
-    uses: ./.github/workflows/infra-aws-identity-create.yml
+    uses: ./.github/workflows/terraform.yml
+    with: { component: identity, action: apply }
     secrets: inherit
   provisioner-api:
     needs: [shared-vpc, shared-ecr, shared-datadog]
-    uses: ./.github/workflows/infra-aws-api-create.yml
+    uses: ./.github/workflows/terraform.yml
+    with: { component: api, action: apply }
     secrets: inherit
   ...
 ```
