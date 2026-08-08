@@ -20,8 +20,14 @@ notification_email = "rafaelcmd@gmail.com"
 
 # IAM principals granted cluster-admin via EKS Access Entries. Replace the
 # placeholder with the output of `aws sts get-caller-identity` on your workstation.
+# The pipeline roles are listed explicitly rather than relying on
+# bootstrap_cluster_creator_admin_permissions: the deploy workflows run kubectl
+# but never create the cluster, and the api role only inherits creator access on
+# clusters it built itself.
 cluster_admin_principal_arns = [
   "arn:aws:iam::413703165862:user/rafael",
+  "arn:aws:iam::413703165862:role/github-actions-tf-api",
+  "arn:aws:iam::413703165862:role/github-actions-deploy",
 ]
 
 # Terraform-managed API NLB + target group consumed by API Gateway and
