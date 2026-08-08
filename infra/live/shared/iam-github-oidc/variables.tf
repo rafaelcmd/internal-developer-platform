@@ -22,11 +22,15 @@ variable "github_role_name" {
   default     = "github-actions-oidc-role"
 }
 
+# Jobs that reference a GitHub Environment present `environment:<name>` as
+# their OIDC subject instead of `ref:refs/heads/main`, so the gated
+# apply/destroy jobs in terraform.yml need the second entry.
 variable "github_allowed_subs" {
   description = "List of allowed OIDC subject claims for GitHub Actions (e.g., repo:org/repo:ref:branch)"
   type        = list(string)
   default = [
-    "repo:rafaelcmd/internal-developer-platform:ref:refs/heads/main"
+    "repo:rafaelcmd/internal-developer-platform:ref:refs/heads/main",
+    "repo:rafaelcmd/internal-developer-platform:environment:dev"
   ]
 }
 
