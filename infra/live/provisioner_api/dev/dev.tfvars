@@ -18,15 +18,17 @@ datadog_chart_version                      = "3.227.1"
 # this is left blank; only the auto-created email subscription is skipped.
 notification_email = "rafaelcmd@gmail.com"
 
-# IAM principals granted cluster-admin via EKS Access Entries. Replace the
-# placeholder with the output of `aws sts get-caller-identity` on your workstation.
-# The pipeline roles are listed explicitly rather than relying on
-# bootstrap_cluster_creator_admin_permissions: the deploy workflows run kubectl
-# but never create the cluster, and the api role only inherits creator access on
-# clusters it built itself.
+# IAM principals granted cluster-admin via EKS Access Entries, for principals
+# that need kubectl but never create the cluster — the deploy workflows, and
+# operator users working from a workstation.
+#
+# Never list whoever applies this stack. bootstrap_cluster_creator_admin_permissions
+# already grants the creator an access entry, and creating a second one for the
+# same principal fails the apply with ResourceInUseException. That excludes
+# github-actions-tf-api, which is the creator on every CI-applied cluster; it
+# would equally exclude the operator user on a cluster applied from a laptop.
 cluster_admin_principal_arns = [
   "arn:aws:iam::413703165862:user/rafael",
-  "arn:aws:iam::413703165862:role/github-actions-tf-api",
   "arn:aws:iam::413703165862:role/github-actions-deploy",
 ]
 
