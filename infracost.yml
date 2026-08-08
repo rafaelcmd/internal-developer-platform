@@ -1,0 +1,21 @@
+# Infracost project map: one entry per Terraform stack so cost estimation
+# covers each state root with its real var-files. Parsed statically from HCL
+# by infra-checks-pr.yml — no cloud credentials involved.
+version: 0.1
+projects:
+  - path: infra/live/shared/vpc
+    name: vpc
+  - path: infra/live/shared/ecr
+    name: ecr
+  - path: infra/live/shared/datadog
+    name: datadog
+  - path: infra/live/shared/identity
+    name: identity
+  - path: infra/live/provisioner_api/dev
+    name: api
+    terraform_var_files:
+      - dev.tfvars
+  - path: infra/live/provisioner_api_gateway/dev
+    name: api-gateway
+    terraform_var_files:
+      - dev.tfvars
