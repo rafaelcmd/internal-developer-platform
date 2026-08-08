@@ -2,6 +2,9 @@
 # REST API, its WAF web ACL, and the VPC Link that reaches the NLB the api
 # stack owns. API Gateway has no per-resource tagging model for authorization,
 # so its statements are action-scoped rather than tag-conditioned.
+#
+# The stack also provisions its own observability plumbing: access log and WAF
+# log groups, plus the role API Gateway assumes to write them.
 
 resource "aws_iam_policy" "pipeline_api_gateway" {
   name        = "${var.project}-${var.environment}-pipeline-api-gateway-policy"
@@ -43,6 +46,112 @@ resource "aws_iam_policy" "pipeline_api_gateway" {
           "ec2:CreateTags"
         ]
         Resource = "*"
+      },
+      {
+        Sid    = "CloudWatchLogsRead"
+        Effect = "Allow"
+        Action = [
+          "logs:Describe*",
+          "logs:Get*",
+          "logs:List*"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "CreateTaggedLogGroups"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:TagLogGroup",
+          "logs:TagResource"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/Project" = var.project
+          }
+        }
+      },
+      {
+        Sid    = "ManageProjectLogGroups"
+        Effect = "Allow"
+        Action = [
+          "logs:DeleteLogGroup",
+          "logs:PutRetentionPolicy",
+          "logs:DeleteRetentionPolicy",
+          "logs:UntagLogGroup",
+          "logs:UntagResource"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/Project" = var.project
+          }
+        }
+      },
+      # wafv2:PutLoggingConfiguration provisions a log delivery behind the
+      # scenes and fails without these, even though the caller never names them.
+      {
+        Sid    = "WAFLogDelivery"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogDelivery",
+          "logs:GetLogDelivery",
+          "logs:UpdateLogDelivery",
+          "logs:DeleteLogDelivery",
+          "logs:ListLogDeliveries",
+          "logs:PutResourcePolicy",
+          "logs:DescribeResourcePolicies"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "CreateTaggedCloudWatchRole"
+        Effect = "Allow"
+        Action = [
+          "iam:CreateRole",
+          "iam:TagRole"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/Project" = var.project
+          }
+        }
+      },
+      {
+        Sid    = "ManageProjectCloudWatchRole"
+        Effect = "Allow"
+        Action = [
+          "iam:DeleteRole",
+          "iam:UpdateRole",
+          "iam:UpdateAssumeRolePolicy",
+          "iam:AttachRolePolicy",
+          "iam:DetachRolePolicy",
+          "iam:PutRolePolicy",
+          "iam:DeleteRolePolicy",
+          "iam:TagRole",
+          "iam:UntagRole"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/Project" = var.project
+          }
+        }
+      },
+      # Setting the account-level CloudWatch role hands it to API Gateway,
+      # which is authorized separately from creating it.
+      {
+        Sid      = "PassCloudWatchRoleToApiGateway"
+        Effect   = "Allow"
+        Action   = "iam:PassRole"
+        Resource = "*"
+        Condition = {
+          StringLike = {
+            "iam:PassedToService" = "apigateway.amazonaws.com"
+          }
+        }
       },
       {
         Sid    = "WAFRead"
