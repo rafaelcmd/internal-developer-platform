@@ -8,6 +8,10 @@ name: Infra - Apply on merge to main
 # rejecting the deployment is the escape hatch.
 #
 # Component detection mirrors infra-plan-pr.yml.
+#
+# Repository variable DISABLE_BRANCH_TRIGGERS=true short-circuits the run, so
+# merges to main stop re-creating a stack that was deliberately torn down;
+# orchestrate-create.yml then stays the only way to bring it back.
 
 on:
   push:
@@ -29,6 +33,8 @@ permissions:
 jobs:
   detect-changes:
     name: Detect affected components
+    # Skipping this job skips `apply` too — it `needs` this one.
+    if: vars.DISABLE_BRANCH_TRIGGERS != 'true'
     runs-on: ubuntu-latest
     outputs:
       components: ${{ steps.filter.outputs.changes }}

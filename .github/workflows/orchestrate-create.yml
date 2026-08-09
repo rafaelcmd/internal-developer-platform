@@ -14,6 +14,14 @@ name: Orchestrate - Create Full Infrastructure
 #                                         └▶ provisioner_api_gateway/dev
 # The gateway depends on the Terraform-managed NLB from provisioner_api,
 # not on k8s Service reconciliation.
+#
+# Two repository variables make the create/destroy development cycle
+# unattended:
+#   DISABLE_DEPLOYMENT_APPROVALS=true — every terraform apply/destroy skips
+#     the `dev` environment approval instead of pausing per component.
+#   DISABLE_BRANCH_TRIGGERS=true — the pull_request and push-to-main
+#     workflows skip, leaving this workflow and orchestrate-destroy.yml as
+#     the only things that touch AWS.
 
 on:
   workflow_dispatch:

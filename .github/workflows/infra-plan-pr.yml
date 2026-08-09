@@ -11,6 +11,11 @@ name: Infra - Plan on PR
 #
 # These runs authenticate with the read-only plan role, so a pull request
 # can read AWS to compute the diff but can never mutate it.
+#
+# Repository variable DISABLE_BRANCH_TRIGGERS=true short-circuits the run:
+# `on:` can't read the vars context, so the workflow still starts and every
+# job skips immediately. Plans are meaningless while the stack is destroyed,
+# which is most of the time during development.
 
 on:
   pull_request:
@@ -32,6 +37,8 @@ permissions:
 jobs:
   detect-changes:
     name: Detect affected components
+    # Skipping this job skips `plan` too — it `needs` this one.
+    if: vars.DISABLE_BRANCH_TRIGGERS != 'true'
     runs-on: ubuntu-latest
     outputs:
       components: ${{ steps.filter.outputs.changes }}
