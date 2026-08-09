@@ -8,6 +8,11 @@ name: Orchestrate - Destroy Full Infrastructure
 #
 # k8s resources (api, redis) are destroyed implicitly when the EKS cluster
 # goes away in provisioner_api destroy, so no separate jobs for them here.
+#
+# The DISABLE_DEPLOYMENT_APPROVALS and DISABLE_BRANCH_TRIGGERS repository
+# variables apply here too — see orchestrate-create.yml for what each does.
+# The confirmation guard below is unaffected: it is this workflow's own
+# safeguard, not an environment rule.
 
 on:
   workflow_dispatch:

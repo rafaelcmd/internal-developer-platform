@@ -12,6 +12,9 @@ name: Terraform (reusable)
 # infra/live/shared/iam-github-oidc/plan_role.tf) — the main role's OIDC
 # trust is main-branch-only, and unmerged code should never hold write
 # credentials.
+#
+# Repository variable DISABLE_DEPLOYMENT_APPROVALS=true drops the `dev`
+# environment gate from apply and destroy (see the apply job below).
 
 on:
   workflow_call:
@@ -167,7 +170,14 @@ jobs:
     if: inputs.action == 'apply'
     needs: [params, plan]
     runs-on: ubuntu-latest
-    environment: dev
+    # `dev` carries a required-reviewer rule, so every apply pauses for
+    # manual approval. Setting the DISABLE_DEPLOYMENT_APPROVALS repository
+    # variable to "true" resolves this to an empty name — a job with no
+    # environment — which runs straight through; useful during development,
+    # where the whole stack is created and destroyed several times a day.
+    # The `dev` environment holds no secrets or variables of its own, so
+    # bypassing it costs nothing but the gate.
+    environment: ${{ vars.DISABLE_DEPLOYMENT_APPROVALS == 'true' && '' || 'dev' }}
     concurrency:
       group: terraform-${{ inputs.component }}
       cancel-in-progress: false
@@ -228,13 +238,14 @@ jobs:
           docker push $ECR_URL:datadog-agent
 
   # Destroy plans can't be saved and applied like create plans, so this stays
-  # a single plan-then-destroy job, gated by the same environment as apply.
+  # a single plan-then-destroy job, gated by the same environment as apply
+  # and bypassed by the same repository variable.
   destroy:
     name: Terraform destroy — ${{ inputs.component }}
     if: inputs.action == 'destroy'
     needs: [params]
     runs-on: ubuntu-latest
-    environment: dev
+    environment: ${{ vars.DISABLE_DEPLOYMENT_APPROVALS == 'true' && '' || 'dev' }}
     concurrency:
       group: terraform-${{ inputs.component }}
       cancel-in-progress: false
