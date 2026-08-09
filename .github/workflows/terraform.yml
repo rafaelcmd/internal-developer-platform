@@ -13,8 +13,8 @@ name: Terraform (reusable)
 # trust is main-branch-only, and unmerged code should never hold write
 # credentials.
 #
-# Repository variable DISABLE_DEPLOYMENT_APPROVALS=true drops the `dev`
-# environment gate from apply and destroy (see the apply job below).
+# Repository variable DISABLE_DEPLOYMENT_APPROVALS=true moves apply and
+# destroy to the unprotected `dev-auto` environment (see the apply job).
 
 on:
   workflow_call:
@@ -172,12 +172,17 @@ jobs:
     runs-on: ubuntu-latest
     # `dev` carries a required-reviewer rule, so every apply pauses for
     # manual approval. Setting the DISABLE_DEPLOYMENT_APPROVALS repository
-    # variable to "true" resolves this to an empty name — a job with no
-    # environment — which runs straight through; useful during development,
-    # where the whole stack is created and destroyed several times a day.
-    # The `dev` environment holds no secrets or variables of its own, so
-    # bypassing it costs nothing but the gate.
-    environment: ${{ vars.DISABLE_DEPLOYMENT_APPROVALS == 'true' && '' || 'dev' }}
+    # variable to "true" switches to `dev-auto`, an identical environment
+    # with no protection rules — useful during development, where the whole
+    # stack is created and destroyed several times a day. Neither
+    # environment holds secrets or variables of its own, so the reviewer
+    # rule is the only difference, and the deployment is still recorded.
+    #
+    # Don't "simplify" the false branch to an empty environment name: in
+    # `a && b || c` GitHub returns b only when b is truthy, and the empty
+    # string is falsy, so `... && '' || 'dev'` silently yields 'dev' in both
+    # branches. Both values must be non-empty for this idiom to work.
+    environment: ${{ vars.DISABLE_DEPLOYMENT_APPROVALS == 'true' && 'dev-auto' || 'dev' }}
     concurrency:
       group: terraform-${{ inputs.component }}
       cancel-in-progress: false
@@ -245,7 +250,7 @@ jobs:
     if: inputs.action == 'destroy'
     needs: [params]
     runs-on: ubuntu-latest
-    environment: ${{ vars.DISABLE_DEPLOYMENT_APPROVALS == 'true' && '' || 'dev' }}
+    environment: ${{ vars.DISABLE_DEPLOYMENT_APPROVALS == 'true' && 'dev-auto' || 'dev' }}
     concurrency:
       group: terraform-${{ inputs.component }}
       cancel-in-progress: false

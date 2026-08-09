@@ -17,8 +17,9 @@ name: Orchestrate - Create Full Infrastructure
 #
 # Two repository variables make the create/destroy development cycle
 # unattended:
-#   DISABLE_DEPLOYMENT_APPROVALS=true — every terraform apply/destroy skips
-#     the `dev` environment approval instead of pausing per component.
+#   DISABLE_DEPLOYMENT_APPROVALS=true — every terraform apply/destroy runs
+#     in the unprotected `dev-auto` environment instead of pausing for
+#     approval per component.
 #   DISABLE_BRANCH_TRIGGERS=true — the pull_request and push-to-main
 #     workflows skip, leaving this workflow and orchestrate-destroy.yml as
 #     the only things that touch AWS.
