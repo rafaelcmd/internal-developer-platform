@@ -7,15 +7,20 @@
 # convention plus the AWS_ACCOUNT_ID repo variable, so adding a component
 # needs no new repo configuration.
 #
-# The trust conditions match the two identities a pipeline job can present:
-# the main branch ref for ungated jobs, and environment:dev for the jobs
-# behind the approval gate. Pull-request plans use the separate read-only
-# role in plan_role.tf.
+# The trust conditions match the identities a pipeline job can present: the
+# main branch ref for ungated jobs, and one entry per environment the gated
+# apply/destroy jobs can run in — `dev` normally, `dev-auto` when the
+# DISABLE_DEPLOYMENT_APPROVALS repository variable is set (see
+# .github/workflows/terraform.yml). A job that names an environment presents
+# `environment:<name>` as its subject *instead of* the ref, so an
+# environment missing from this list fails AssumeRoleWithWebIdentity.
+# Pull-request plans use the separate read-only role in plan_role.tf.
 
 locals {
   pipeline_trust_subs = [
     "repo:rafaelcmd/internal-developer-platform:ref:refs/heads/main",
-    "repo:rafaelcmd/internal-developer-platform:environment:dev"
+    "repo:rafaelcmd/internal-developer-platform:environment:dev",
+    "repo:rafaelcmd/internal-developer-platform:environment:dev-auto"
   ]
 
   component_policy_arns = {
