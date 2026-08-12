@@ -1,0 +1,78 @@
+# =============================================================================
+# PURPOSE   Applies the infra components affected by a merge to main. Re-plans
+#           against post-merge state, then applies that plan.
+# TRIGGER   push to main touching infra/live/** or infra/modules/**
+# AUTH      Per-component role github-actions-tf-<component>, via OIDC.
+# EFFECT    MUTATES AWS. The apply job inside _terraform.yml waits at the `dev`
+#           environment gate, so nothing runs until a human approves it with
+#           the fresh post-merge plan in view.
+# TOGGLE    Repository variable DISABLE_BRANCH_TRIGGERS=true skips every job.
+# DOCS      .github/workflows/README.md
+# =============================================================================
+#
+# The approval gate also covers the torn-down case: merging an infra change
+# while the stack is destroyed would otherwise re-create it (and its bill).
+# Rejecting the pending deployment is the escape hatch; setting
+# DISABLE_BRANCH_TRIGGERS is the durable one, which leaves ops-platform-up.yml
+# as the only way to bring the stack back.
+
+name: CD · Infra Apply (main)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infra/live/**"
+      - "infra/modules/**"
+
+# Serialize merge-triggered applies; never cancel one mid-apply.
+concurrency:
+  group: infra-apply-main
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write # required by _terraform.yml, which can post plan comments
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Same component detection as ci-infra-plan.yml, reading the same canonical
+  # map in .github/infra-components.yml.
+  # ---------------------------------------------------------------------------
+  detect-changes:
+    name: Detect affected components
+    # See ci-infra-plan.yml for why the kill switch sits on the job.
+    # Skipping this job skips `apply` too, because `apply` needs it.
+    if: vars.DISABLE_BRANCH_TRIGGERS != 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      components: ${{ steps.filter.outputs.changes }}
+    steps:
+      # On push events paths-filter has no base to diff against unless the repo
+      # is checked out and a base ref is named.
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Match changed paths to components
+        id: filter
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          base: main
+          filters: .github/infra-components.yml
+
+  apply:
+    name: Apply / ${{ matrix.component }}
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.components != '[]'
+    strategy:
+      # Components are applied independently; one failure should not abandon
+      # the others half-way.
+      fail-fast: false
+      matrix:
+        component: ${{ fromJSON(needs.detect-changes.outputs.components) }}
+    uses: ./.github/workflows/_terraform.yml
+    with:
+      component: ${{ matrix.component }}
+      action: apply
+    secrets: inherit

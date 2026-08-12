@@ -1,0 +1,69 @@
+# =============================================================================
+# PURPOSE   Applies the OpenTelemetry Collector manifests (k8s/otel-collector).
+#           The collector receives OTLP from both services and forwards it to
+#           Datadog.
+# TRIGGER   Manual (workflow_dispatch), or called by ops-platform-up.yml.
+# AUTH      Shared `github-actions-deploy` role, via OIDC.
+# EFFECT    MUTATES the cluster, in the `observability` namespace.
+# REQUIRES  The `api` Terraform component, which owns this workload's
+#           prerequisites: the observability namespace, the IRSA
+#           ServiceAccount, the datadog-api-key secret and the namespace's
+#           Fargate profile (infra/modules/aws/eks/otel_collector.tf).
+# DOCS      .github/workflows/README.md
+# =============================================================================
+
+name: CD · Deploy OTel Collector → EKS
+
+on:
+  workflow_dispatch:
+  workflow_call: {}
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_ROLE_ARN: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/github-actions-deploy
+  EKS_CLUSTER_NAME: internal-developer-platform-cluster
+
+concurrency:
+  group: deploy-otel-collector
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy OTel Collector to EKS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Assume AWS role
+        uses: ./.github/actions/aws-oidc-login
+        with:
+          role-arn: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure kubectl
+        uses: ./.github/actions/eks-kubeconfig
+        with:
+          cluster-name: ${{ env.EKS_CLUSTER_NAME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Apply manifests
+        run: |
+          kubectl apply -f k8s/otel-collector/configmap.yaml
+          kubectl apply -f k8s/otel-collector/rbac.yaml
+          kubectl apply -f k8s/otel-collector/deployment.yaml
+          kubectl apply -f k8s/otel-collector/service.yaml
+
+      # The config is mounted from a ConfigMap and the collector does not
+      # hot-reload it, so a config-only change would otherwise apply cleanly
+      # while the pod kept running the old settings. Force the restart so every
+      # run actually deploys the config it just applied.
+      - name: Restart and wait for rollout
+        run: |
+          kubectl rollout restart deployment/otel-collector -n observability
+          kubectl rollout status deployment/otel-collector -n observability --timeout=10m

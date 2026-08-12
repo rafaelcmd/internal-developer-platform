@@ -1,0 +1,146 @@
+# =============================================================================
+# PURPOSE   Policy and cost gates for infrastructure pull requests, alongside
+#           the plan posted by ci-infra-plan.yml:
+#             - Checkov scans the HCL for security misconfigurations
+#             - Infracost comments the monthly cost delta of the change
+# TRIGGER   pull_request touching infra/live/** or infra/modules/**
+# AUTH      None. Both tools parse HCL statically, so there is no OIDC role and
+#           no id-token permission here.
+# EFFECT    None. Writes a PR comment and SARIF findings to the Security tab.
+# REQUIRES  Secret INFRACOST_API_KEY (free key from infracost.io).
+# TOGGLE    Repository variable DISABLE_BRANCH_TRIGGERS=true skips every job.
+# DOCS      .github/workflows/README.md
+# =============================================================================
+#
+# Both gates are advisory today: Checkov soft-fails and the Infracost comment
+# step ignores errors, so neither blocks a merge while their baselines are
+# being triaged. See the notes on each job for how to make them blocking.
+
+name: CI · Infra Policy & Cost (PR)
+
+on:
+  pull_request:
+    paths:
+      - "infra/live/**"
+      - "infra/modules/**"
+
+concurrency:
+  group: infra-policy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write # upload SARIF findings
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Repo-wide formatting gate. _terraform.yml also runs `fmt -check` per
+  # component, but only inside that component's live directory — this is what
+  # covers infra/modules/**, which no single component's run reaches.
+  #
+  # Blocking, unlike the two advisory gates below: formatting is deterministic
+  # and `terraform fmt -recursive infra/` fixes any failure in one command.
+  # ---------------------------------------------------------------------------
+  terraform-fmt:
+    name: Terraform fmt
+    if: vars.DISABLE_BRANCH_TRIGGERS != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_wrapper: false
+
+      # -diff prints exactly what is misaligned, so a failure is actionable
+      # without reproducing it locally.
+      - name: Check formatting
+        run: terraform fmt -check -recursive -diff infra/
+
+  checkov:
+    name: Checkov security scan
+    # See ci-infra-plan.yml for why the kill switch sits on the job.
+    if: vars.DISABLE_BRANCH_TRIGGERS != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # soft_fail: findings are reported but do not fail the check. Flip it to
+      # false (or enforce a subset with --check) once the baseline is clean.
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@99bb2caf247dfd9f03cf984373bc6043d4e32ebf # v12.1347.0
+        with:
+          directory: infra
+          framework: terraform
+          quiet: true
+          soft_fail: true
+          # With sarif output Checkov writes results.sarif to the working
+          # directory, which the next step uploads.
+          output_format: sarif
+
+      - name: Upload findings to Security tab
+        uses: github/codeql-action/upload-sarif@c4dd10e44af883a891fe31ced449bcb4a6728b9b # v3.37.6
+        with:
+          sarif_file: results.sarif
+
+  # ---------------------------------------------------------------------------
+  # Cost diff = (breakdown of base branch) vs (breakdown of PR branch), so the
+  # job checks out both refs in turn.
+  # ---------------------------------------------------------------------------
+  infracost:
+    name: Infracost cost estimate
+    if: vars.DISABLE_BRANCH_TRIGGERS != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Infracost
+        uses: infracost/actions/setup@fb736a8f219195d6efdca58682069b16fe1bc280 # v4.2.0
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+
+      - name: Checkout PR branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The config file may not exist on the base branch yet. Carrying the PR's
+      # copy across both checkouts keeps baseline and diff comparable.
+      - name: Stash Infracost config
+        run: cp infracost.yml /tmp/infracost.yml
+
+      - name: Checkout base branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+
+      - name: Generate cost baseline from base branch
+        run: |
+          cp /tmp/infracost.yml ./infracost.yml
+          infracost breakdown --config-file=infracost.yml \
+            --format=json --out-file=/tmp/infracost-base.json
+
+      - name: Checkout PR branch again
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Generate cost diff
+        run: |
+          infracost diff --config-file=infracost.yml \
+            --compare-to=/tmp/infracost-base.json \
+            --format=json --out-file=/tmp/infracost.json
+
+      # behavior=update keeps a single comment per PR, edited in place.
+      #
+      # continue-on-error for the same reason Checkov soft-fails: Infracost
+      # Cloud's default FinOps tag policy exits non-zero *after* the comment is
+      # posted, and the estimate is advisory while the tagging baseline is
+      # unresolved. Disable that policy in Infracost Cloud to silence it at the
+      # source, or drop this line to make cost policy blocking.
+      - name: Post cost comment on PR
+        continue-on-error: true
+        run: |
+          infracost comment github --path=/tmp/infracost.json \
+            --repo=${{ github.repository }} \
+            --pull-request=${{ github.event.pull_request.number }} \
+            --github-token=${{ github.token }} \
+            --behavior=update

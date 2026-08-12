@@ -83,8 +83,14 @@ services/
 infra/                Terraform modules and live environments
 k8s/                  Kubernetes manifests
 k6/                   Load-testing scripts
-.github/workflows/    CI/CD pipelines
+.github/workflows/    CI/CD pipelines — see .github/workflows/README.md
+.github/actions/      Composite actions shared by the workflows
 ```
+
+Workflow filenames encode when they run: `ci-` on pull requests, `cd-` to ship,
+`ops-` for manual operator actions, `_` for internal reusable pipelines.
+[`.github/workflows/README.md`](.github/workflows/README.md) documents the
+triggers, IAM roles, approval gates and a from-scratch runbook.
 
 ---
 

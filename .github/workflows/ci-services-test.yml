@@ -1,0 +1,126 @@
+# =============================================================================
+# PURPOSE   Build, vet, format-check and test the Go services on every pull
+#           request. This is the merge gate for application code, mirroring
+#           what ci-infra-plan.yml does for infrastructure.
+# TRIGGER   pull_request or push to main touching services/**
+# AUTH      None. Nothing here talks to AWS.
+# EFFECT    None.
+# DOCS      .github/workflows/README.md
+# =============================================================================
+#
+# Both services are independent Go modules, so the matrix runs one job per
+# service and a failure in one still reports the other.
+
+name: CI · Services Build & Test
+
+on:
+  pull_request:
+    paths:
+      - "services/**"
+      - ".github/workflows/ci-services-test.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/**"
+
+# Application CI is read-only, so superseding a run is safe.
+concurrency:
+  group: services-test-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [api, provisioner]
+    defaults:
+      run:
+        working-directory: services/${{ matrix.service }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # go-version-file keeps the toolchain pinned to each module's go.mod, so
+      # bumping Go is a source change rather than a workflow change.
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: services/${{ matrix.service }}/go.mod
+          cache-dependency-path: services/${{ matrix.service }}/go.sum
+
+      # Two separate guarantees: `verify` checks the downloaded modules match
+      # the recorded checksums, and the `tidy` diff fails if a dependency was
+      # added or removed without go.mod/go.sum being regenerated.
+      - name: Verify dependencies
+        run: |
+          go mod download
+          go mod verify
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+
+      - name: Check formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt-formatted:"
+            echo "$unformatted"
+            echo "Run: gofmt -w ."
+            exit 1
+          fi
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      # -race needs cgo, which is enabled by default on GitHub runners; setting
+      # it explicitly keeps the job honest if that default ever changes.
+      - name: Test
+        env:
+          CGO_ENABLED: 1
+        run: go test -race -coverprofile=coverage.out ./...
+
+      - name: Coverage summary
+        run: |
+          echo "### Coverage — ${{ matrix.service }}" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          go tool cover -func=coverage.out | tail -1 >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # Advisory for now, in the same spirit as Checkov's soft_fail: the findings
+  # are visible on the PR but do not block. Remove continue-on-error once the
+  # existing baseline is clean.
+  # ---------------------------------------------------------------------------
+  lint:
+    name: golangci-lint / ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [api, provisioner]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: services/${{ matrix.service }}/go.mod
+          cache-dependency-path: services/${{ matrix.service }}/go.sum
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: latest
+          working-directory: services/${{ matrix.service }}

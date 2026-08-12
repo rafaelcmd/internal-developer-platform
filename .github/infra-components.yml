@@ -1,0 +1,41 @@
+# =============================================================================
+# Canonical map of infra component -> the paths that component owns.
+#
+# Consumed by dorny/paths-filter in ci-infra-plan.yml and cd-infra-apply.yml to
+# work out which components a change affects. The filter names must match the
+# component names accepted by .github/workflows/_terraform.yml.
+#
+# A module listed under several components is intentional: editing a shared
+# module plans every component that consumes it.
+#
+# Adding a component means touching three places: this file, the `case`
+# statement in _terraform.yml, and the dropdown in ops-infra-component.yml.
+# =============================================================================
+
+vpc:
+  - "infra/live/shared/vpc/**"
+  - "infra/modules/aws/vpc/**"
+
+ecr:
+  - "infra/live/shared/ecr/**"
+  - "infra/modules/aws/ecr/**"
+
+datadog:
+  - "infra/live/shared/datadog/**"
+  - "infra/modules/datadog/**"
+  - "infra/modules/aws/datadog_integration/**"
+
+identity:
+  - "infra/live/shared/identity/**"
+  - "infra/modules/aws/cognito/**"
+
+api:
+  - "infra/live/provisioner_api/**"
+  - "infra/modules/aws/eks/**"
+  - "infra/modules/aws/sqs/**"
+  - "infra/modules/aws/nlb/**"
+
+api-gateway:
+  - "infra/live/provisioner_api_gateway/**"
+  - "infra/modules/aws/api_gateway/**"
+  - "infra/modules/aws/waf/**"

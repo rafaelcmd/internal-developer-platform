@@ -18,7 +18,7 @@ Dockerfile.dev, docker-compose.dev.yaml - local run (Kafka-based dev stack)
 ```
 
 Runs on the EKS cluster alongside the API: `k8s/provisioner/deployment.yaml`
-(default namespace, Fargate), deployed by the `provisioner-deploy.yml` workflow
+(default namespace, Fargate), deployed by the `cd-provisioner.yml` workflow
 (build + push to the shared ECR repo as immutable `provisioner-<sha>` — also
 tagged `provisioner-latest` for convenience — then apply; the sha tag makes the
 apply itself roll the Deployment). AWS access (SQS consume, SSM read) comes

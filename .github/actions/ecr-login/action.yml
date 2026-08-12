@@ -1,0 +1,42 @@
+name: ECR Login
+description: >
+  Reads the shared ECR repository URL from SSM Parameter Store and logs Docker
+  in to that registry. The URL is published by the `ecr` Terraform component,
+  so no workflow needs to hardcode an account id or registry hostname.
+
+inputs:
+  aws-region:
+    description: Region of the ECR registry.
+    required: true
+  ssm-parameter:
+    description: SSM parameter holding the ECR repository URL.
+    required: false
+    default: /internal-developer-platform/shared/ecr/internal-developer-platform-repo/repository_url
+
+outputs:
+  repository-url:
+    description: Full repository URL, e.g. 123456789012.dkr.ecr.us-east-1.amazonaws.com/my-repo
+    value: ${{ steps.lookup.outputs.repository-url }}
+  registry:
+    description: Registry hostname only, i.e. the repository URL without the path.
+    value: ${{ steps.lookup.outputs.registry }}
+
+runs:
+  using: composite
+  steps:
+    - name: Read repository URL from SSM
+      id: lookup
+      shell: bash
+      run: |
+        url=$(aws ssm get-parameter \
+          --name "${{ inputs.ssm-parameter }}" \
+          --query 'Parameter.Value' \
+          --output text)
+        echo "repository-url=$url" >> "$GITHUB_OUTPUT"
+        echo "registry=${url%%/*}" >> "$GITHUB_OUTPUT"
+
+    - name: Docker login to ECR
+      shell: bash
+      run: |
+        aws ecr get-login-password --region "${{ inputs.aws-region }}" \
+          | docker login --username AWS --password-stdin "${{ steps.lookup.outputs.registry }}"

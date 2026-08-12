@@ -1,0 +1,123 @@
+# =============================================================================
+# PURPOSE   Builds the API image, pushes it to ECR and rolls it out on EKS.
+# TRIGGER   Manual (workflow_dispatch), or called by ops-platform-up.yml.
+# AUTH      Shared `github-actions-deploy` role, via OIDC. Deploy workflows run
+#           kubectl and push images; they use this role rather than any
+#           Terraform component role.
+# EFFECT    MUTATES the cluster. Replaces the running API pods.
+# REQUIRES  The `api` Terraform component (EKS, SQS, NLB target group), the
+#           `identity` component (the pod reads the Cognito client id from SSM
+#           at startup and exits if it is missing), and secret DD_API_KEY.
+# DOCS      .github/workflows/README.md
+# =============================================================================
+
+name: CD · Deploy API → EKS
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    secrets:
+      DD_API_KEY:
+        required: true
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_ROLE_ARN: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/github-actions-deploy
+  EKS_CLUSTER_NAME: internal-developer-platform-cluster
+  TG_ARN_SSM_PARAM: /internal-developer-platform/provisioner-api/nlb/target_group_arn
+
+# One deploy of this workload at a time, and never cancel one mid-rollout.
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy API to EKS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Assume AWS role
+        uses: ./.github/actions/aws-oidc-login
+        with:
+          role-arn: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to ECR
+        id: ecr
+        uses: ./.github/actions/ecr-login
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+
+      # The NLB target group is created by Terraform; the TargetGroupBinding
+      # manifest needs its ARN at deploy time.
+      - name: Read NLB target group ARN from SSM
+        run: |
+          arn=$(aws ssm get-parameter \
+            --name "${{ env.TG_ARN_SSM_PARAM }}" \
+            --query 'Parameter.Value' \
+            --output text)
+          echo "TARGET_GROUP_ARN=$arn" >> "$GITHUB_ENV"
+
+      - name: Build and push image
+        working-directory: services/api
+        env:
+          ECR_URL: ${{ steps.ecr.outputs.repository-url }}
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            -f Dockerfile.dev \
+            -t "$ECR_URL:api-latest" \
+            -t "$ECR_URL:api-${{ github.sha }}" \
+            .
+          docker push "$ECR_URL:api-latest"
+          docker push "$ECR_URL:api-${{ github.sha }}"
+
+      # Deploy the immutable sha tag, not `api-latest`. A stable tag applies as
+      # a no-op, leaving the old build running; the sha tag is a real spec
+      # change, so kubectl apply triggers the rollout and `kubectl rollout
+      # undo` becomes a genuine rollback.
+      - name: Pin image in deployment manifest
+        env:
+          ECR_URL: ${{ steps.ecr.outputs.repository-url }}
+        run: sed -i "s|PLACEHOLDER-API-IMAGE|${ECR_URL}:api-${{ github.sha }}|g" k8s/api/deployment.yaml
+
+      - name: Pin target group ARN in TargetGroupBinding
+        run: sed -i "s|PLACEHOLDER-TARGET-GROUP-ARN|${TARGET_GROUP_ARN}|g" k8s/api/targetgroupbinding.yaml
+
+      - name: Configure kubectl
+        uses: ./.github/actions/eks-kubeconfig
+        with:
+          cluster-name: ${{ env.EKS_CLUSTER_NAME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Upsert rather than create: re-running the deploy must not fail on an
+      # existing secret.
+      - name: Upsert datadog-api-key secret
+        env:
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+        run: |
+          kubectl create secret generic datadog-api-key \
+            --from-literal=api-key="$DD_API_KEY" \
+            --namespace=default \
+            --dry-run=client -o yaml \
+            | kubectl apply -f -
+
+      - name: Apply manifests
+        run: |
+          kubectl apply -f k8s/api/deployment.yaml
+          kubectl apply -f k8s/api/service.yaml
+          kubectl apply -f k8s/api/targetgroupbinding.yaml
+
+      # Failing here — rather than succeeding while the old pod still serves
+      # traffic — is the point. Fargate scheduling plus image pull takes a few
+      # minutes, hence the generous timeout.
+      - name: Wait for rollout
+        run: kubectl rollout status deployment/internal-developer-platform-api -n default --timeout=10m

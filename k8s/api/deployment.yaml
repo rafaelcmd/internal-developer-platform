@@ -40,7 +40,7 @@ spec:
       # (label above) only reports pod/container status for the K8s Explorer.
       containers:
         - name: internal-developer-platform-api
-          # Replaced by api-deploy.yml with the immutable api-<sha> build, so
+          # Replaced by cd-api.yml with the immutable api-<sha> build, so
           # every apply pins an exact commit and triggers its own rollout.
           image: PLACEHOLDER-API-IMAGE
           imagePullPolicy: IfNotPresent
