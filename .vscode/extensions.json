@@ -1,0 +1,19 @@
+{
+  "recommendations": [
+    // Applies the correct JSON schema to each YAML file (see settings.json).
+    // Also what makes .github/actions/*/action.yml validate as action
+    // metadata rather than as a malformed workflow.
+    "redhat.vscode-yaml",
+
+    // Workflow authoring: expression completion, run history, log viewing.
+    // Caveat: it reports bogus "Required property is missing: on / jobs"
+    // errors on .github/actions/*/action.yml — see settings.json.
+    "github.vscode-github-actions",
+
+    // Terraform: formatting on save, module navigation, provider docs.
+    "hashicorp.terraform",
+
+    // Go toolchain integration for services/api and services/provisioner.
+    "golang.go"
+  ]
+}

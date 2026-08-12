@@ -1,0 +1,51 @@
+{
+  // Maps each kind of YAML in .github/ to its correct JSON schema, giving
+  // completion and validation via redhat.vscode-yaml (see extensions.json).
+  //
+  // KNOWN FALSE POSITIVE — not fixed by anything in this file:
+  // github.vscode-github-actions (0.32.3, latest as of 2026-08) validates
+  // .github/actions/*/action.yml with the *workflow* schema and reports
+  // "Required property is missing: on" and "...: jobs". Composite actions are
+  // a different format entirely (name / description / inputs / outputs /
+  // runs), so those errors are bogus — the files are valid, and `actionlint`
+  // parses them correctly and cross-checks their inputs against every caller.
+  //
+  // The message comes from that extension's own language server, so the
+  // schema mappings below cannot suppress it. To silence it, disable the
+  // GitHub Actions extension for this workspace (Extensions view → GitHub
+  // Actions → gear → "Disable (Workspace)"); redhat.vscode-yaml then handles
+  // both workflows and actions with the correct schemas. The trade-off is
+  // losing workflow expression completion and the run-history view.
+  "yaml.schemas": {
+    "https://json.schemastore.org/github-action.json": [
+      ".github/actions/*/action.yml"
+    ],
+    "https://json.schemastore.org/github-workflow.json": [
+      ".github/workflows/*.yml"
+    ]
+  },
+
+  // .github/infra-components.yml is a dorny/paths-filter config, not a
+  // workflow. It is deliberately absent from yaml.schemas above so that no
+  // schema is applied to it.
+  "files.associations": {
+    ".github/infra-components.yml": "yaml"
+  },
+
+  "[yaml]": {
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2,
+    "editor.autoIndent": "keep"
+  },
+
+  // gofmt compliance is enforced by ci-services-test.yml; formatting on save
+  // keeps that gate from ever being the thing that fails a PR.
+  "[go]": {
+    "editor.formatOnSave": true
+  },
+
+  "[terraform]": {
+    "editor.formatOnSave": true,
+    "editor.tabSize": 2
+  }
+}

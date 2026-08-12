@@ -31,7 +31,13 @@ go.work.sum
 
 # IDE files
 .idea/
-.vscode/
+# Personal editor state stays local, but the two shared config files are
+# committed: they give everyone the same YAML schema validation and extension
+# recommendations. Note the `/*` — git will not descend into an excluded
+# directory, so `.vscode/` here would make the negations below unreachable.
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 
 # Terraform files
 .terraform/
