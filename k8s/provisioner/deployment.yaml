@@ -38,7 +38,7 @@ spec:
       # IRSA role on the ServiceAccount.
       containers:
         - name: internal-developer-platform-provisioner
-          # Replaced by provisioner-deploy.yml with the immutable
+          # Replaced by cd-provisioner.yml with the immutable
           # provisioner-<sha> build — see the api manifest for the pattern.
           image: PLACEHOLDER-PROVISIONER-IMAGE
           imagePullPolicy: IfNotPresent

@@ -1,0 +1,23 @@
+name: EKS Kubeconfig
+description: >
+  Points kubectl at the platform's EKS cluster using the AWS credentials
+  already configured in the job. Run aws-oidc-login before this action.
+
+inputs:
+  cluster-name:
+    description: Name of the EKS cluster.
+    required: false
+    default: internal-developer-platform-cluster
+  aws-region:
+    description: Region the cluster runs in.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Update kubeconfig
+      shell: bash
+      run: |
+        aws eks update-kubeconfig \
+          --name "${{ inputs.cluster-name }}" \
+          --region "${{ inputs.aws-region }}"

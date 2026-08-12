@@ -1,0 +1,70 @@
+# =============================================================================
+# PURPOSE   Runs `terraform plan` for every component a pull request touches
+#           and posts each plan as a PR comment, so infra changes are reviewed
+#           against the real diff rather than the HCL alone.
+# TRIGGER   pull_request touching infra/live/** or infra/modules/**
+# AUTH      Read-only plan role (vars.AWS_PLAN_ROLE_ARN). A pull request can
+#           read AWS to compute a diff but can never mutate it.
+# EFFECT    None. Read-only.
+# TOGGLE    Repository variable DISABLE_BRANCH_TRIGGERS=true skips every job.
+# DOCS      .github/workflows/README.md
+# =============================================================================
+
+name: CI · Infra Plan (PR)
+
+on:
+  pull_request:
+    paths:
+      - "infra/live/**"
+      - "infra/modules/**"
+
+# One group per PR. A new push cancels the previous run: a superseded commit's
+# plan is worthless, and plans are read-only so cancelling is safe.
+concurrency:
+  group: infra-plan-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Matches the PR's changed files against .github/infra-components.yml and
+  # emits the matching component names as a JSON array for the matrix below,
+  # so only affected components are planned.
+  # ---------------------------------------------------------------------------
+  detect-changes:
+    name: Detect affected components
+    # The `on:` block cannot read the `vars` context, so the kill switch has to
+    # live on the jobs: the workflow still starts, then every job skips.
+    # Skipping this job skips `plan` too, because `plan` needs it.
+    if: vars.DISABLE_BRANCH_TRIGGERS != 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      components: ${{ steps.filter.outputs.changes }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Match changed paths to components
+        id: filter
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          filters: .github/infra-components.yml
+
+  plan:
+    name: Plan / ${{ matrix.component }}
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.components != '[]'
+    strategy:
+      # One broken component should not hide the plans for the others.
+      fail-fast: false
+      matrix:
+        component: ${{ fromJSON(needs.detect-changes.outputs.components) }}
+    uses: ./.github/workflows/_terraform.yml
+    with:
+      component: ${{ matrix.component }}
+      action: plan
+    secrets: inherit

@@ -146,9 +146,9 @@ resource "aws_iam_policy" "provisioner_api_app_policy" {
       },
       # API Gateway Statements (REST API)
       {
-        Sid    = "APIGatewayRead"
-        Effect = "Allow"
-        Action = "apigateway:GET"
+        Sid      = "APIGatewayRead"
+        Effect   = "Allow"
+        Action   = "apigateway:GET"
         Resource = "*"
       },
       {

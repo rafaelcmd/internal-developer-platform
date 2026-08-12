@@ -167,7 +167,7 @@ Module IAM policies use concrete ARNs (`aws_ecr_repository.this.arn`, `aws_sqs_q
 | `/idp/shared/identity/user_pool_arn` | String | `shared/identity` | `provisioner_api_gateway/dev` |
 | `/idp/shared/identity/user_pool_client_id` | String | `shared/identity` | (future workloads) |
 | `/idp/<project>/<env>/datadog/api_key` | SecureString | `shared/datadog` | `provisioner_api/dev` |
-| `/idp/<project>/<env>/ecr/<repo>/repository_url` | String | `shared/ecr` | `api-deploy.yml` (CI) |
+| `/idp/<project>/<env>/ecr/<repo>/repository_url` | String | `shared/ecr` | `cd-api.yml` (CI) |
 | `/INTERNAL_DEVELOPER_PLATFORM/PROVISIONER_QUEUE_URL` | String | `provisioner_api/dev` (SQS module) | Go API runtime |
 | `/INTERNAL_DEVELOPER_PLATFORM/COGNITO_CLIENT_ID` | String | `shared/identity` (Cognito module) | Go API runtime |
 | `/INTERNAL_DEVELOPER_PLATFORM/REDIS_ADDR` | String | `provisioner_api/dev` | Go API runtime |
@@ -181,32 +181,36 @@ The two namespaces reflect a deliberate split:
 
 ## CI / CD
 
-Two layers:
+Full pipeline map — triggers, IAM roles, approval gates, runbook — is in
+[`.github/workflows/README.md`](../.github/workflows/README.md). The infra-relevant
+part, in two layers:
 
-**Reusable Terraform workflow** (`.github/workflows/terraform.yml`) — one parameterized pipeline for every stack, taking `component` (vpc, ecr, datadog, identity, api, api-gateway) and `action` (apply, destroy) as inputs. It maps the component to its working directory and var-file, then runs:
+**Reusable Terraform workflow** (`.github/workflows/_terraform.yml`) — one parameterized pipeline for every stack, taking `component` (vpc, ecr, datadog, identity, api, api-gateway) and `action` (apply, destroy) as inputs. It maps the component to its working directory and var-file, then runs:
 
 1. `actions/checkout`
 2. `hashicorp/setup-terraform` with `cli_config_credentials_token` (TFC token)
-3. `terraform init` / `fmt -check` / `validate` / `plan` / `apply` (or `plan -destroy` / `destroy`)
+3. `terraform init` / `fmt -check -recursive` / `validate` / `plan` / `apply` (or `plan -destroy` / `destroy`)
 
-Component-specific post-apply steps (CoreDNS restart for `api`, Datadog agent image mirror for `ecr`) live behind `if:` conditions in the same file. Manual single-stack runs go through `infra.yml`, a thin `workflow_dispatch` wrapper with component/action dropdowns.
+That `fmt -check` is scoped to the component's own directory. Formatting across all of `infra/` — including the shared modules, which no single component's run reaches — is enforced by the `terraform-fmt` job in `ci-infra-policy.yml`.
 
-**Orchestrators** (`orchestrate-create.yml`, `orchestrate-destroy.yml`) — chain the stacks in dependency order using `needs:`, each job calling the reusable workflow:
+Component-specific post-apply steps (CoreDNS restart for `api`, Datadog agent image mirror for `ecr`) live behind `if:` conditions in the same file. Manual single-stack runs go through `ops-infra-component.yml`, a thin `workflow_dispatch` wrapper with component/action dropdowns.
+
+**Orchestrators** (`ops-platform-up.yml`, `ops-platform-down.yml`) — chain the stacks in dependency order using `needs:`, each job calling the reusable workflow:
 
 ```yaml
 jobs:
   shared-vpc:
-    uses: ./.github/workflows/terraform.yml
+    uses: ./.github/workflows/_terraform.yml
     with: { component: vpc, action: apply }
     secrets: inherit
   shared-identity:
     needs: [shared-vpc]
-    uses: ./.github/workflows/terraform.yml
+    uses: ./.github/workflows/_terraform.yml
     with: { component: identity, action: apply }
     secrets: inherit
   provisioner-api:
     needs: [shared-vpc, shared-ecr, shared-datadog]
-    uses: ./.github/workflows/terraform.yml
+    uses: ./.github/workflows/_terraform.yml
     with: { component: api, action: apply }
     secrets: inherit
   ...

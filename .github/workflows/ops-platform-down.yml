@@ -1,0 +1,103 @@
+# =============================================================================
+# PURPOSE   Tears the entire platform down in one run, in strict reverse of the
+#           creation order. This is the cost control for a development
+#           environment that is rebuilt on demand.
+# TRIGGER   Manual (workflow_dispatch), guarded by a typed confirmation.
+# AUTH      Per-component Terraform roles, via OIDC.
+# EFFECT    DESTRUCTIVE. Deletes all platform infrastructure in the account.
+#           Each job also pauses at the `dev` environment gate unless approvals
+#           are disabled.
+# TOGGLES   Same DISABLE_DEPLOYMENT_APPROVALS and DISABLE_BRANCH_TRIGGERS
+#           variables as ops-platform-up.yml. Neither affects the confirmation
+#           guard below, which is this workflow's own safeguard rather than an
+#           environment rule.
+# DOCS      .github/workflows/README.md
+# =============================================================================
+#
+# Teardown order, enforced by `needs:` so a component is never destroyed while
+# something still depends on it:
+#
+#   api-gateway ─▶ api (EKS) ─┬─▶ identity ─┐
+#                             └─▶ datadog ──┴─▶ ecr ─▶ vpc
+#
+# Kubernetes workloads (API, provisioner, Redis, collector) need no jobs of
+# their own: they disappear with the EKS cluster when the `api` component is
+# destroyed.
+
+name: Ops · Platform Down (destroy everything)
+
+# Shared group with ops-platform-up.yml: creating and destroying the platform
+# must never overlap.
+concurrency:
+  group: orchestrate
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "destroy" to confirm. Anything else aborts.'
+        required: true
+        type: string
+
+# pull-requests: write is required because the called _terraform.yml requests
+# it. A caller granting less than the callee asks for fails the run at startup.
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  # Cheap, credential-free gate so a mis-click cannot start a teardown.
+  guard:
+    name: Confirmation guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate confirmation phrase
+        run: |
+          if [ "${{ inputs.confirm }}" != "destroy" ]; then
+            echo "Confirmation phrase did not match 'destroy'. Aborting."
+            exit 1
+          fi
+
+  provisioner-api-gateway:
+    name: Provisioner API Gateway (destroy)
+    needs: [guard]
+    uses: ./.github/workflows/_terraform.yml
+    with: { component: api-gateway, action: destroy }
+    secrets: inherit
+
+  provisioner-api:
+    name: Provisioner API / EKS (destroy)
+    needs: [provisioner-api-gateway]
+    uses: ./.github/workflows/_terraform.yml
+    with: { component: api, action: destroy }
+    secrets: inherit
+
+  shared-identity:
+    name: Shared / Identity (destroy)
+    needs: [provisioner-api]
+    uses: ./.github/workflows/_terraform.yml
+    with: { component: identity, action: destroy }
+    secrets: inherit
+
+  shared-datadog:
+    name: Shared / Datadog (destroy)
+    needs: [provisioner-api]
+    uses: ./.github/workflows/_terraform.yml
+    with: { component: datadog, action: destroy }
+    secrets: inherit
+
+  shared-ecr:
+    name: Shared / ECR (destroy)
+    needs: [shared-datadog, provisioner-api]
+    uses: ./.github/workflows/_terraform.yml
+    with: { component: ecr, action: destroy }
+    secrets: inherit
+
+  shared-vpc:
+    name: Shared / VPC (destroy)
+    needs: [shared-ecr, shared-identity]
+    uses: ./.github/workflows/_terraform.yml
+    with: { component: vpc, action: destroy }
+    secrets: inherit

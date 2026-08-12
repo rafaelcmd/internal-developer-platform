@@ -1,0 +1,130 @@
+# =============================================================================
+# PURPOSE   Builds the entire platform from nothing in one run: all Terraform
+#           components, then all Kubernetes workloads, in dependency order.
+# TRIGGER   Manual (workflow_dispatch) only.
+# AUTH      Per-component Terraform roles and the shared deploy role, via OIDC.
+# EFFECT    MUTATES AWS. Creates real, billable infrastructure. Each Terraform
+#           job pauses at the `dev` environment gate unless approvals are
+#           disabled (see TOGGLES below).
+# TOGGLES   DISABLE_DEPLOYMENT_APPROVALS=true — Terraform jobs run in the
+#             unprotected `dev-auto` environment instead of pausing per
+#             component. Makes the run unattended.
+#           DISABLE_BRANCH_TRIGGERS=true — the PR and push-to-main workflows
+#             skip, leaving this workflow and ops-platform-down.yml as the only
+#             things that touch AWS.
+# DOCS      .github/workflows/README.md
+# =============================================================================
+#
+# Dependency order is expressed entirely through `needs:`. It mirrors the stack
+# graph, where components exchange values through SSM Parameter Store rather
+# than Terraform remote state:
+#
+#   vpc ──┐
+#   ecr ──┼─▶ datadog
+#         │
+#         ├─▶ identity
+#         │
+#         └─▶ api (EKS/SQS) ─┬─▶ redis ────────────────▶ api-deploy
+#                            ├─▶ otel-collector ──┬────▶ api-deploy
+#                            │                    └────▶ provisioner-deploy
+#                            └─▶ api-gateway
+#
+# The gateway depends on the Terraform-managed NLB from the `api` component,
+# not on Kubernetes Service reconciliation.
+
+name: Ops · Platform Up (create everything)
+
+# Shared group with ops-platform-down.yml: creating and destroying the platform
+# must never overlap.
+concurrency:
+  group: orchestrate
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+
+# pull-requests: write is required because the called _terraform.yml requests
+# it. A caller granting less than the callee asks for fails the run at startup.
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  # --- Shared foundations ----------------------------------------------------
+
+  shared-vpc:
+    name: Shared / VPC
+    uses: ./.github/workflows/_terraform.yml
+    with: { component: vpc, action: apply }
+    secrets: inherit
+
+  shared-ecr:
+    name: Shared / ECR
+    uses: ./.github/workflows/_terraform.yml
+    with: { component: ecr, action: apply }
+    secrets: inherit
+
+  shared-datadog:
+    name: Shared / Datadog
+    needs: [shared-vpc, shared-ecr]
+    uses: ./.github/workflows/_terraform.yml
+    with: { component: datadog, action: apply }
+    secrets: inherit
+
+  shared-identity:
+    name: Shared / Identity (Cognito)
+    needs: [shared-vpc]
+    uses: ./.github/workflows/_terraform.yml
+    with: { component: identity, action: apply }
+    secrets: inherit
+
+  # --- Application infrastructure --------------------------------------------
+
+  provisioner-api:
+    name: Provisioner API / EKS + SQS + Redis SSM
+    needs: [shared-vpc, shared-ecr, shared-datadog]
+    uses: ./.github/workflows/_terraform.yml
+    with: { component: api, action: apply }
+    secrets: inherit
+
+  provisioner-api-gateway:
+    name: Provisioner API Gateway / API Gateway + WAF
+    needs: [provisioner-api, shared-identity]
+    uses: ./.github/workflows/_terraform.yml
+    with: { component: api-gateway, action: apply }
+    secrets: inherit
+
+  # --- Kubernetes workloads --------------------------------------------------
+
+  redis:
+    name: K8s / Redis
+    needs: [provisioner-api]
+    uses: ./.github/workflows/cd-redis.yml
+    secrets: inherit
+
+  otel-collector:
+    name: K8s / OTel Collector
+    # provisioner-api owns this workload's Terraform prerequisites: the
+    # observability namespace, IRSA ServiceAccount, datadog-api-key secret and
+    # the namespace's Fargate profile.
+    needs: [provisioner-api]
+    uses: ./.github/workflows/cd-otel-collector.yml
+    secrets: inherit
+
+  api:
+    name: K8s / API
+    # shared-identity is a runtime requirement: the pod reads the Cognito
+    # client id from SSM at startup and exits if it is missing.
+    # otel-collector is ordered first so the API does not export OTLP into the
+    # void on a fresh environment — the exporter drops silently.
+    needs: [provisioner-api, redis, otel-collector, shared-ecr, shared-identity]
+    uses: ./.github/workflows/cd-api.yml
+    secrets: inherit
+
+  provisioner:
+    name: K8s / Provisioner
+    # Same collector-before-consumer ordering as the API above.
+    needs: [provisioner-api, otel-collector, shared-ecr]
+    uses: ./.github/workflows/cd-provisioner.yml
+    secrets: inherit

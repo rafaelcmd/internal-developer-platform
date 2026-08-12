@@ -1,6 +1,6 @@
 # Infracost project map: one entry per Terraform stack so cost estimation
 # covers each state root with its real var-files. Parsed statically from HCL
-# by infra-checks-pr.yml — no cloud credentials involved.
+# by ci-infra-policy.yml — no cloud credentials involved.
 version: 0.1
 projects:
   - path: infra/live/shared/vpc

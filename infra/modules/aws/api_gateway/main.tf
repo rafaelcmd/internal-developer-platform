@@ -25,11 +25,11 @@ resource "aws_api_gateway_rest_api" "this" {
   description = "${var.api_description} (${var.api_version})"
 
   body = templatefile(local.openapi_spec_path, {
-    nlb_uri                = "http://${var.nlb_dns_name}"
-    vpc_link_id            = aws_api_gateway_vpc_link.this.id
-    cognito_user_pool_arn  = var.cognito_user_pool_arn
-    api_version            = var.api_version
-    aws_region             = var.aws_region
+    nlb_uri               = "http://${var.nlb_dns_name}"
+    vpc_link_id           = aws_api_gateway_vpc_link.this.id
+    cognito_user_pool_arn = var.cognito_user_pool_arn
+    api_version           = var.api_version
+    aws_region            = var.aws_region
   })
 
   endpoint_configuration {

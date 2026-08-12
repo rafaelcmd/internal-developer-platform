@@ -11,7 +11,7 @@
 # main branch ref for ungated jobs, and one entry per environment the gated
 # apply/destroy jobs can run in — `dev` normally, `dev-auto` when the
 # DISABLE_DEPLOYMENT_APPROVALS repository variable is set (see
-# .github/workflows/terraform.yml). A job that names an environment presents
+# .github/workflows/_terraform.yml). A job that names an environment presents
 # `environment:<name>` as its subject *instead of* the ref, so an
 # environment missing from this list fails AssumeRoleWithWebIdentity.
 # Pull-request plans use the separate read-only role in plan_role.tf.

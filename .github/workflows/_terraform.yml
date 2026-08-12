@@ -1,20 +1,24 @@
-name: Terraform (reusable)
+# =============================================================================
+# PURPOSE   The one Terraform pipeline every infra component runs through.
+#           Callers pass a component name and an action; all component-specific
+#           knowledge (working directory, var-files, post-apply fixups) lives
+#           here so the calling workflows stay declarative.
+# TRIGGER   workflow_call only. Never runs on its own — see the `ci-*`, `cd-*`
+#           and `ops-*` workflows for the entry points.
+# AUTH      Per-component IAM role `github-actions-tf-<component>`, assumed via
+#           OIDC. Pull request runs instead assume a read-only plan role.
+# EFFECT    plan = read-only. apply / destroy = mutates AWS, gated by a
+#           deployment environment.
+# REQUIRES  Secret TF_API_TOKEN. Secrets DATADOG_API_KEY and
+#           DATADOG_APP_KEY_PROV_API for the `datadog` component.
+# DOCS      .github/workflows/README.md
+# =============================================================================
+#
+# Why plan and apply are separate jobs: plan writes a binary `tfplan`, uploads
+# it as an artifact, and apply executes that exact artifact. What a reviewer
+# approved is what runs — apply never re-plans against drifted state.
 
-# One parameterized pipeline for every infra/live component. Callers pass a
-# component and an action (plan | apply | destroy); component knowledge —
-# working directory, var-file, post-apply steps — lives here.
-#
-# Plan and apply are separate jobs: plan saves tfplan and uploads it as an
-# artifact (posting the readable output as a PR comment on pull_request
-# events), and apply executes that exact artifact behind the `dev`
-# environment gate, so the reviewed plan is what runs. Pull-request plans
-# assume a read-only role (vars.AWS_PLAN_ROLE_ARN, defined in
-# infra/live/shared/iam-github-oidc/plan_role.tf) — the main role's OIDC
-# trust is main-branch-only, and unmerged code should never hold write
-# credentials.
-#
-# Repository variable DISABLE_DEPLOYMENT_APPROVALS=true moves apply and
-# destroy to the unprotected `dev-auto` environment (see the apply job).
+name: 🔁 Reusable · Terraform Pipeline
 
 on:
   workflow_call:
@@ -24,7 +28,7 @@ on:
         type: string
         required: true
       action:
-        description: "Terraform action: plan | apply | destroy"
+        description: "Action: plan | apply | destroy"
         type: string
         required: true
     secrets:
@@ -37,22 +41,25 @@ on:
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION }}
-  # Each component assumes a role scoped to the services it provisions,
-  # addressed by naming convention (see infra/live/shared/iam-github-oidc/
-  # roles.tf) so a new component needs no new repo variable.
+  # Roles are addressed by naming convention (infra/live/shared/iam-github-oidc/
+  # roles.tf), so adding a component needs no new repository variable.
   AWS_ROLE_ARN: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/github-actions-tf-${{ inputs.component }}
-  # TF_VAR_* env vars are silently ignored by configurations that don't
-  # declare the variable, so these are safe for every component and keep
-  # the Datadog secrets out of CLI arguments.
+  # Terraform ignores TF_VAR_* for variables a configuration doesn't declare,
+  # so setting these globally is safe and keeps the keys out of CLI arguments
+  # (where they would appear in logs).
   TF_VAR_datadog_api_key: ${{ secrets.DATADOG_API_KEY }}
   TF_VAR_datadog_app_key: ${{ secrets.DATADOG_APP_KEY_PROV_API }}
 
 permissions:
-  id-token: write
+  id-token: write # assume the AWS role via OIDC
   contents: read
-  pull-requests: write
+  pull-requests: write # post the plan as a PR comment
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Translates the component name into a directory and var-file flags, and
+  # rejects unknown inputs before any credentials are handed out.
+  # ---------------------------------------------------------------------------
   params:
     name: Resolve component
     runs-on: ubuntu-latest
@@ -79,13 +86,16 @@ jobs:
           echo "dir=$dir" >> "$GITHUB_OUTPUT"
           echo "var_flags=${var_flags:-}" >> "$GITHUB_OUTPUT"
 
-  # The per-component concurrency group on the plan/apply/destroy jobs keeps
-  # two runs from executing Terraform against the same state at once — the
-  # queued job waits instead of dying on a state-lock timeout. Runs for
-  # different components still parallelize. cancel-in-progress stays false:
-  # interrupting a mid-apply Terraform is how half-created infrastructure
-  # happens. A queued run whose plan went stale is caught by Terraform's
-  # saved-plan staleness check at apply time.
+  # ---------------------------------------------------------------------------
+  # Runs for `plan` and as the first half of `apply`.
+  #
+  # Concurrency (shared by all three jobs below): one Terraform run per
+  # component at a time. A second run queues instead of failing on a state-lock
+  # timeout, and different components still run in parallel.
+  # cancel-in-progress stays false — interrupting a running apply is how
+  # half-created infrastructure happens. A queued run whose plan went stale is
+  # caught by Terraform's own staleness check at apply time.
+  # ---------------------------------------------------------------------------
   plan:
     name: Terraform plan — ${{ inputs.component }}
     if: inputs.action == 'plan' || inputs.action == 'apply'
@@ -100,40 +110,44 @@ jobs:
         shell: bash
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Configure AWS Credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+      # Pull requests get a read-only role: unmerged code must never hold
+      # write credentials, and the per-component roles only trust main.
+      - name: Assume AWS role
+        uses: ./.github/actions/aws-oidc-login
         with:
-          role-to-assume: ${{ github.event_name == 'pull_request' && vars.AWS_PLAN_ROLE_ARN || env.AWS_ROLE_ARN }}
-          role-session-name: github-actions-${{ github.run_id }}
+          role-arn: ${{ github.event_name == 'pull_request' && vars.AWS_PLAN_ROLE_ARN || env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # The wrapper intercepts stdout, which would break capturing the plan
-      # output to a file below.
+      # terraform_wrapper intercepts stdout, which would break capturing the
+      # plan output to a file below.
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
           terraform_wrapper: false
 
-      - name: Terraform Init
+      - name: Terraform init
         run: terraform init
 
-      - name: Terraform Format
-        run: terraform fmt -check
+      # Scoped to this component's own directory tree. Shared modules live
+      # outside it, so repo-wide formatting is enforced by the terraform-fmt
+      # job in ci-infra-policy.yml.
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
 
-      - name: Terraform Validate
+      - name: Terraform validate
         run: terraform validate
 
-      # tee preserves terraform's exit code (bash runs with pipefail here);
-      # plan.txt feeds the PR comment below.
-      - name: Terraform Plan
+      # `tee` keeps terraform's exit code because bash runs with pipefail here.
+      # plan.txt is the human-readable copy used by the PR comment.
+      - name: Terraform plan
         run: terraform plan -input=false -no-color ${{ needs.params.outputs.var_flags }} -out=tfplan 2>&1 | tee plan.txt
 
-      # The artifact name embeds the component because one orchestrator run
-      # produces several plans in the same workflow run.
+      # Component-scoped name: one orchestrator run produces several plans
+      # within the same workflow run.
       - name: Upload plan artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -143,8 +157,8 @@ jobs:
             ${{ needs.params.outputs.dir }}/plan.txt
           retention-days: 5
 
-      # Upserts one comment per component, found again via the marker on the
-      # first line, so repeated pushes update in place instead of stacking.
+      # One comment per component, located again by the HTML marker on the
+      # first line so repeated pushes edit it in place instead of stacking.
       - name: Comment plan on PR
         if: github.event_name == 'pull_request'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -165,23 +179,24 @@ jobs:
               await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
             }
 
+  # ---------------------------------------------------------------------------
+  # Executes the plan artifact produced above. Pauses for approval first.
+  # ---------------------------------------------------------------------------
   apply:
     name: Terraform apply — ${{ inputs.component }}
     if: inputs.action == 'apply'
     needs: [params, plan]
     runs-on: ubuntu-latest
-    # `dev` carries a required-reviewer rule, so every apply pauses for
-    # manual approval. Setting the DISABLE_DEPLOYMENT_APPROVALS repository
-    # variable to "true" switches to `dev-auto`, an identical environment
-    # with no protection rules — useful during development, where the whole
-    # stack is created and destroyed several times a day. Neither
-    # environment holds secrets or variables of its own, so the reviewer
-    # rule is the only difference, and the deployment is still recorded.
+    # `dev` has a required-reviewer rule, so every apply waits for a human with
+    # the plan in view. Repository variable DISABLE_DEPLOYMENT_APPROVALS=true
+    # swaps in `dev-auto`, an identical environment with no protection rules,
+    # for unattended development cycles. Neither environment carries secrets or
+    # variables of its own — the reviewer rule is the only difference — and the
+    # deployment is recorded either way.
     #
-    # Don't "simplify" the false branch to an empty environment name: in
-    # `a && b || c` GitHub returns b only when b is truthy, and the empty
-    # string is falsy, so `... && '' || 'dev'` silently yields 'dev' in both
-    # branches. Both values must be non-empty for this idiom to work.
+    # Do not shorten the false branch to an empty string: in `a && b || c`
+    # GitHub returns b only when b is truthy, so `... && '' || 'dev'` yields
+    # 'dev' in both branches. Both values must be non-empty.
     environment: ${{ vars.DISABLE_DEPLOYMENT_APPROVALS == 'true' && 'dev-auto' || 'dev' }}
     concurrency:
       group: terraform-${{ inputs.component }}
@@ -192,14 +207,13 @@ jobs:
         shell: bash
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Configure AWS Credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+      - name: Assume AWS role
+        uses: ./.github/actions/aws-oidc-login
         with:
-          role-to-assume: ${{ env.AWS_ROLE_ARN }}
-          role-session-name: github-actions-${{ github.run_id }}
+          role-arn: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup Terraform
@@ -208,8 +222,9 @@ jobs:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
           terraform_wrapper: false
 
-      # A fresh runner needs the providers/modules the saved plan expects.
-      - name: Terraform Init
+      # This is a fresh runner: it needs the providers and modules the saved
+      # plan was built against.
+      - name: Terraform init
         run: terraform init
 
       - name: Download plan artifact
@@ -218,21 +233,23 @@ jobs:
           name: tfplan-${{ inputs.component }}
           path: ${{ needs.params.outputs.dir }}
 
-      - name: Terraform Apply (saved plan)
+      - name: Terraform apply (saved plan)
         run: terraform apply -input=false tfplan
 
+      # --- Component-specific post-apply fixups -------------------------------
+
       # CoreDNS pods created before the Fargate profile exists stay Pending
-      # forever; a restart reschedules them onto Fargate.
-      - name: Restart CoreDNS to schedule on Fargate
+      # forever; restarting reschedules them onto Fargate.
+      - name: Restart CoreDNS onto Fargate
         if: inputs.component == 'api'
         run: |
           aws eks update-kubeconfig --name internal-developer-platform-cluster --region "${{ env.AWS_REGION }}"
           kubectl rollout restart deployment/coredns -n kube-system
           kubectl rollout status deployment/coredns -n kube-system --timeout=5m
 
-      # Mirror the Datadog agent into the private registry so cluster pulls
-      # don't hit public-registry rate limits.
-      - name: Push Datadog Agent Image
+      # Mirror the Datadog agent into the private registry so cluster image
+      # pulls don't hit public-registry rate limits.
+      - name: Mirror Datadog agent image into ECR
         if: inputs.component == 'ecr'
         run: |
           ECR_URL=$(terraform output -raw repository_url)
@@ -242,9 +259,11 @@ jobs:
           docker tag public.ecr.aws/datadog/agent:latest $ECR_URL:datadog-agent
           docker push $ECR_URL:datadog-agent
 
-  # Destroy plans can't be saved and applied like create plans, so this stays
-  # a single plan-then-destroy job, gated by the same environment as apply
-  # and bypassed by the same repository variable.
+  # ---------------------------------------------------------------------------
+  # Terraform cannot save and replay a destroy plan the way it can a create
+  # plan, so this stays one plan-then-destroy job. Same environment gate and
+  # same bypass variable as apply.
+  # ---------------------------------------------------------------------------
   destroy:
     name: Terraform destroy — ${{ inputs.component }}
     if: inputs.action == 'destroy'
@@ -260,14 +279,13 @@ jobs:
         shell: bash
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Configure AWS Credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+      - name: Assume AWS role
+        uses: ./.github/actions/aws-oidc-login
         with:
-          role-to-assume: ${{ env.AWS_ROLE_ARN }}
-          role-session-name: github-actions-${{ github.run_id }}
+          role-arn: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup Terraform
@@ -276,11 +294,12 @@ jobs:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
           terraform_wrapper: false
 
-      - name: Terraform Init
+      - name: Terraform init
         run: terraform init
 
-      - name: Terraform Plan Destroy
+      # Printed for the run log so the approver can see what is about to go.
+      - name: Terraform plan (destroy)
         run: terraform plan -destroy -input=false ${{ needs.params.outputs.var_flags }}
 
-      - name: Terraform Destroy
+      - name: Terraform destroy
         run: terraform destroy -auto-approve -input=false ${{ needs.params.outputs.var_flags }}

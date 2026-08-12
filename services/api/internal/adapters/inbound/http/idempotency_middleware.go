@@ -210,4 +210,3 @@ func (r *responseRecorder) capturedHeaders() map[string]string {
 	}
 	return out
 }
-

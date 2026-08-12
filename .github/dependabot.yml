@@ -1,14 +1,34 @@
-# Keeps the commit-SHA pins in .github/workflows current: Dependabot opens a
-# PR when an action releases, updating both the SHA and its version comment,
-# so pinning stays a supply-chain control rather than a version freeze.
+# Keeps the commit-SHA pins in .github/workflows and .github/actions current:
+# Dependabot opens a PR when an action releases, updating both the SHA and its
+# version comment, so pinning stays a supply-chain control rather than a
+# version freeze.
 version: 2
 updates:
   - package-ecosystem: github-actions
-    directory: /
+    # "/" covers .github/workflows only, so the composite actions under
+    # .github/actions/ are listed explicitly — otherwise their pins would
+    # silently go stale.
+    directories:
+      - /
+      - /.github/actions/aws-oidc-login
+      - /.github/actions/ecr-login
+      - /.github/actions/eks-kubeconfig
     schedule:
       interval: weekly
     groups:
       # One PR per week covering all action bumps instead of one PR each.
       actions:
+        patterns:
+          - "*"
+
+  # Go module updates, one grouped PR per service.
+  - package-ecosystem: gomod
+    directories:
+      - /services/api
+      - /services/provisioner
+    schedule:
+      interval: weekly
+    groups:
+      go-dependencies:
         patterns:
           - "*"

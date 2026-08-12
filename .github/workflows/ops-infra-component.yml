@@ -1,0 +1,55 @@
+# =============================================================================
+# PURPOSE   Manual console for a single infra component: pick one component and
+#           one action. Use it for targeted work — re-applying a drifted
+#           component, or tearing one down without touching the rest.
+# TRIGGER   Manual (workflow_dispatch) only.
+# AUTH      Per-component role github-actions-tf-<component>, via OIDC.
+# EFFECT    plan = read-only. apply / destroy = MUTATES AWS, and pauses at the
+#           `dev` environment gate first.
+# DOCS      .github/workflows/README.md
+# =============================================================================
+#
+# For the whole platform at once, use ops-platform-up.yml / ops-platform-down.yml,
+# which run these same components in dependency order.
+#
+# The component list below must stay in sync with the `case` statement in
+# _terraform.yml and the filters in .github/infra-components.yml.
+
+name: Ops · Infra Component (plan/apply/destroy)
+
+on:
+  workflow_dispatch:
+    inputs:
+      component:
+        description: Component to operate on
+        required: true
+        type: choice
+        options:
+          - vpc
+          - ecr
+          - datadog
+          - identity
+          - api
+          - api-gateway
+      action:
+        description: Terraform action
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write # required by _terraform.yml, which can post plan comments
+
+jobs:
+  terraform:
+    name: ${{ inputs.action }} / ${{ inputs.component }}
+    uses: ./.github/workflows/_terraform.yml
+    with:
+      component: ${{ inputs.component }}
+      action: ${{ inputs.action }}
+    secrets: inherit

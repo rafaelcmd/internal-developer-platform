@@ -22,10 +22,10 @@ Terraform (`infra/modules/aws/eks/otel_collector.tf`) and raw manifests here:
 
 1. `terraform apply` with `install_otel_collector = true` (creates namespace,
    ServiceAccount, secret, IRSA role).
-2. The `otel-collector-deploy.yml` workflow applies the manifests here
+2. The `cd-otel-collector.yml` workflow applies the manifests here
    (ConfigMap, RBAC, Deployment, Service) and restarts the Deployment so config
-   changes take effect. It runs in `orchestrate-create.yml` after the EKS stack
-   and before `api-deploy`, or on demand via workflow_dispatch. Manual
+   changes take effect. It runs in `ops-platform-up.yml` after the EKS stack
+   and before `cd-api`, or on demand via workflow_dispatch. Manual
    equivalent: `kubectl apply -f k8s/otel-collector/` + rollout restart.
 
 ## Endpoints

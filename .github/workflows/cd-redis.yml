@@ -1,0 +1,57 @@
+# =============================================================================
+# PURPOSE   Applies the in-cluster Redis manifests (k8s/redis). Redis backs the
+#           API's idempotency store — see docs/adr/0003.
+# TRIGGER   Manual (workflow_dispatch), or called by ops-platform-up.yml.
+# AUTH      Shared `github-actions-deploy` role, via OIDC.
+# EFFECT    MUTATES the cluster.
+# REQUIRES  The `api` Terraform component (the EKS cluster itself).
+# DOCS      .github/workflows/README.md
+# =============================================================================
+#
+# No image build: this deploys an upstream Redis image straight from the
+# manifests, so there is nothing to push to ECR.
+
+name: CD · Deploy Redis → EKS
+
+on:
+  workflow_dispatch:
+  workflow_call: {}
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_ROLE_ARN: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/github-actions-deploy
+  EKS_CLUSTER_NAME: internal-developer-platform-cluster
+
+concurrency:
+  group: deploy-redis
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy Redis to EKS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Assume AWS role
+        uses: ./.github/actions/aws-oidc-login
+        with:
+          role-arn: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure kubectl
+        uses: ./.github/actions/eks-kubeconfig
+        with:
+          cluster-name: ${{ env.EKS_CLUSTER_NAME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Apply manifests
+        run: |
+          kubectl apply -f k8s/redis/deployment.yaml
+          kubectl apply -f k8s/redis/service.yaml
