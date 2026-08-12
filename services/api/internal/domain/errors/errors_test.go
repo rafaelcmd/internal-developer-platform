@@ -69,9 +69,9 @@ func TestDomainError_Is(t *testing.T) {
 }
 
 func TestDomainError_WithDetail(t *testing.T) {
-	err := NewDomainError("TEST", "test", nil)
-	err.WithDetail("key1", "value1")
-	err.WithDetail("key2", 123)
+	err := NewDomainError("TEST", "test", nil).
+		WithDetail("key1", "value1").
+		WithDetail("key2", 123)
 
 	if err.Details["key1"] != "value1" {
 		t.Errorf("expected detail key1 to be value1, got %v", err.Details["key1"])
