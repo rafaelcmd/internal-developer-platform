@@ -87,7 +87,7 @@ resource "aws_wafv2_web_acl" "api" {
     action {
       block {
         custom_response {
-          response_code = 429
+          response_code            = 429
           custom_response_body_key = "rate-limited"
         }
       }
@@ -118,7 +118,7 @@ resource "aws_wafv2_web_acl" "api" {
     action {
       block {
         custom_response {
-          response_code = 413
+          response_code            = 413
           custom_response_body_key = "request-too-large"
         }
       }
@@ -178,28 +178,28 @@ resource "aws_wafv2_web_acl" "api" {
   # Standardized error responses for WAF blocks
   # =============================================================================
   custom_response_body {
-    key          = "rate-limited"
-    content      = jsonencode({
-      code      = "RATE_LIMITED"
-      message   = "Too many requests. Please try again later."
+    key = "rate-limited"
+    content = jsonencode({
+      code    = "RATE_LIMITED"
+      message = "Too many requests. Please try again later."
     })
     content_type = "APPLICATION_JSON"
   }
 
   custom_response_body {
-    key          = "request-too-large"
-    content      = jsonencode({
-      code      = "REQUEST_TOO_LARGE"
-      message   = "Request body exceeds maximum allowed size."
+    key = "request-too-large"
+    content = jsonencode({
+      code    = "REQUEST_TOO_LARGE"
+      message = "Request body exceeds maximum allowed size."
     })
     content_type = "APPLICATION_JSON"
   }
 
   custom_response_body {
-    key          = "blocked"
-    content      = jsonencode({
-      code      = "BLOCKED"
-      message   = "Request blocked by security policy."
+    key = "blocked"
+    content = jsonencode({
+      code    = "BLOCKED"
+      message = "Request blocked by security policy."
     })
     content_type = "APPLICATION_JSON"
   }
