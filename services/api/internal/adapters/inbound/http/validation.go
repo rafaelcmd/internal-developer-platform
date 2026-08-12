@@ -135,7 +135,7 @@ func toSnakeCase(s string) string {
 func RespondWithError(w http.ResponseWriter, statusCode int, errResp ErrorResponse) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(errResp)
+	_ = json.NewEncoder(w).Encode(errResp)
 }
 
 // RespondWithValidationError sends a 400 response with validation errors
@@ -153,7 +153,7 @@ func RespondWithJSON(w http.ResponseWriter, statusCode int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	if payload != nil {
-		json.NewEncoder(w).Encode(payload)
+		_ = json.NewEncoder(w).Encode(payload)
 	}
 }
 

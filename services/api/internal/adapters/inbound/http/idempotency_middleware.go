@@ -200,7 +200,7 @@ func (r *responseRecorder) capturedHeaders() map[string]string {
 		"Connection":        {},
 	}
 	out := make(map[string]string)
-	for k, v := range r.ResponseWriter.Header() {
+	for k, v := range r.Header() {
 		if _, drop := skip[k]; drop {
 			continue
 		}

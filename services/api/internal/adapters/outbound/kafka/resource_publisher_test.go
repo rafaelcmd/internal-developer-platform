@@ -13,7 +13,7 @@ import (
 
 func TestPublish_UnreachableBroker_ReturnsError(t *testing.T) {
 	p := NewResourcePublisher([]string{"127.0.0.1:1"}, "test-topic")
-	defer p.Close()
+	defer func() { _ = p.Close() }()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()

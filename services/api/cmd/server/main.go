@@ -34,7 +34,9 @@ func main() {
 	// Run the application (blocks until shutdown signal)
 	if err := app.Run(ctx); err != nil {
 		app.Logger.Error("Application error", logger.F("error", err.Error()))
-		app.Shutdown()
+		if shutdownErr := app.Shutdown(); shutdownErr != nil {
+			app.Logger.Error("Shutdown error", logger.F("error", shutdownErr.Error()))
+		}
 		os.Exit(1)
 	}
 

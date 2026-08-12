@@ -346,7 +346,7 @@ func (a *Application) initializeServer() error {
 	// Wrap with OpenTelemetry HTTP instrumentation if enabled (skipped in local
 	// mode). otelhttp starts a server span per request from the propagated
 	// context and hands spans to the global TracerProvider (OTLP -> Collector).
-	var handler http.Handler = router
+	handler := router
 	if a.Config.App.EnableTracing && !a.isLocalMode() {
 		mux := http.NewServeMux()
 

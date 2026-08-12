@@ -36,10 +36,9 @@ func TestNewConfig_DefaultValues(t *testing.T) {
 
 func TestNewConfig_WithEnvironmentVariables(t *testing.T) {
 	os.Clearenv()
-	os.Setenv("PORT", "9090")
-	os.Setenv("ENVIRONMENT", "production")
-	os.Setenv("LOG_LEVEL", "debug")
-	defer os.Clearenv()
+	t.Setenv("PORT", "9090")
+	t.Setenv("ENVIRONMENT", "production")
+	t.Setenv("LOG_LEVEL", "debug")
 
 	cfg := NewConfig()
 

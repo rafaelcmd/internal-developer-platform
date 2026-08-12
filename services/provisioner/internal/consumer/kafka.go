@@ -25,7 +25,11 @@ func RunKafka(ctx context.Context, cfg KafkaConfig, tracer trace.Tracer, metrics
 		Topic:   cfg.Topic,
 		GroupID: cfg.GroupID,
 	})
-	defer reader.Close()
+	defer func() {
+		if err := reader.Close(); err != nil {
+			log.WithContext(ctx).Warn("failed to close Kafka reader", logger.F("error", err.Error()))
+		}
+	}()
 
 	log.WithContext(ctx).Info("consuming messages from Kafka",
 		logger.F("topic", cfg.Topic),
