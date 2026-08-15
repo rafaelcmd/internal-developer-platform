@@ -150,9 +150,14 @@ a service production-shaped on day zero:
 Env vars, set by SAM per function. No config file.
 
 - `SCAFFOLDER_TABLE_NAME`, `TEMPLATE_BUCKET`
-- `GITHUB_APP_ID`, `GITHUB_ORG` — in dev, `GITHUB_ORG` is the sandbox org
-  `idp-scaffolder-sandbox`. It exists to be filled with disposable repositories;
-  never point dev at a real org
+- `GITHUB_APP_ID`, `GITHUB_ORG` — in dev these are `4608314` and the sandbox org
+  `idp-scaffolder-sandbox`. The sandbox exists to be filled with disposable
+  repositories; never point dev at a real org
+
+There is deliberately **no `GITHUB_INSTALLATION_ID`**. Resolve the installation at
+runtime with `GET /orgs/{org}/installation` using the app JWT, then exchange it for
+an installation token. One less config value, and it survives the app being
+uninstalled and reinstalled — which changes the installation ID but not the App ID.
 - `GITHUB_APP_KEY_SECRET_ARN` — Secrets Manager ARN for the GitHub App private
   key. Never a PAT, never an env var holding the key itself.
 - `ENVIRONMENT`, `SERVICE_VERSION`, `SERVICE_NAME`

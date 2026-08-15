@@ -94,10 +94,15 @@ B0 ──▶ B1 ──▶ B2 ──▶ B3 ──▶ B4 ──▶ B5 ──▶ B6
 - [x] Update `CLAUDE.md` with the runtime answer
 - [x] Create a throwaway GitHub org for testing — **`idp-scaffolder-sandbox`** (free plan,
       created 15 Aug 2026). This is the `GITHUB_ORG` value for dev
-- [ ] Create a GitHub App installed on it: `Administration: write`, `Contents: write`,
-      `Actions: write`, `Secrets: write`. Record the App ID; keep the private key for B5.
-      Create it at
-      `github.com/organizations/idp-scaffolder-sandbox/settings/apps/new`
+- [x] Create a GitHub App installed on it — app slug `idp-scaffolder-sandbox`,
+      **App ID `4608314`**, installation ID `154041917`, installed on **all** repositories
+      in the org. Granted exactly the permissions the service needs and nothing else:
+      `administration: write`, `contents: write`, `actions: write`, `secrets: write`,
+      `metadata: read` (mandatory). No webhook events — the scaffolder calls GitHub, never
+      the reverse. Private key is held outside the repo and goes into Secrets Manager in B5
+
+**B0 complete.** Toolchain, runtime decision, sandbox org and GitHub App are all in place;
+B1 can start.
 
 ---
 
