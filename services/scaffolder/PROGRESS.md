@@ -92,9 +92,12 @@ B0 ──▶ B1 ──▶ B2 ──▶ B3 ──▶ B4 ──▶ B5 ──▶ B6
       months away — and `dotnet9` is container-only with the same date. .NET 10 is the only
       .NET runtime with real runway
 - [x] Update `CLAUDE.md` with the runtime answer
-- [ ] Create a throwaway GitHub org for testing
+- [x] Create a throwaway GitHub org for testing — **`idp-scaffolder-sandbox`** (free plan,
+      created 15 Aug 2026). This is the `GITHUB_ORG` value for dev
 - [ ] Create a GitHub App installed on it: `Administration: write`, `Contents: write`,
-      `Actions: write`, `Secrets: write`. Record the App ID; keep the private key for B5
+      `Actions: write`, `Secrets: write`. Record the App ID; keep the private key for B5.
+      Create it at
+      `github.com/organizations/idp-scaffolder-sandbox/settings/apps/new`
 
 ---
 
