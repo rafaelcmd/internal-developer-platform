@@ -1,0 +1,225 @@
+# Scaffolder Service
+
+> **Status: design only.** This directory holds the CLAUDE.md and empty `src/`,
+> `tests/`, `templates/` trees. No .NET code exists yet — everything below is the
+> intended shape, not a description of working code. Delete this banner once the
+> solution builds.
+>
+> **Build progress is tracked in [`PROGRESS.md`](./PROGRESS.md)**, organised as
+> DVA-C02 study blocks. Read this file for *what the service is*; read that one
+> for *what is done and what is next*.
+
+.NET service that owns the **repository domain** of the platform: given an
+application request, it creates a GitHub repository, renders a golden-path
+template into it, wires up CI/CD, and records what it built. It runs as a set of
+AWS Lambda functions invoked as task states in a Step Functions state machine.
+
+Target framework: **.NET 10 (LTS)**, Lambda runtime identifier **`dotnet10`** on
+Amazon Linux 2023. It is a managed runtime — zip package type, no container image
+— GA since 8 January 2026 and deployable through SAM. Runtime deprecation is
+14 November 2028.
+
+Do not target .NET 8: `dotnet8` deprecates **10 November 2026**, and `dotnet9` is
+container-only with the same date.
+
+Neither the `dotnet` SDK nor the `sam` CLI is installed on the current dev box.
+On Ubuntu 24.04 the SDK comes straight from the distro archive
+(`sudo apt install dotnet-sdk-10.0`); no Microsoft package repo is needed.
+
+## Why this service is serverless
+
+The rest of the platform runs on EKS Fargate and is deployed with Terraform. This
+service deliberately does not, for two reasons:
+
+1. Its work is spiky and event-driven — a scaffold request arrives, runs for
+   seconds, and stops. Lambda fits that shape better than a long-lived pod.
+2. The project doubles as AWS DVA-C02 exam preparation, and the exam is heavily
+   weighted toward Lambda, DynamoDB, S3, Step Functions, SAM, and CloudWatch —
+   none of which the Go services exercise.
+
+**IaC boundary:** SAM (`template.yaml`) owns everything belonging to this service
+— functions, aliases, the DynamoDB table, the S3 bucket, per-function IAM roles.
+Terraform keeps owning shared, long-lived infrastructure (VPC, ECR, Cognito, the
+EventBridge bus, the Step Functions state machine itself). This is a deliberate
+exception to the repo-wide Terraform convention; do not migrate shared
+infrastructure into SAM.
+
+## Place in the platform
+
+```
+Developer
+   │ POST /v1/applications
+   ▼
+API (Go) ──SQS──▶ Provisioner (Go)          ← orchestrator: owns saga state,
+                       │ StartExecution        starts the execution
+                       ▼
+             ┌──── Step Functions ─────────────────────────┐
+             │ ReserveName          → Scaffolder (.NET)    │
+             │ CreateRepository     → Scaffolder (.NET)    │
+             │ ProvisionInfra       → Infra Worker (Go)    │  .waitForTaskToken
+             │ PushScaffold         → Scaffolder (.NET)    │
+             │ InjectInfraOutputs   → Scaffolder (.NET)    │
+             │ ConfigureCiCd        → Scaffolder (.NET)    │
+             │ RegisterRepository   → Scaffolder (.NET)    │
+             │ (Catch) Compensate   → Scaffolder (.NET)    │
+             └─────────────────────────────────────────────┘
+```
+
+`CreateRepository` and `ProvisionInfra` can run in parallel — creating a repo does
+not depend on infrastructure existing. Only `InjectInfraOutputs` needs both, so it
+is the join. Keep it that way: serializing them makes a developer wait for a
+multi-minute Terraform run before they can see their repository, and "time to
+first commit" is the metric this platform is judged on.
+
+**Ownership boundary.** The provisioner owns saga/request state. This service owns
+templates, name reservations, and the repository inventory, in its own DynamoDB
+table. Neither service reads the other's table — they communicate only through the
+state machine's input/output.
+
+## Planned layout
+
+```
+src/
+  Scaffolder.Domain/          - entities, value objects, port interfaces; no SDK refs
+  Scaffolder.Application/     - one use case per state machine task
+  Scaffolder.Infrastructure/  - adapters: GitHub, DynamoDB, S3, Secrets Manager
+  Scaffolder.Functions/       - Lambda entry points; thin, one handler per task
+tests/
+  Scaffolder.UnitTests/       - xUnit, domain + application
+  Scaffolder.IntegrationTests/- adapters against LocalStack / a test GitHub org
+templates/
+  dotnet-api/                 - HTTP service golden path
+  dotnet-consumer/            - queue worker golden path
+  dotnet-console/             - one-shot job / CLI golden path
+template.yaml                 - SAM: functions, table, bucket, aliases, IAM
+samconfig.toml
+Scaffolder.sln
+Makefile
+```
+
+Dependency rule mirrors the Go API's hexagonal layout: `Domain` depends on
+nothing, `Application` depends on domain ports, `Infrastructure` implements them,
+`Functions` is composition + serialization only. Business logic must not live in a
+Lambda handler — handlers deserialize, call a use case, and serialize the result,
+so the same logic is testable without invoking Lambda.
+
+## DynamoDB (single table)
+
+One table, `scaffolder`, owned entirely by this service.
+
+| Item | PK | SK | Purpose |
+|---|---|---|---|
+| Template version | `TEMPLATE#<name>` | `VERSION#<semver>` | S3 bundle key, checksum, parameter schema |
+| Name reservation | `NAME#<app-name>` | `RESERVATION` | request id, status, TTL |
+| Repository record | `REPO#<owner>/<name>` | `META` | source template + version, request id, created_at |
+
+- **GSI1** (`template#version` → repos) answers *"which repositories are behind the
+  current template version?"* — the day-2 drift question that separates a real
+  scaffolder from a demo. Design for it now even if the reporting comes later.
+- **Name reservation is a conditional write**
+  (`attribute_not_exists(PK)`), which makes uniqueness a single atomic operation
+  instead of a read-then-write race.
+- **Every state transition is a conditional write** on the expected current
+  status. Step Functions retries and at-least-once delivery mean handlers *will*
+  be invoked more than once for the same input; conditional writes make the
+  duplicate a no-op instead of a second repository.
+- **TTL** on reservations so abandoned requests release their name automatically.
+
+## Templates
+
+Source of truth is `templates/` in this repo. CI packages each directory into a
+versioned bundle and uploads it to the S3 template bucket (versioning enabled);
+DynamoDB records the version and checksum. Lambdas never read `templates/` from
+the repo — always from S3 by version, so a scaffold is reproducible.
+
+A template is not just `dotnet new` output. Each one carries the things that make
+a service production-shaped on day zero:
+
+- service code in the platform's layout
+- OTel SDK pre-wired to the Collector, with `service.name` / `service.version` /
+  `deployment.environment` set the same way the Go services set them
+- health and readiness endpoints, graceful shutdown, structured JSON logging
+- `Dockerfile` and `k8s/deployment.yaml` matching the existing manifests
+- CI/CD workflows following the repo's `ci-` / `cd-` / `ops-` naming convention
+- `CLAUDE.md`, README, and an `docs/adr/` directory
+- Terraform stub for the service's own resources (IRSA role, ECR repo)
+- catalog registration metadata (owner, team, on-call, tier)
+
+## Configuration
+
+Env vars, set by SAM per function. No config file.
+
+- `SCAFFOLDER_TABLE_NAME`, `TEMPLATE_BUCKET`
+- `GITHUB_APP_ID`, `GITHUB_ORG`
+- `GITHUB_APP_KEY_SECRET_ARN` — Secrets Manager ARN for the GitHub App private
+  key. Never a PAT, never an env var holding the key itself.
+- `ENVIRONMENT`, `SERVICE_VERSION`, `SERVICE_NAME`
+
+Secrets are fetched at cold start and cached for the container's lifetime — not
+per invocation, which would add a Secrets Manager call to every request.
+
+## Security
+
+- **GitHub App, not a PAT.** Short-lived installation tokens, scoped to the org,
+  revocable, and auditable per-repository.
+- **Per-function IAM roles.** One role per Lambda in `template.yaml`, each granted
+  only what that function touches. Do not share a single "scaffolder role" —
+  least privilege per function is both correct and directly exam-relevant.
+- **KMS** for the template bucket and the secret. Customer-managed key so key
+  policy and rotation are explicit.
+
+## Deployment
+
+SAM, from GitHub Actions, following the repo's `cd-` workflow convention
+(`cd-scaffolder.yml`). Use the existing `aws-oidc-login` composite action — no
+long-lived AWS keys.
+
+- `AutoPublishAlias: live` — every deploy publishes a new version and moves the
+  alias.
+- `DeploymentPreference: Canary10Percent5Minutes` with CloudWatch alarms, so a
+  bad deploy rolls back automatically via CodeDeploy.
+
+Versions, aliases, and CodeDeploy traffic shifting are exam topics in their own
+right; wiring them here is deliberate.
+
+## Observability
+
+The platform's rule is vendor-agnostic OpenTelemetry, and this service keeps it —
+but Lambda constrains how.
+
+- Use the **ADOT (AWS Distro for OpenTelemetry) Lambda layer**, not the X-Ray SDK.
+  ADOT speaks W3C trace context, which is what the Go services propagate, so a
+  scaffold request stays **one distributed trace** from API → SQS → provisioner →
+  Step Functions → these functions. The X-Ray SDK's native header format would
+  break that continuity.
+- The OTel Collector runs inside the EKS cluster, so these functions cannot reach
+  it unless they are VPC-attached. Simplest v1: ADOT exports to X-Ray and
+  CloudWatch directly. Only attach to the VPC if something else forces it — it
+  costs cold-start time and ENI management.
+- Metrics via **CloudWatch EMF** (structured logs → metrics) rather than a
+  separate metrics pipeline; it is the idiomatic Lambda approach and avoids
+  needing a Collector route.
+- Enable X-Ray active tracing on the state machine — the execution graph with
+  timings is the fastest way to see which step is slow.
+- Alarms on function errors, throttles, and duration feed the canary deployment
+  gate above.
+
+## Testing
+
+- `dotnet test` — xUnit. Domain and application layers test with no AWS.
+- Adapters test against LocalStack (DynamoDB, S3, Secrets Manager) and a
+  throwaway GitHub org.
+- `sam local invoke` with event fixtures for handler-level checks.
+- The compensation path (`Compensate`) needs tests as much as the happy path. It
+  runs rarely, which is exactly why it rots — assert that a failed scaffold leaves
+  no repository and no reservation behind.
+
+## Commands
+
+```bash
+dotnet build                      # build the solution
+dotnet test                       # run tests
+sam build                         # build deployment artifacts
+sam local invoke CreateRepository -e events/create-repo.json
+sam deploy --config-env dev       # deploy
+```
