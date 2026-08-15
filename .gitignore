@@ -50,3 +50,17 @@ tfplan
 
 # Kafka data
 /resource-provisioner-consumer/data/
+
+# Credential material — never commit. The scaffolder's GitHub App private key
+# downloads as a .pem and belongs in Secrets Manager, not in the tree. These
+# patterns are a backstop, not permission to keep keys in the working copy.
+*.pem
+*.p12
+*.pfx
+*.key
+
+# .NET build output (`bin/` is already covered above)
+obj/
+
+# AWS SAM build artifacts
+.aws-sam/

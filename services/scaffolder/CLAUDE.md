@@ -150,7 +150,9 @@ a service production-shaped on day zero:
 Env vars, set by SAM per function. No config file.
 
 - `SCAFFOLDER_TABLE_NAME`, `TEMPLATE_BUCKET`
-- `GITHUB_APP_ID`, `GITHUB_ORG`
+- `GITHUB_APP_ID`, `GITHUB_ORG` — in dev, `GITHUB_ORG` is the sandbox org
+  `idp-scaffolder-sandbox`. It exists to be filled with disposable repositories;
+  never point dev at a real org
 - `GITHUB_APP_KEY_SECRET_ARN` — Secrets Manager ARN for the GitHub App private
   key. Never a PAT, never an env var holding the key itself.
 - `ENVIRONMENT`, `SERVICE_VERSION`, `SERVICE_NAME`
