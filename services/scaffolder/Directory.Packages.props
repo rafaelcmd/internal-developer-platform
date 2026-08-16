@@ -1,0 +1,35 @@
+<Project>
+
+  <!-- Central package management: projects reference packages by name only, and
+       every version is pinned here. Keeps the six projects from drifting apart
+       and gives Dependabot a single file to bump. -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup Label="Lambda runtime">
+    <PackageVersion Include="Amazon.Lambda.Core" Version="3.3.0" />
+    <PackageVersion Include="Amazon.Lambda.Serialization.SystemTextJson" Version="3.0.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="AWS SDK">
+    <PackageVersion Include="AWSSDK.DynamoDBv2" Version="4.0.103.1" />
+  </ItemGroup>
+
+  <ItemGroup Label="Composition">
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
+  </ItemGroup>
+
+  <ItemGroup Label="Testing">
+    <PackageVersion Include="Amazon.Lambda.TestUtilities" Version="4.2.0" />
+    <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageVersion Include="NSubstitute" Version="6.2.0" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+</Project>

@@ -1,13 +1,14 @@
 # Scaffolder Service
 
-> **Status: design only.** This directory holds the CLAUDE.md and empty `src/`,
-> `tests/`, `templates/` trees. No .NET code exists yet — everything below is the
-> intended shape, not a description of working code. Delete this banner once the
-> solution builds.
+> **Status: partially built.** The solution builds and its tests pass. What is
+> real today: the six projects, the dependency rule (enforced by a test), the
+> `ReserveName` handler, and the DynamoDB name-reservation adapter. Still design
+> only: `template.yaml` and every other handler, the table itself, the templates,
+> CI/CD, and observability. Sections below describing those are intent, not
+> working code.
 >
-> **Build progress is tracked in [`PROGRESS.md`](./PROGRESS.md)**, organised as
-> DVA-C02 study blocks. Read this file for *what the service is*; read that one
-> for *what is done and what is next*.
+> **Build progress is tracked in [`PROGRESS.md`](./PROGRESS.md)**. Read this file
+> for *what the service is*; read that one for *what is done and what is next*.
 
 .NET service that owns the **repository domain** of the platform: given an
 application request, it creates a GitHub repository, renders a golden-path
@@ -22,8 +23,8 @@ Amazon Linux 2023. It is a managed runtime — zip package type, no container im
 Do not target .NET 8: `dotnet8` deprecates **10 November 2026**, and `dotnet9` is
 container-only with the same date.
 
-Neither the `dotnet` SDK nor the `sam` CLI is installed on the current dev box.
-On Ubuntu 24.04 the SDK comes straight from the distro archive
+Dev box toolchain: .NET SDK 10.0.110, SAM CLI 1.165.0, Docker 29.7.2. On Ubuntu
+24.04 the SDK comes straight from the distro archive
 (`sudo apt install dotnet-sdk-10.0`); no Microsoft package repo is needed.
 
 ## Why this service is serverless
@@ -32,10 +33,11 @@ The rest of the platform runs on EKS Fargate and is deployed with Terraform. Thi
 service deliberately does not, for two reasons:
 
 1. Its work is spiky and event-driven — a scaffold request arrives, runs for
-   seconds, and stops. Lambda fits that shape better than a long-lived pod.
-2. The project doubles as AWS DVA-C02 exam preparation, and the exam is heavily
-   weighted toward Lambda, DynamoDB, S3, Step Functions, SAM, and CloudWatch —
-   none of which the Go services exercise.
+   seconds, and stops. Lambda fits that shape better than a long-lived pod, and
+   scaffolding traffic does not justify capacity sitting idle between requests.
+2. It is the only service whose critical path is a third-party API. Keeping it
+   off the cluster means a GitHub outage or a rate-limit backoff cannot consume
+   pod capacity that the request-serving path depends on.
 
 **IaC boundary:** SAM (`template.yaml`) owns everything belonging to this service
 — functions, aliases, the DynamoDB table, the S3 bucket, per-function IAM roles.
@@ -76,25 +78,25 @@ templates, name reservations, and the repository inventory, in its own DynamoDB
 table. Neither service reads the other's table — they communicate only through the
 state machine's input/output.
 
-## Planned layout
+## Layout
 
 ```
 src/
-  Scaffolder.Domain/          - entities, value objects, port interfaces; no SDK refs
+  Scaffolder.Domain/          - entities, value objects, port interfaces; no refs at all
   Scaffolder.Application/     - one use case per state machine task
   Scaffolder.Infrastructure/  - adapters: GitHub, DynamoDB, S3, Secrets Manager
   Scaffolder.Functions/       - Lambda entry points; thin, one handler per task
 tests/
-  Scaffolder.UnitTests/       - xUnit, domain + application
+  Scaffolder.UnitTests/       - xUnit, domain + application + handler wiring
   Scaffolder.IntegrationTests/- adapters against LocalStack / a test GitHub org
-templates/
-  dotnet-api/                 - HTTP service golden path
-  dotnet-consumer/            - queue worker golden path
-  dotnet-console/             - one-shot job / CLI golden path
-template.yaml                 - SAM: functions, table, bucket, aliases, IAM
-samconfig.toml
-Scaffolder.sln
+templates/                    - golden paths (dotnet-api, then consumer and console)
+events/                       - `sam local invoke` payloads
+Directory.Build.props         - TFM, nullable, langversion, warnings-as-errors
+Directory.Packages.props      - every package version, pinned centrally
+Scaffolder.slnx               - the .NET 10 SDK's XML solution format, not .sln
 Makefile
+template.yaml                 - SAM: functions, table, bucket, aliases, IAM (not written yet)
+samconfig.toml                - (not written yet)
 ```
 
 Dependency rule mirrors the Go API's hexagonal layout: `Domain` depends on
@@ -102,6 +104,20 @@ nothing, `Application` depends on domain ports, `Infrastructure` implements them
 `Functions` is composition + serialization only. Business logic must not live in a
 Lambda handler — handlers deserialize, call a use case, and serialize the result,
 so the same logic is testable without invoking Lambda.
+
+This is not an honour system: `tests/Scaffolder.UnitTests/Architecture/DependencyRuleTests.cs`
+parses the project files and fails the build if a layer grows a reference it
+should not have, or if a package version is declared outside
+`Directory.Packages.props`.
+
+**Cold start is a design constraint, not a detail.** `FunctionHost` builds the DI
+container in a static initializer, so it runs during INIT, once per execution
+context; every registration is a singleton so the SDK clients, credentials and
+TLS connections survive across warm invocations. Configuration is read there too,
+so a missing environment variable fails as an init error rather than as a
+NullReference on the first request. Handlers keep no request state in statics —
+the only static state is `ExecutionContextTelemetry`, which exists precisely to
+show which invocations shared a context.
 
 ## DynamoDB (single table)
 
@@ -149,7 +165,11 @@ a service production-shaped on day zero:
 
 Env vars, set by SAM per function. No config file.
 
-- `SCAFFOLDER_TABLE_NAME`, `TEMPLATE_BUCKET`
+- `SCAFFOLDER_TABLE_NAME` (required), `TEMPLATE_BUCKET`
+- `SCAFFOLDER_RESERVATION_TTL_MINUTES` — how long an unfinished scaffold holds a
+  name before TTL releases it. Defaults to 360 (6 hours): long enough to outlive a
+  slow Terraform run, short enough that an abandoned request frees the name the
+  same day
 - `GITHUB_APP_ID`, `GITHUB_ORG` — in dev these are `4608314` and the sandbox org
   `idp-scaffolder-sandbox`. The sandbox exists to be filled with disposable
   repositories; never point dev at a real org
@@ -170,8 +190,9 @@ per invocation, which would add a Secrets Manager call to every request.
 - **GitHub App, not a PAT.** Short-lived installation tokens, scoped to the org,
   revocable, and auditable per-repository.
 - **Per-function IAM roles.** One role per Lambda in `template.yaml`, each granted
-  only what that function touches. Do not share a single "scaffolder role" —
-  least privilege per function is both correct and directly exam-relevant.
+  only what that function touches. Do not share a single "scaffolder role" — a
+  function that only reserves a name has no business holding permission to create
+  repositories or read the GitHub App key.
 - **KMS** for the template bucket and the secret. Customer-managed key so key
   policy and rotation are explicit.
 
@@ -185,9 +206,6 @@ long-lived AWS keys.
   alias.
 - `DeploymentPreference: Canary10Percent5Minutes` with CloudWatch alarms, so a
   bad deploy rolls back automatically via CodeDeploy.
-
-Versions, aliases, and CodeDeploy traffic shifting are exam topics in their own
-right; wiring them here is deliberate.
 
 ## Observability
 
@@ -223,10 +241,16 @@ but Lambda constrains how.
 
 ## Commands
 
+`make` from this directory lists the targets. The common ones:
+
 ```bash
-dotnet build                      # build the solution
-dotnet test                       # run tests
-sam build                         # build deployment artifacts
-sam local invoke CreateRepository -e events/create-repo.json
+make build                        # dotnet build
+make test                         # unit tests: no AWS, no Docker, no network
+make test-integration             # adapters against LocalStack + the sandbox org (opt-in)
+make format-check                 # dotnet format --verify-no-changes
+make invoke F=ReserveName E=events/reserve-name.json   # sam build + sam local invoke
 sam deploy --config-env dev       # deploy
 ```
+
+Integration tests are opt-in via `SCAFFOLDER_INTEGRATION=1` because they need
+Docker and credentials; without it xUnit skips rather than fails them.

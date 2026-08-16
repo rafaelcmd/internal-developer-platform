@@ -50,8 +50,8 @@ belongs to Terraform when it arrives — it will invoke this one as a nested exe
 
 | Block | Topic | Domain | Status |
 |---|---|---|---|
-| B0 | Prerequisites | — | [ ] |
-| B1 | Lambda fundamentals | 1 + 3 | [ ] |
+| B0 | Prerequisites | — | [x] |
+| B1 | Lambda fundamentals | 1 + 3 | [x] build · hands-on gated on B2 |
 | B2 | SAM & CloudFormation | 3 | [ ] |
 | B3 | DynamoDB | 1 | [ ] |
 | B4 | S3 | 1 + 2 | [ ] |
@@ -115,18 +115,42 @@ behaviour by invocation type (sync = none from Lambda, async = 2 retries then DL
 event source mapping = its own rules); deployment package limits.
 
 **Build**
-- [ ] Solution skeleton: `Scaffolder.sln`, `Directory.Build.props` (target framework, nullable,
-      langversion in ONE place)
-- [ ] Projects: `Scaffolder.Domain`, `Scaffolder.Application`, `Scaffolder.Infrastructure`,
+- [x] Solution skeleton: **`Scaffolder.slnx`** — the .NET 10 SDK emits the XML solution format,
+      not `.sln`; `dotnet build` / `test` / `format` all read it. `Directory.Build.props` holds
+      target framework, nullable, langversion and warnings-as-errors in ONE place, and
+      `Directory.Packages.props` pins every package version centrally
+- [x] Projects: `Scaffolder.Domain`, `Scaffolder.Application`, `Scaffolder.Infrastructure`,
       `Scaffolder.Functions`, plus `Scaffolder.UnitTests` / `Scaffolder.IntegrationTests`
-- [ ] `events/` directory for `sam local invoke` payloads; `Makefile`
-- [ ] Enforce the dependency rule from the first commit — `Domain` depends on nothing,
-      `Application` on domain ports, `Infrastructure` implements them, `Functions` is
-      composition and serialization only. **No business logic in a handler**
-- [ ] `ReserveName` handler with DI container and AWS SDK clients initialised **outside** the
-      handler method, so they land in the reused execution context
+- [x] `events/` directory for `sam local invoke` payloads (`reserve-name.json` plus an invalid
+      one for the failure path); `Makefile`; `.editorconfig` so `make format-check` is
+      deterministic
+- [x] Enforce the dependency rule from the first commit — `tests/Scaffolder.UnitTests/Architecture/DependencyRuleTests.cs`
+      parses the `.csproj` files and asserts it. Reading project files rather than compiled
+      assemblies is deliberate: the compiler drops references a project never uses, so a
+      wrong-but-unused reference would pass an assembly check. Verified it actually bites by
+      adding `AWSSDK.DynamoDBv2` to `Domain` and watching the test go red
+- [x] `ReserveName` handler with DI container and AWS SDK clients initialised **outside** the
+      handler method — `FunctionHost` builds the container in a static initializer, so it runs
+      during INIT and every warm invocation reuses the same clients, credentials and TLS
+      connections. Everything is registered as a singleton for the same reason
 
-**Hands-on checks**
+Two deviations worth recording. There is no `IClock` port: .NET 10 ships `TimeProvider` in the
+BCL, so the domain uses it directly and the tests subclass it. And the reservation's DynamoDB
+adapter landed here rather than waiting for B3, because a handler with no AWS SDK client cannot
+demonstrate the cold-start lesson this block is about. **B3 still owns** the table itself, GSI1,
+the TTL configuration, the `TEMPLATE#` and `REPO#` item shapes, and the capacity/pagination
+work.
+
+Idempotency is in from the start: the conditional write is
+`attribute_not_exists(PK) OR RequestId = :requestId` with `ReturnValues: ALL_OLD`, so a Step
+Functions retry of the *same* request is a no-op that reports `AlreadyHeldByThisRequest`, while
+a *different* request gets `ConditionalCheckFailedException` translated into a
+`NameAlreadyReservedException` domain error.
+
+**Hands-on checks** — all four need a deployed function, so they run once B2 lands the template
+and `sam deploy` succeeds. The instrumentation they read is already in place
+(`ExecutionContextTelemetry` logs instance id, invocation number, cold-start flag, context age,
+memory limit and remaining time on every invocation).
 - [ ] Log a static counter to prove execution-context reuse across warm invocations
 - [ ] Compare duration at 128MB vs 1024MB — observe the CPU coupling
 - [ ] Set reserved concurrency to 0, invoke, watch it throttle
@@ -180,12 +204,14 @@ Streams; DAX; `ProvisionedThroughputExceededException` and exponential backoff.
 - [ ] **GSI1** (`GSI1PK = TEMPLATE#<name>#<semver>`) for the drift query *"which repos are
       behind the current template version?"* — define now; adding a GSI later means a backfill
 - [ ] TTL on reservations so abandoned requests release their name automatically
-- [ ] `ReserveNameUseCase` as a conditional `PutItem` on `attribute_not_exists(PK)` — name
-      uniqueness as one atomic operation, not a read-then-write race
+- [x] `ReserveNameUseCase` as a conditional `PutItem` on `attribute_not_exists(PK)` — name
+      uniqueness as one atomic operation, not a read-then-write race. **Landed in B1**; the
+      table it writes to still needs creating here
 
 **Hands-on checks**
 - [ ] Reserve the same name twice; catch `ConditionalCheckFailedException` and surface it as a
-      domain error, not a leaked exception
+      domain error, not a leaked exception *(translation written in B1 — verify it against a
+      real table here)*
 - [ ] Write an item over 400KB and read the error
 - [ ] Query with a small page size and walk `LastEvaluatedKey` to exhaustion
 - [ ] Run one access pattern as Query and as Scan; compare consumed capacity in the response

@@ -8,7 +8,7 @@ Event-driven, multi-service platform on AWS (EKS, SQS, Cognito):
 
 1. **API** (`/services/api`) — Go 1.25 REST API. Receives resource creation requests, publishes messages to SQS.
 2. **Provisioner** (`/services/provisioner`) — Go 1.25 service. Consumes SQS messages and orchestrates fulfilment.
-3. **Scaffolder** (`/services/scaffolder`) — .NET on Lambda. Owns the repository domain: creates GitHub repos from golden-path templates and wires their CI/CD. **Design only — no code yet.**
+3. **Scaffolder** (`/services/scaffolder`) — .NET 10 on Lambda, deployed with SAM. Owns the repository domain: creates GitHub repos from golden-path templates and wires their CI/CD. **Under construction** — the solution and the `ReserveName` handler exist; nothing is deployed yet. See that service's `PROGRESS.md`.
 
 Message flow: API → SQS → Provisioner → Step Functions → task workers
 
