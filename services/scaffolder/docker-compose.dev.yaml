@@ -1,0 +1,59 @@
+services:
+  scaffolder:
+    container_name: scaffolder
+    build:
+      args:
+        - DOTNET_VERSION=${DOTNET_VERSION:-10.0}
+      context: .
+      dockerfile: Dockerfile.dev
+    ports: []
+    environment:
+      # In-cluster these two come from SSM parameters Terraform publishes; here
+      # they point at the LocalStack resources created by the init script below.
+      - SCAFFOLDER_TABLE_NAME=internal-developer-platform-scaffolder-local
+      - SCAFFOLDER_TASK_QUEUE_NAME=internal-developer-platform-scaffolder-tasks-local
+      - SCAFFOLDER_RESERVATION_TTL_MINUTES=360
+      - SERVICE_NAME=scaffolder
+      - SERVICE_VERSION=0.1.0-local
+      - ENVIRONMENT=local
+      # One endpoint override for every AWS service, so the SDK talks to
+      # LocalStack without any per-client configuration in the code.
+      - AWS_ENDPOINT_URL=http://localstack:4566
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_REGION=us-east-1
+      # OTLP egress to the dev Collector. Telemetry is a no-op when this is
+      # unset, so it is what turns the scaffolder's tracing on locally.
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+    depends_on:
+      localstack:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    networks:
+      - internal-network
+    restart: on-failure
+
+  # DynamoDB and SQS for local runs. The scaffolder is the only service that
+  # needs them, so LocalStack lives in this fragment rather than the root file.
+  localstack:
+    image: localstack/localstack:3.8
+    container_name: localstack
+    # Published, unlike the other services here: `make seed` and the
+    # integration tests run on the host and need to reach the edge port.
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=dynamodb,sqs,s3,secretsmanager,stepfunctions
+      - DEBUG=0
+    volumes:
+      - ./local/localstack-init.sh:/etc/localstack/init/ready.d/scaffolder.sh:ro
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - internal-network

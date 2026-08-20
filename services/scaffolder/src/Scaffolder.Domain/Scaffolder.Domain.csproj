@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The innermost layer. It must stay free of ProjectReference and
+       PackageReference items forever - no AWS SDK, no DI container, nothing.
+       Scaffolder.UnitTests/Architecture/DependencyRuleTests.cs asserts this. -->
+
+</Project>

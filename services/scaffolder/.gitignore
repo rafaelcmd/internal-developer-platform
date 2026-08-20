@@ -1,0 +1,11 @@
+# .NET build output
+bin/
+obj/
+
+# IDE state
+*.user
+*.suo
+
+# Coverage output
+TestResults/
+coverage.*.xml

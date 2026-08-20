@@ -39,3 +39,6 @@ api-gateway:
   - "infra/live/provisioner_api_gateway/**"
   - "infra/modules/aws/api_gateway/**"
   - "infra/modules/aws/waf/**"
+
+scaffolder:
+  - "infra/live/scaffolder/**"

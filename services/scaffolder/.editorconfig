@@ -1,0 +1,30 @@
+# Formatting rules for the scaffolder solution. `make format-check` enforces
+# these, so CI and a local editor agree on the same output.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+[*.{yaml,yml,json}]
+indent_size = 2
+
+[Makefile]
+indent_style = tab
+
+[*.{cs,csproj,props,targets}]
+indent_size = 4
+
+[*.cs]
+# Modern C# defaults, kept explicit so the choice is deliberate rather than
+# whatever the SDK happens to default to this release.
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_using_directive_placement = outside_namespace:warning
+dotnet_sort_system_directives_first = true
+csharp_prefer_braces = true:warning
+csharp_style_var_when_type_is_apparent = true:suggestion
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:warning
+dotnet_style_readonly_field = true:warning

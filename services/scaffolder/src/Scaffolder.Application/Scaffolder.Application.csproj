@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Use cases. Depends on domain ports only - never on Infrastructure, so the
+       use cases are testable with no AWS in the room. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Scaffolder.Domain\Scaffolder.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+</Project>

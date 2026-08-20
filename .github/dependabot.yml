@@ -32,3 +32,16 @@ updates:
       go-dependencies:
         patterns:
           - "*"
+
+  # .NET packages for the scaffolder. Versions are pinned centrally in
+  # services/scaffolder/Directory.Packages.props, so that is the only file
+  # these PRs touch.
+  - package-ecosystem: nuget
+    directories:
+      - /services/scaffolder
+    schedule:
+      interval: weekly
+    groups:
+      dotnet-dependencies:
+        patterns:
+          - "*"

@@ -30,6 +30,7 @@ locals {
     identity      = aws_iam_policy.pipeline_identity.arn
     api           = aws_iam_policy.pipeline_api.arn
     "api-gateway" = aws_iam_policy.pipeline_api_gateway.arn
+    scaffolder    = aws_iam_policy.pipeline_scaffolder.arn
   }
 }
 
