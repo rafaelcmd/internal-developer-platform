@@ -95,6 +95,16 @@ jobs:
     with: { component: api-gateway, action: apply }
     secrets: inherit
 
+  scaffolder-infra:
+    name: Scaffolder / DynamoDB + task queue + IRSA
+    # Reads the cluster's OIDC provider and API-server coordinates from the
+    # SSM parameters the api component publishes, and creates a ServiceAccount
+    # in the cluster — so it cannot run before the cluster exists.
+    needs: [provisioner-api]
+    uses: ./.github/workflows/_terraform.yml
+    with: { component: scaffolder, action: apply }
+    secrets: inherit
+
   # --- Kubernetes workloads --------------------------------------------------
 
   redis:
@@ -127,4 +137,13 @@ jobs:
     # Same collector-before-consumer ordering as the API above.
     needs: [provisioner-api, otel-collector, shared-ecr]
     uses: ./.github/workflows/cd-provisioner.yml
+    secrets: inherit
+
+  scaffolder:
+    name: K8s / Scaffolder
+    # scaffolder-infra is a hard prerequisite, not just ordering: the pod binds
+    # to the ServiceAccount that stack creates, and crash-loops on startup if
+    # its table or task queue are missing.
+    needs: [scaffolder-infra, otel-collector, shared-ecr]
+    uses: ./.github/workflows/cd-scaffolder.yml
     secrets: inherit

@@ -2,8 +2,8 @@
   <Folder Name="/src/">
     <Project Path="src/Scaffolder.Application/Scaffolder.Application.csproj" />
     <Project Path="src/Scaffolder.Domain/Scaffolder.Domain.csproj" />
-    <Project Path="src/Scaffolder.Functions/Scaffolder.Functions.csproj" />
     <Project Path="src/Scaffolder.Infrastructure/Scaffolder.Infrastructure.csproj" />
+    <Project Path="src/Scaffolder.Worker/Scaffolder.Worker.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Scaffolder.IntegrationTests/Scaffolder.IntegrationTests.csproj" />

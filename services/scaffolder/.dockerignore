@@ -1,0 +1,21 @@
+# Host build output must not reach the image. COPY src/ would otherwise overlay
+# the container's own obj/project.assets.json with one written on the host,
+# pointing at host paths - which fails the publish with a "package was not
+# found" that has nothing to do with the package.
+**/bin/
+**/obj/
+**/TestResults/
+
+# Not needed to build the worker, and copying them busts the layer cache on
+# every docs or fixture edit.
+tests/
+templates/
+events/
+local/
+docs/
+*.md
+Makefile
+docker-compose.dev.yaml
+.dockerignore
+.editorconfig
+.gitignore

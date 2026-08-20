@@ -2,9 +2,6 @@
 bin/
 obj/
 
-# SAM build artifacts and local state
-.aws-sam/
-
 # IDE state
 *.user
 *.suo

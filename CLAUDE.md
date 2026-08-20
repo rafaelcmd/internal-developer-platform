@@ -8,7 +8,7 @@ Event-driven, multi-service platform on AWS (EKS, SQS, Cognito):
 
 1. **API** (`/services/api`) — Go 1.25 REST API. Receives resource creation requests, publishes messages to SQS.
 2. **Provisioner** (`/services/provisioner`) — Go 1.25 service. Consumes SQS messages and orchestrates fulfilment.
-3. **Scaffolder** (`/services/scaffolder`) — .NET 10 on Lambda, deployed with SAM. Owns the repository domain: creates GitHub repos from golden-path templates and wires their CI/CD. **Under construction** — the solution and the `ReserveName` handler exist; nothing is deployed yet. See that service's `PROGRESS.md`.
+3. **Scaffolder** (`/services/scaffolder`) — .NET 10 container on EKS. Owns the repository domain: creates GitHub repos from golden-path templates and wires their CI/CD. Consumes Step Functions `.waitForTaskToken` messages off its own SQS queue. **Under construction** — the solution, the `ReserveName` task, the image and its Terraform component exist; nothing is deployed yet.
 
 Message flow: API → SQS → Provisioner → Step Functions → task workers
 
@@ -21,7 +21,8 @@ bare consume loop and no state machine is deployed.
 - Each service has its own `CLAUDE.md` with service-specific details — read it before working on that service.
 - When a change alters a service's architecture, commands, or conventions, update that service's CLAUDE.md in the same commit.
 - Go services use standard `cmd/` and `internal/` layout.
-- Infrastructure follows Terraform `modules/` + `live/` pattern. **Exception:** the scaffolder's own
-  serverless resources are owned by SAM (`services/scaffolder/template.yaml`); Terraform keeps
-  shared, long-lived infrastructure. See that service's CLAUDE.md for the boundary.
+- Infrastructure follows Terraform `modules/` + `live/` pattern, with no exceptions: every AWS
+  resource in the platform is Terraform-owned, and every workload is a container deployed with
+  `kubectl`. The scaffolder was briefly a SAM/Lambda exception; see
+  [ADR-0004](docs/adr/0004-scaffolder-runs-as-a-container-on-eks.md) for why it is not any more.
 - Services own their own data. No service reads another service's table or database.

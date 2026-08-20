@@ -1,0 +1,85 @@
+# Scaffolder worker — consumes Step Functions task tokens off SQS, so there is
+# no Service/ports/HTTP probes here (the process has no HTTP server; liveness is
+# "the container is running"). Same shape as the provisioner consumer.
+#
+# Single replica. The name reservation is a conditional write and therefore
+# already replay-safe, but the rest of the scaffold tasks are not written yet —
+# don't scale this out until every handler's state transition is a conditional
+# write, because SQS delivery is at-least-once.
+#
+# Runs as a container rather than as Lambda functions: see ADR-0004.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: internal-developer-platform-scaffolder
+  namespace: default
+  labels:
+    app: internal-developer-platform-scaffolder
+    "tags.datadoghq.com/service": scaffolder
+    "tags.datadoghq.com/env": dev
+    "tags.datadoghq.com/version": "0.1.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: internal-developer-platform-scaffolder
+  template:
+    metadata:
+      labels:
+        app: internal-developer-platform-scaffolder
+        "tags.datadoghq.com/service": scaffolder
+        "tags.datadoghq.com/env": dev
+        "tags.datadoghq.com/version": "0.1.0"
+        # Opts into datadog-agent sidecar injection (live pod status in the
+        # K8s Explorer — see k8s/api/deployment.yaml for the full note). The
+        # SA below is registered for the sidecar's kubelet-read RBAC in
+        # infra/live/scaffolder/dev/irsa.tf.
+        "agent.datadoghq.com/sidecar": fargate
+    spec:
+      serviceAccountName: internal-developer-platform-scaffolder
+      # The 20s SQS long poll plus an in-flight task means SIGTERM can arrive
+      # mid-work. The worker stops receiving and lets the current message go
+      # back to the queue rather than half-finishing it, which needs more than
+      # the default 30s grace period.
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: internal-developer-platform-scaffolder
+          # Replaced by cd-scaffolder.yml with the immutable
+          # scaffolder-<sha> build — see the api manifest for the pattern.
+          image: PLACEHOLDER-SCAFFOLDER-IMAGE
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: ENVIRONMENT
+              value: dev
+            - name: SERVICE_NAME
+              value: scaffolder
+            # Feeds the OTel resource (service.version -> Datadog version tag).
+            - name: SERVICE_VERSION
+              value: "0.1.0"
+            # Terraform owns both of these (infra/live/scaffolder/dev). Names,
+            # not ARNs or URLs: the SDK resolves them, so no account id lands in
+            # this file and the same manifest works in any account.
+            - name: SCAFFOLDER_TABLE_NAME
+              value: internal-developer-platform-scaffolder-dev
+            - name: SCAFFOLDER_TASK_QUEUE_NAME
+              value: internal-developer-platform-scaffolder-tasks-dev
+            # How long an unfinished scaffold holds a name before DynamoDB TTL
+            # releases it. Long enough to outlive a slow Terraform run, short
+            # enough that an abandoned request frees the name the same day.
+            - name: SCAFFOLDER_RESERVATION_TTL_MINUTES
+              value: "360"
+            # OTLP egress to the Collector, same seam as the API and the
+            # provisioner. Telemetry is a no-op when this is unset, so it must
+            # be present for traces and metrics to ship — and being able to
+            # reach this endpoint at all is why this service is not on Lambda.
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel-collector.observability.svc.cluster.local:4317
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: grpc
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

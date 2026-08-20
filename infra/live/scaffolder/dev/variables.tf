@@ -1,0 +1,73 @@
+# =============================================================================
+# GENERAL PROJECT CONFIGURATION
+# =============================================================================
+
+variable "project" {
+  description = "Project name used for resource naming and tagging"
+  type        = string
+}
+
+variable "environment" {
+  description = "Environment name (e.g., prod, staging, dev) used for resource naming and tagging"
+  type        = string
+  default     = "dev"
+}
+
+variable "aws_region" {
+  description = "AWS region where resources will be deployed"
+  type        = string
+}
+
+variable "service_name" {
+  description = "Name of the service being deployed"
+  type        = string
+  default     = "scaffolder"
+}
+
+# =============================================================================
+# DYNAMODB
+# One table for the whole service: name reservations today, template versions
+# and repository records to come.
+# =============================================================================
+
+variable "point_in_time_recovery_enabled" {
+  description = "Continuous backups for the scaffolder table. Off in dev, on everywhere else."
+  type        = bool
+  default     = false
+}
+
+variable "deletion_protection_enabled" {
+  description = "Blocks a destroy from taking the repository inventory with it. Off in dev, on everywhere else."
+  type        = bool
+  default     = false
+}
+
+# =============================================================================
+# TASK QUEUE
+# Step Functions drops .waitForTaskToken messages here; the worker pod consumes
+# them and reports back with SendTaskSuccess / SendTaskFailure.
+# =============================================================================
+
+variable "task_visibility_timeout_seconds" {
+  description = "How long a received task is hidden from other consumers. Must exceed the slowest task (a template render plus a GitHub push)."
+  type        = number
+  default     = 300
+}
+
+variable "task_message_retention_seconds" {
+  description = "How long an unconsumed task survives. A task older than this has already lost its execution."
+  type        = number
+  default     = 86400
+}
+
+variable "task_max_receive_count" {
+  description = "Deliveries before a task is moved to the DLQ"
+  type        = number
+  default     = 5
+}
+
+variable "dlq_message_retention_seconds" {
+  description = "How long a dead-lettered task is kept for inspection"
+  type        = number
+  default     = 1209600
+}

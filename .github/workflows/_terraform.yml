@@ -77,6 +77,7 @@ jobs:
             identity)    dir=infra/live/shared/identity ;;
             api)         dir=infra/live/provisioner_api/dev;         var_flags="-var-file=dev.tfvars" ;;
             api-gateway) dir=infra/live/provisioner_api_gateway/dev; var_flags="-var-file=dev.tfvars" ;;
+            scaffolder)  dir=infra/live/scaffolder/dev;              var_flags="-var-file=dev.tfvars" ;;
             *) echo "Unknown component: ${{ inputs.component }}"; exit 1 ;;
           esac
           case "${{ inputs.action }}" in

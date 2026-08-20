@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The service's entry point: a long-running host that consumes Step
+       Functions task tokens off SQS. Composition and serialization only - the
+       same role Scaffolder.Functions played for Lambda, which is why swapping
+       the runtime touched no other project. See ADR-0004. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Scaffolder.Worker</RootNamespace>
+    <!-- Reflection-based JSON binding of task payloads; trimming would remove
+         the very types the dispatcher deserializes into. -->
+    <PublishTrimmed>false</PublishTrimmed>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The dispatcher and envelope are exercised directly by the unit tests,
+         with no queue and no AWS. -->
+    <InternalsVisibleTo Include="Scaffolder.UnitTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Scaffolder.Application\Scaffolder.Application.csproj" />
+    <ProjectReference Include="..\Scaffolder.Infrastructure\Scaffolder.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.SQS" />
+    <PackageReference Include="AWSSDK.StepFunctions" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" />
+  </ItemGroup>
+
+  <ItemGroup Label="Telemetry">
+    <!-- Same OTLP seam as the Go services: traces and metrics leave the pod as
+         OTLP to the in-cluster Collector, which forwards to Datadog. Being able
+         to use this at all is the main reason this service is not on Lambda. -->
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AWS" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
+  </ItemGroup>
+
+</Project>

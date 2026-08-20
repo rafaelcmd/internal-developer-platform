@@ -67,9 +67,18 @@ jobs:
     with: { component: api-gateway, action: destroy }
     secrets: inherit
 
+  scaffolder:
+    name: Scaffolder / DynamoDB + task queue + IRSA (destroy)
+    # Before the cluster: this stack owns a ServiceAccount inside it, and the
+    # kubernetes provider cannot reach the API server once EKS is gone.
+    needs: [guard]
+    uses: ./.github/workflows/_terraform.yml
+    with: { component: scaffolder, action: destroy }
+    secrets: inherit
+
   provisioner-api:
     name: Provisioner API / EKS (destroy)
-    needs: [provisioner-api-gateway]
+    needs: [provisioner-api-gateway, scaffolder]
     uses: ./.github/workflows/_terraform.yml
     with: { component: api, action: destroy }
     secrets: inherit

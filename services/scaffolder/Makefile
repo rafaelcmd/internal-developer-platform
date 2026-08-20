@@ -1,8 +1,19 @@
 # Internal Developer Platform Scaffolder Makefile
+#
+# The scaffolder runs as a container on EKS like the other two services
+# (ADR-0004). Nothing here needs the AWS SAM CLI or the Amazon.Lambda.Tools
+# global tool; local runs go through docker compose against LocalStack.
 
-.PHONY: help restore build test test-unit test-integration coverage format format-check sam-build invoke clean
+# The compose targets drive the ROOT compose file, not the fragment in this
+# directory: the fragment's otel-collector dependency is defined there, and the
+# root file is what `include:`s this one. Running the fragment alone fails with
+# "undefined service otel-collector".
+COMPOSE := docker compose -f ../../docker-compose.dev.yaml
+QUEUE_URL := http://localhost:4566/000000000000/internal-developer-platform-scaffolder-tasks-local
 
-# Default target
+.PHONY: help restore build test test-unit test-integration coverage format format-check \
+        image up down logs seed clean
+
 help:
 	@echo "Available targets:"
 	@echo "  restore          - Restore NuGet packages"
@@ -12,19 +23,20 @@ help:
 	@echo "  coverage         - Run unit tests with coverage collection"
 	@echo "  format           - Apply formatting fixes"
 	@echo "  format-check     - Verify formatting without changing files"
-	@echo "  sam-build        - Build the SAM deployment artifacts"
-	@echo "  invoke           - Invoke a function locally (F=ReserveName E=events/reserve-name.json)"
-	@echo "  clean            - Remove build and SAM artifacts"
+	@echo "  image            - Build the container image"
+	@echo "  up               - Start the worker and LocalStack"
+	@echo "  down             - Stop them and drop the volumes"
+	@echo "  logs             - Follow the worker's logs"
+	@echo "  seed             - Enqueue a task fixture (E=events/reserve-name.json)"
+	@echo "  clean            - Remove build artifacts"
 
-# Restore NuGet packages
 restore:
 	dotnet restore
 
-# Build the solution
 build:
 	dotnet build
 
-# Unit tests only: domain, application and handler wiring
+# Unit tests only: domain, application and dispatcher wiring
 test: test-unit
 
 test-unit:
@@ -38,28 +50,36 @@ test-integration:
 coverage:
 	dotnet test tests/Scaffolder.UnitTests --collect:"XPlat Code Coverage"
 
-# Formatting
 format:
 	dotnet format
 
 format-check:
 	dotnet format --verify-no-changes
 
-# SAM. Requires template.yaml, which is not written yet.
-F ?= ReserveName
+# Container
+image:
+	docker build -f Dockerfile.dev -t internal-developer-platform-scaffolder:dev .
+
+up:
+	$(COMPOSE) up --build -d scaffolder
+
+down:
+	$(COMPOSE) down -v
+
+logs:
+	$(COMPOSE) logs -f scaffolder
+
+# Put one task on the local queue. See events/README.md for what the fake task
+# token does and does not exercise.
 E ?= events/reserve-name.json
 
-sam-build:
-	@test -f template.yaml || { echo "template.yaml does not exist yet"; exit 1; }
-	sam build
+seed:
+	aws --endpoint-url http://localhost:4566 --region us-east-1 sqs send-message \
+	  --queue-url "$(QUEUE_URL)" \
+	  --message-body "file://$(E)"
 
-invoke: sam-build
-	sam local invoke $(F) -e $(E)
-
-# Clean build artifacts
 clean:
 	dotnet clean
-	rm -rf .aws-sam
 	find . -type d \( -name bin -o -name obj \) -prune -exec rm -rf {} +
 
 .DEFAULT_GOAL := help

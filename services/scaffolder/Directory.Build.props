@@ -2,7 +2,8 @@
 
   <!-- Language and framework settings live here and nowhere else. Every project
        under services/scaffolder inherits them, so a runtime bump is one edit.
-       See PROGRESS.md B0 for why the target is .NET 10 and not .NET 8. -->
+       .NET 10 is an LTS with runway to Nov 2030; .NET 8 goes out of support in
+       Nov 2026, so do not fall back to it. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <LangVersion>latest</LangVersion>

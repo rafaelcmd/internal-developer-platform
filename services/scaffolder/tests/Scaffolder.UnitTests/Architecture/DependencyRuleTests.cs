@@ -11,7 +11,7 @@ namespace Scaffolder.UnitTests.Architecture;
 /// </summary>
 public sealed class DependencyRuleTests
 {
-    private static readonly string SolutionRoot = FindSolutionRoot();
+    private static readonly string SolutionRoot = SolutionLayout.Root;
 
     [Fact]
     public void Domain_references_nothing()
@@ -50,15 +50,40 @@ public sealed class DependencyRuleTests
     }
 
     [Fact]
-    public void Functions_is_the_only_project_referencing_the_lambda_runtime()
+    public void Worker_is_the_only_project_wired_to_the_messaging_runtime()
     {
+        // The queue, the callback API and the generic host are details of the
+        // entry point. A use case that reached for them directly would be
+        // untestable without AWS, which is the whole point of the layering.
+        string[] runtimeOnly =
+        [
+            "AWSSDK.SQS",
+            "AWSSDK.StepFunctions",
+            "Microsoft.Extensions.Hosting",
+        ];
+
+        var runtimeAware = ProjectFiles()
+            .Where(path => ReferencesOf(path).Packages.Any(p => runtimeOnly.Contains(p, StringComparer.Ordinal)))
+            .Select(path => Path.GetFileNameWithoutExtension(path)!)
+            .Order()
+            .ToArray();
+
+        Assert.Equal(new[] { "Scaffolder.Worker" }, runtimeAware);
+    }
+
+    [Fact]
+    public void Nothing_references_the_lambda_runtime()
+    {
+        // ADR-0004: this service runs as a container on EKS. A stray
+        // Amazon.Lambda.* reference means someone is reintroducing the runtime
+        // that decision removed, and it should fail here rather than at deploy.
         var lambdaAware = ProjectFiles()
             .Where(path => ReferencesOf(path).Packages.Any(p => p.StartsWith("Amazon.Lambda.", StringComparison.Ordinal)))
             .Select(path => Path.GetFileNameWithoutExtension(path)!)
             .Order()
             .ToArray();
 
-        Assert.Equal(new[] { "Scaffolder.Functions", "Scaffolder.UnitTests" }, lambdaAware);
+        Assert.Empty(lambdaAware);
     }
 
     [Fact]
@@ -103,18 +128,5 @@ public sealed class DependencyRuleTests
             .ToArray();
 
         return (projects, packages);
-    }
-
-    private static string FindSolutionRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-
-        while (directory is not null && directory.GetFiles("Directory.Packages.props").Length == 0)
-        {
-            directory = directory.Parent;
-        }
-
-        return directory?.FullName
-            ?? throw new InvalidOperationException("could not locate the scaffolder solution root from " + AppContext.BaseDirectory);
     }
 }

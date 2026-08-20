@@ -1,0 +1,38 @@
+# ---- Build stage ----
+ARG DOTNET_VERSION=10.0
+FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION} AS builder
+
+WORKDIR /src
+
+# Restore against the project graph alone, so a source-only edit reuses the
+# cached package layer. Directory.*.props carry the TFM and the pinned versions,
+# so they have to land before the restore.
+COPY Directory.Build.props Directory.Packages.props Scaffolder.slnx ./
+COPY src/Scaffolder.Domain/Scaffolder.Domain.csproj                 src/Scaffolder.Domain/
+COPY src/Scaffolder.Application/Scaffolder.Application.csproj       src/Scaffolder.Application/
+COPY src/Scaffolder.Infrastructure/Scaffolder.Infrastructure.csproj src/Scaffolder.Infrastructure/
+COPY src/Scaffolder.Worker/Scaffolder.Worker.csproj                 src/Scaffolder.Worker/
+RUN dotnet restore src/Scaffolder.Worker/Scaffolder.Worker.csproj
+
+COPY src/ src/
+RUN dotnet publish src/Scaffolder.Worker/Scaffolder.Worker.csproj \
+      --configuration Release \
+      --no-restore \
+      --output /app/publish
+
+# ---- Runtime stage ----
+FROM mcr.microsoft.com/dotnet/runtime:${DOTNET_VERSION}
+
+WORKDIR /app
+
+# Non-root. The .NET runtime image already ships an unprivileged `app` user
+# (uid 1654) — reuse it rather than adding one, because uid 1000 is taken by
+# `ubuntu` in the Azure Linux base and useradd fails on the collision.
+USER app
+
+COPY --from=builder --chown=app:app /app/publish ./
+
+# No HTTP server and no ports: the worker's only inbound channel is the task
+# queue. Liveness in Kubernetes is "the container is running", same as the
+# provisioner consumer.
+ENTRYPOINT ["dotnet", "/app/Scaffolder.Worker.dll"]

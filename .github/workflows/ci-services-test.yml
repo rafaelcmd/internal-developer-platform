@@ -8,8 +8,10 @@
 # DOCS      .github/workflows/README.md
 # =============================================================================
 #
-# Both services are independent Go modules, so the matrix runs one job per
-# service and a failure in one still reports the other.
+# The two Go services are independent modules, so the matrix runs one job per
+# service and a failure in one still reports the other. The scaffolder is .NET
+# and gets its own job rather than a matrix entry — the Go matrix is
+# Go-specific from setup-go down to gofmt.
 
 name: CI · Services Build & Test
 
@@ -93,6 +95,53 @@ jobs:
           echo "### Coverage — ${{ matrix.service }}" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           go tool cover -func=coverage.out | tail -1 >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # The scaffolder: .NET, one solution, no AWS and no Docker in the unit tests.
+  # The architecture tests in tests/Scaffolder.UnitTests/Architecture run here
+  # too, so a layering violation or an unpinned package version fails the PR.
+  # ---------------------------------------------------------------------------
+  scaffolder:
+    name: scaffolder (.NET)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/scaffolder
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # global-json-file would pin the SDK, but the service does not carry one:
+      # Directory.Build.props holds the target framework, and any 10.0 SDK
+      # builds it. Keep this in step with the TFM there.
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Check formatting
+        run: dotnet format --verify-no-changes --no-restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test tests/Scaffolder.UnitTests --configuration Release --no-build --collect:"XPlat Code Coverage"
+
+      # Cobertura reports land in a GUID-named directory per run, so the
+      # summary globs for the file rather than assuming its path.
+      - name: Coverage summary
+        run: |
+          report=$(find tests/Scaffolder.UnitTests/TestResults -name coverage.cobertura.xml | head -1)
+          rate=$(sed -n 's/.*line-rate="\([0-9.]*\)".*/\1/p' "$report" | head -1)
+          echo "### Coverage — scaffolder" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "line coverage: $(awk -v r="$rate" 'BEGIN { printf "%.1f%%", r * 100 }')" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
   # ---------------------------------------------------------------------------

@@ -8,12 +8,12 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Scaffolder.Application\Scaffolder.Application.csproj" />
     <ProjectReference Include="..\..\src\Scaffolder.Domain\Scaffolder.Domain.csproj" />
-    <ProjectReference Include="..\..\src\Scaffolder.Functions\Scaffolder.Functions.csproj" />
+    <ProjectReference Include="..\..\src\Scaffolder.Worker\Scaffolder.Worker.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Amazon.Lambda.TestUtilities" />
     <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="NSubstitute" />
     <PackageReference Include="xunit" />
