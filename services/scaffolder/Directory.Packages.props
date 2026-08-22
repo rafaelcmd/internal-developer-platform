@@ -8,9 +8,9 @@
   </PropertyGroup>
 
   <ItemGroup Label="AWS SDK">
-    <PackageVersion Include="AWSSDK.DynamoDBv2" Version="4.0.103.1" />
-    <PackageVersion Include="AWSSDK.SQS" Version="4.0.100.9" />
-    <PackageVersion Include="AWSSDK.StepFunctions" Version="4.0.100.9" />
+    <PackageVersion Include="AWSSDK.DynamoDBv2" Version="4.0.103.4" />
+    <PackageVersion Include="AWSSDK.SQS" Version="4.0.100.10" />
+    <PackageVersion Include="AWSSDK.StepFunctions" Version="4.0.100.10" />
   </ItemGroup>
 
   <ItemGroup Label="Composition">
@@ -25,18 +25,18 @@
        four on one version: the exporter and the instrumentation packages share
        an API surface that moves together. -->
   <ItemGroup Label="Telemetry">
-    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
-    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.AWS" Version="1.17.0" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.18.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.18.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AWS" Version="1.18.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.18.0" />
   </ItemGroup>
 
   <ItemGroup Label="Testing">
-    <PackageVersion Include="coverlet.collector" Version="6.0.4" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageVersion Include="coverlet.collector" Version="10.0.1" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
     <PackageVersion Include="NSubstitute" Version="6.2.0" />
     <PackageVersion Include="xunit" Version="2.9.3" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
   </ItemGroup>
 
 </Project>
