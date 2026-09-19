@@ -8,28 +8,28 @@
   </PropertyGroup>
 
   <ItemGroup Label="AWS SDK">
-    <PackageVersion Include="AWSSDK.DynamoDBv2" Version="4.0.103.6" />
-    <PackageVersion Include="AWSSDK.SecretsManager" Version="4.0.100.12" />
-    <PackageVersion Include="AWSSDK.SQS" Version="4.0.100.12" />
-    <PackageVersion Include="AWSSDK.StepFunctions" Version="4.0.100.13" />
+    <PackageVersion Include="AWSSDK.DynamoDBv2" Version="4.0.104" />
+    <PackageVersion Include="AWSSDK.SecretsManager" Version="4.0.100.14" />
+    <PackageVersion Include="AWSSDK.SQS" Version="4.0.100.14" />
+    <PackageVersion Include="AWSSDK.StepFunctions" Version="4.0.100.15" />
   </ItemGroup>
 
   <ItemGroup Label="Composition">
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.11" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
     <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.11" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.11" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
   </ItemGroup>
 
   <!-- OTLP to the in-cluster Collector, same seam as the Go services. Keep the
        four on one version: the exporter and the instrumentation packages share
        an API surface that moves together. -->
   <ItemGroup Label="Telemetry">
-    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.18.0" />
-    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.18.0" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.AWS" Version="1.18.0" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.18.0" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.19.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.19.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AWS" Version="1.19.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.19.0" />
   </ItemGroup>
 
   <!-- The GitHub API client. Pinned here like everything else; Octokit is the
@@ -40,7 +40,7 @@
 
   <ItemGroup Label="Testing">
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageVersion Include="NSubstitute" Version="6.2.0" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
