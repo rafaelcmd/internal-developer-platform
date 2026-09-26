@@ -66,6 +66,22 @@ jobs:
             --output text)
           echo "TARGET_GROUP_ARN=$arn" >> "$GITHUB_ENV"
 
+      # The builder image tracks the go directive rather than a second copy of
+      # the version. Dependabot raises that directive whenever a dependency
+      # needs a newer Go, and the toolchain the tests run on comes from the same
+      # place (ci-services-test.yml uses go-version-file), so the image and the
+      # tests cannot disagree.
+      - name: Read Go version from go.mod
+        working-directory: services/api
+        run: |
+          version=$(sed -n 's/^go \([0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' go.mod)
+          if [ -z "$version" ]; then
+            echo "No go directive found in services/api/go.mod" >&2
+            exit 1
+          fi
+          echo "Building with Go $version"
+          echo "GO_VERSION=$version" >> "$GITHUB_ENV"
+
       - name: Build and push image
         working-directory: services/api
         env:
@@ -73,6 +89,7 @@ jobs:
         run: |
           docker build \
             --platform linux/amd64 \
+            --build-arg GO_VERSION="$GO_VERSION" \
             -f Dockerfile.dev \
             -t "$ECR_URL:api-latest" \
             -t "$ECR_URL:api-${{ github.sha }}" \

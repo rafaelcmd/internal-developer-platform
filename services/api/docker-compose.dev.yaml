@@ -3,7 +3,7 @@ services:
     container_name: internal-developer-platform-api
     build:
       args:
-        - GO_VERSION=${GO_VERSION:-1.25}
+        - GO_VERSION=${GO_VERSION:-1.26}
       context: .
       dockerfile: Dockerfile.dev
     ports:

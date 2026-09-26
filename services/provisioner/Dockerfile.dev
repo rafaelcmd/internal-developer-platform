@@ -1,3 +1,7 @@
+# Must satisfy the go directive in go.mod. The official Go images set
+# GOTOOLCHAIN=local, so a builder older than the directive fails the build
+# instead of fetching a newer toolchain. The deploy workflow overrides this with
+# the version read out of go.mod; the default is here for a bare docker build.
 ARG GO_VERSION=1.25
 
 FROM golang:${GO_VERSION}
