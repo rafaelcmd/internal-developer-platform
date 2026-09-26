@@ -7,10 +7,16 @@ Monorepo for an internal developer platform that provisions cloud resources.
 Event-driven, multi-service platform on AWS (EKS, SQS, Cognito):
 
 1. **API** (`/services/api`) — Go 1.25 REST API. Receives provision requests — one request carries both the application to scaffold and the cloud resources it needs — and publishes them to SQS.
-2. **Provisioner** (`/services/provisioner`) — Go 1.25 service and the control plane. Consumes SQS messages and splits each request into the work each downstream worker owns: the repository half for the scaffolder, the resources half for the infra worker.
-3. **Scaffolder** (`/services/scaffolder`) — .NET 10 container on EKS. Owns the repository domain: creates GitHub repos from golden-path templates and wires their CI/CD. Consumes Step Functions `.waitForTaskToken` messages off its own SQS queues, as two Deployments of one image split by what they are trusted with — only the `github` one can read the GitHub App private key. **Under construction** — the solution, the `ReserveName` and `CreateRepository` tasks, the GitHub App adapter, the image and its Terraform component exist; nothing is deployed yet, and nothing upstream calls it.
+2. **Provisioner** (`/services/provisioner`) — Go 1.25 service and the control plane. Consumes SQS messages and splits each request into the work each downstream worker owns: the repository half for the scaffolder, the resources half for the infra worker. Its Terraform component owns the **scaffold Step Functions state machine** and the request-state table; the service does not start executions yet.
+3. **Scaffolder** (`/services/scaffolder`) — .NET 10 container on EKS. Owns the repository domain: creates GitHub repos from golden-path templates and wires their CI/CD. Consumes Step Functions `.waitForTaskToken` messages off its own SQS queues, as two Deployments of one image split by what they are trusted with — only the `github` one can read the GitHub App private key. **Under construction** — the solution, the `ReserveName` and `CreateRepository` tasks, the GitHub App adapter, the image and its Terraform component exist, and the state machine now targets both queues; nothing is deployed yet, and no code upstream starts an execution.
 
 Message flow: API → SQS → Provisioner → Step Functions → task workers
+
+The state machine is defined in `infra/live/provisioner/dev/state_machine.tf` and
+built by `infra/modules/aws/step_functions`. It lives with the provisioner because
+the provisioner is the control plane and the workflow spans both workers; it
+reaches the scaffolder's task queues by name through SSM. See
+[ADR-0006](docs/adr/0006-step-functions-as-provisioning-orchestrator.md).
 
 The request contract is defined in `services/api/internal/domain/model/resource.go` and
 **duplicated** in `services/provisioner/internal/provision/request.go`. Separate modules and
@@ -18,8 +24,11 @@ separate deployables, so a shared struct would make a field rename in one a comp
 other — the coupling a queue exists to remove. Change them together.
 
 Planned but not yet created: an **Infra Worker** (Go) that executes infrastructure-as-code as a
-`.waitForTaskToken` task in the same state machine. Until it exists, the provisioner is still a
-bare consume loop and no state machine is deployed.
+`.waitForTaskToken` task in the same state machine. Until it exists, the machine's `ProvisionInfra`
+state is a `Fail` state, so a request naming cloud resources fails rather than reporting success for
+resources nothing created; setting `infra_worker_task_queue_name` turns it into the callback task.
+The provisioner service itself is still a bare consume loop: it logs both halves of a request
+instead of calling `StartExecution`.
 
 ## Conventions
 

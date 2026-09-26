@@ -6,17 +6,21 @@
 > `CreateRepository` tasks, the DynamoDB name-reservation and repository-inventory
 > adapters, the GitHub App adapter, the container image, both Kubernetes
 > Deployments, and the `scaffolder` Terraform component that owns its table, its
-> two task queues, the App key secret and the two IRSA roles. Nothing is deployed
-> yet. Still design only: every task after `CreateRepository`, the state machine,
-> and the templates. Sections below describing those are intent, not working code.
+> two task queues, the App key secret and the two IRSA roles. The **scaffold
+> state machine now exists too**, in the provisioner's Terraform component
+> (`infra/live/provisioner/dev/state_machine.tf`), and its `ReserveName` and
+> `CreateRepository` states target these two queues. Nothing is deployed yet.
+> Still design only: every task after `CreateRepository`, and the templates.
+> Sections below describing those are intent, not working code.
 >
-> **Nothing calls this service yet.** The API now accepts an application name and
+> **No code calls this service yet.** The API accepts an application name and
 > template, and the provisioner splits each request into a scaffold half and an
-> infra half — but there is still no state machine, so the provisioner logs both
-> halves and acknowledges the message. A repository appears on GitHub only when
+> infra half, but it still logs both halves and acknowledges the message instead
+> of calling `StartExecution`. A repository therefore appears on GitHub only when
 > something puts a `CreateRepository` envelope on the github queue: today that is
-> `make seed`, not a developer filling in a form. The missing piece is the state
-> machine and the provisioner's two `StartExecution` calls.
+> `make seed` or a hand-started execution, not a developer filling in a form. The
+> missing piece is that one `StartExecution` call — one execution covers a whole
+> request, with the two halves as parallel branches inside it.
 
 .NET service that owns the **repository domain** of the platform: given an
 application request, it creates a GitHub repository, renders a golden-path
@@ -74,6 +78,14 @@ Every scaffolder state is a `.waitForTaskToken` task: Step Functions puts a
 message on a queue carrying the task name, the payload and the callback token,
 and the worker dispatches on the name.
 
+Of those, the deployed definition contains `ReserveName`, `CreateRepository` and
+`ProvisionInfra` (the last a `Fail` state until the infra worker exists), plus
+the DynamoDB writes that record terminal request state. The rest of the diagram
+is still intent. See
+[ADR-0006](../../docs/adr/0006-step-functions-as-provisioning-orchestrator.md)
+for the orchestration decision and `infra/live/provisioner/dev/README.md` for
+the definition as it stands.
+
 There are **two** Deployments of the one image, and a queue each:
 
 | Deployment | Queue | Tasks | Can read the App key |
@@ -93,6 +105,20 @@ does not depend on infrastructure existing. Only `InjectInfraOutputs` needs both
 so it is the join. Keep it that way: serializing them makes a developer wait for
 a multi-minute Terraform run before they can see their repository, and "time to
 first commit" is the metric this platform is judged on.
+
+What crosses that join is deliberately thin.
+[ADR-0007](../../docs/adr/0007-infrastructure-outputs-reach-applications-by-reference.md)
+has scaffolded applications resolve their queue, their database and everything
+else by **SSM parameter path** rather than by values written into the
+repository: the path is derivable from the request
+(`/idp/<application>/<environment>/<resource>/<output>`), so a template renders
+against the contract before Terraform has provisioned anything. `InjectInfraOutputs`
+is therefore a **verification** step — every parameter the template expects
+exists and is readable — not a config rewrite. Anything that genuinely cannot be
+a convention arrives later as a pull request against the new repository, so it
+never blocks first commit. A credential never crosses the join at all: the
+parameter holds a Secrets Manager ARN and the application's IRSA role is what
+reads it.
 
 **Ownership boundary.** The provisioner owns saga/request state. This service
 owns templates, name reservations, and the repository inventory, in its own
@@ -211,6 +237,9 @@ A template is not just `dotnet new` output. Each one carries the things that mak
 a service production-shaped on day zero:
 
 - service code in the platform's layout
+- configuration that resolves provisioned resources by SSM parameter path at
+  startup, never by an injected literal (ADR-0007), with the resolution already
+  wired up so an application author never writes it
 - OTel SDK pre-wired to the Collector, with `service.name` / `service.version` /
   `deployment.environment` set the same way the Go services set them
 - health and readiness endpoints, graceful shutdown, structured JSON logging
@@ -307,8 +336,13 @@ Identical to the Go services, which is the point:
   `deployment.environment` are set from the same env vars the Go services use, so
   a scaffold shows up as part of the request that triggered it rather than as an
   orphan trace.
-- The state machine propagates W3C trace context, so the worker's spans join the
-  trace the API opened.
+- The worker's spans do **not** join the trace the API opened. Step Functions
+  traces with X-Ray and injects no W3C `traceparent`, and `TaskEnvelope` carries
+  no trace-context field, so a scaffold currently reads as its own trace rooted
+  at the worker. Closing that means putting the API's `traceparent` into the
+  execution input and threading it through the envelope; until then the
+  correlation between a request and its scaffold is the request id, not the
+  trace id.
 - `AddAWSInstrumentation()` puts SDK calls on the trace, so a slow DynamoDB write
   reads as its own span rather than unexplained time inside a task.
 - Runtime metrics via `AddRuntimeInstrumentation()`, over the same OTLP pipe. No

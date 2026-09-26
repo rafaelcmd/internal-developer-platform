@@ -5,6 +5,12 @@ queue, decodes the request the API published, and splits it into the work each
 downstream worker owns — the repository half for the scaffolder, the cloud
 resources half for the (not yet built) infra worker.
 
+The component also owns the **scaffold state machine** and the **request-state
+table**, in `infra/live/provisioner/dev`. Those are infrastructure, not code in
+this directory: the machine exists and can be started by hand, but the consumer
+does not call `StartExecution` yet. See [ADR-0006](../../docs/adr/0006-step-functions-as-provisioning-orchestrator.md)
+and `infra/live/provisioner/dev/README.md`.
+
 Go version: 1.25 (see `go.mod`). Entry point: `cmd/consumer/main.go`.
 
 ## Layout
@@ -67,9 +73,27 @@ Two details that matter downstream:
   scaffolder takes the org from its own `GITHUB_ORG` config precisely so a queue
   message cannot choose where it writes.
 
-**Nothing is dispatched yet.** The scaffold state machine does not exist, so
-`Dispatch` logs both halves and the message is acknowledged. The two
-`StartExecution` calls belong exactly where that logging is.
+**Nothing is dispatched yet.** `Dispatch` logs both halves and the message is
+acknowledged. The state machine now exists, so what is missing is the call:
+`StartExecution` belongs exactly where that logging is.
+
+When it is written, three things are already decided by the infrastructure:
+
+- **The execution input is the request message, unchanged.** The machine reads
+  `request_id`, `application.*` and `resources` in the same snake_case shape the
+  API publishes, so the consumer passes through what it parsed rather than
+  translating. `Split()` stays what it is: the control plane's statement of who
+  owns which half, and the thing the log fields are built from.
+- **Execution identity comes from `request_id`.** A deterministic execution name
+  makes a redelivered SQS message collide with `ExecutionAlreadyExists` instead
+  of starting a second saga. That is the idempotency mechanism; the request
+  table is not.
+- **The state machine is the single writer of a request row.** The consumer
+  reads it (`dynamodb:GetItem` only) and never writes it.
+
+The ARN and the table name are resolved at startup from
+`/idp/provisioner/<env>/scaffold_state_machine_arn` and
+`/idp/provisioner/<env>/requests_table_name`, the same way the queue URL is.
 
 ## Observability
 

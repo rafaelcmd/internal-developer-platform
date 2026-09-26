@@ -17,8 +17,12 @@
 # Teardown order, enforced by `needs:` so a component is never destroyed while
 # something still depends on it:
 #
-#   api-gateway ─▶ api (EKS) ─┬─▶ identity ─┐
-#                             └─▶ datadog ──┴─▶ ecr ─▶ vpc
+#   api-gateway ──────────────┬─▶ api (EKS) ─┬─▶ identity ─┐
+#   provisioner ─▶ scaffolder ┘               └─▶ datadog ──┴─▶ ecr ─▶ vpc
+#
+# The provisioner goes before the scaffolder: its state machine resolves the
+# scaffolder's task queues through data sources, which a destroy refreshes like
+# any other run.
 #
 # Kubernetes workloads (API, provisioner, Redis, collector) need no jobs of
 # their own: they disappear with the EKS cluster when the `api` component is
@@ -71,19 +75,23 @@ jobs:
     name: Scaffolder / DynamoDB + task queues + secret + IRSA (destroy)
     # Before the cluster: this stack owns two ServiceAccounts inside it, and the
     # kubernetes provider cannot reach the API server once EKS is gone.
+    # After the provisioner: that stack's state machine resolves these task
+    # queues through data sources, and a destroy refreshes them like any other
+    # run, so removing the queues first fails its plan.
     # The GitHub App key secret goes with it — dev sets a zero-day recovery
     # window precisely so the next apply can reuse the name, which means the
     # PEM has to be put back in by hand after every rebuild.
-    needs: [guard]
+    needs: [guard, provisioner]
     uses: ./.github/workflows/_terraform.yml
     with: { component: scaffolder, action: destroy }
     secrets: inherit
 
   provisioner:
-    name: Provisioner / IRSA (destroy)
+    name: Provisioner / Step Functions + request state + IRSA (destroy)
     # Before the cluster, for the same reason as the scaffolder: this stack owns
     # a ServiceAccount inside it, and the kubernetes provider cannot reach the
-    # API server once EKS is gone.
+    # API server once EKS is gone. It goes first of the two, because its state
+    # machine reads the scaffolder's queues.
     needs: [guard]
     uses: ./.github/workflows/_terraform.yml
     with: { component: provisioner, action: destroy }

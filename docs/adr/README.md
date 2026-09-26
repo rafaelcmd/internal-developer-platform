@@ -28,6 +28,8 @@ None exist yet; create them only when the first such decision arises.
 | 0003 | [Redis on ECS as the idempotency store](0003-redis-on-ecs-for-idempotency-store.md) | Accepted | 2026-05-03 |
 | 0004 | [Scaffolder runs as a container on EKS](0004-scaffolder-runs-as-a-container-on-eks.md) | Accepted | 2026-08-19 |
 | 0005 | [Secrets Manager is reached through a VPC interface endpoint](0005-secrets-manager-vpc-interface-endpoint.md) | Proposed | 2026-09-07 |
+| 0006 | [Step Functions orchestrates provisioning, workers execute it](0006-step-functions-as-provisioning-orchestrator.md) | Proposed | 2026-09-20 |
+| 0007 | [Scaffolded applications resolve infrastructure by reference](0007-infrastructure-outputs-reach-applications-by-reference.md) | Proposed | 2026-09-20 |
 
 ## How to add a new ADR
 

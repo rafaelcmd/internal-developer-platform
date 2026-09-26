@@ -5,6 +5,8 @@ locals {
     Service     = var.service_name
   }
 
+  name_prefix = "${var.project}-${var.service_name}"
+
   service_account_name      = "internal-developer-platform-provisioner"
   service_account_namespace = "default"
 }

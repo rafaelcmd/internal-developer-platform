@@ -27,7 +27,12 @@
 #         └─▶ api (EKS/SQS) ─┬─▶ redis ────────────────▶ api-deploy
 #                            ├─▶ otel-collector ──┬────▶ api-deploy
 #                            │                    └────▶ provisioner-deploy
+#                            ├─▶ scaffolder ──────▶ provisioner
 #                            └─▶ api-gateway
+#
+# The scaffolder comes before the provisioner because the scaffold state machine
+# targets the scaffolder's task queues and resolves them from the SSM parameters
+# that stack publishes.
 #
 # The gateway depends on the Terraform-managed NLB from the `api` component,
 # not on Kubernetes Service reconciliation.
@@ -96,12 +101,14 @@ jobs:
     secrets: inherit
 
   provisioner-infra:
-    name: Provisioner / IRSA
-    # Owns the consumer's IAM role and the ServiceAccount its Deployment binds
-    # to. Reads the cluster's OIDC provider and API-server coordinates, and the
-    # queue ARN, from the SSM parameters the api component publishes — so it
-    # cannot run before the cluster and the queue exist.
-    needs: [api-infra]
+    name: Provisioner / Step Functions + request state + IRSA
+    # Owns the scaffold state machine, the request-state table, the consumer's
+    # IAM role and the ServiceAccount its Deployment binds to. Reads the
+    # cluster's OIDC provider and API-server coordinates, and the queue ARN,
+    # from the SSM parameters the api component publishes, and the scaffolder's
+    # task queue names from the ones the scaffolder publishes — so it cannot run
+    # before either of those stacks.
+    needs: [api-infra, scaffolder-infra]
     uses: ./.github/workflows/_terraform.yml
     with: { component: provisioner, action: apply }
     secrets: inherit

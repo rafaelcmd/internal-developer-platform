@@ -39,6 +39,8 @@ api:
 provisioner:
   - "infra/live/provisioner/**"
   - "infra/modules/aws/irsa/**"
+  - "infra/modules/aws/dynamodb/**"
+  - "infra/modules/aws/step_functions/**"
 
 api-gateway:
   - "infra/live/api_gateway/**"
