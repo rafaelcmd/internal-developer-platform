@@ -30,6 +30,7 @@ resource "aws_iam_policy" "pipeline_provisioner" {
           "dynamodb:Describe*",
           "states:List*",
           "states:Describe*",
+          "states:ValidateStateMachineDefinition",
           "logs:Describe*",
           "logs:ListTagsForResource",
           "cloudwatch:DescribeAlarms",
