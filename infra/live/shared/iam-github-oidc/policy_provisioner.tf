@@ -105,7 +105,10 @@ resource "aws_iam_policy" "pipeline_provisioner" {
         Resource = "*"
         Condition = {
           StringEquals = {
-            "aws:ResourceTag/Project" = var.project
+            # iam:ResourceTag, not aws:ResourceTag. Step Functions is the caller
+            # when a role is passed, and the global key is unpopulated in that
+            # request, so the condition never matches and the pass is denied.
+            "iam:ResourceTag/Project" = var.project
             "iam:PassedToService"     = "states.amazonaws.com"
           }
         }
