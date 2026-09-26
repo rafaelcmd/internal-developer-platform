@@ -30,3 +30,39 @@ data "aws_ssm_parameter" "eks_oidc_provider_url" {
 data "aws_ssm_parameter" "provisioner_queue_arn" {
   name = "/idp/shared/provisioner/queue_arn"
 }
+
+# The scaffolder's task queues, resolved by name because the scaffolder
+# publishes names rather than URLs and the SQS integration takes a URL. Reading
+# the queue here also fails the plan with a clear message when the scaffolder
+# stack has not been applied, rather than producing a state machine that sends
+# tasks nowhere.
+data "aws_ssm_parameter" "scaffolder_state_task_queue_name" {
+  name = "/idp/${var.scaffolder_service_name}/${var.environment}/state_task_queue_name"
+}
+
+data "aws_ssm_parameter" "scaffolder_github_task_queue_name" {
+  name = "/idp/${var.scaffolder_service_name}/${var.environment}/github_task_queue_name"
+}
+
+data "aws_sqs_queue" "scaffolder_state_tasks" {
+  name = data.aws_ssm_parameter.scaffolder_state_task_queue_name.value
+}
+
+data "aws_sqs_queue" "scaffolder_github_tasks" {
+  name = data.aws_ssm_parameter.scaffolder_github_task_queue_name.value
+}
+
+# The infra worker's queue exists only once that service is built. Absent, the
+# state machine's infrastructure branch is a Fail state.
+data "aws_sqs_queue" "infra_worker_tasks" {
+  count = var.infra_worker_task_queue_name == null ? 0 : 1
+
+  name = var.infra_worker_task_queue_name
+}
+
+# The platform's alert channel, owned by the api component. Read rather than
+# re-created: an SNS email subscription must be confirmed by a human, so a
+# second topic would cost the same recipient another confirmation.
+data "aws_ssm_parameter" "observability_alerts_topic_arn" {
+  name = "/idp/shared/observability/alerts_topic_arn"
+}
