@@ -4,7 +4,9 @@ Go REST API and entry point of the platform: it receives resource provisioning
 requests, authenticates users against Cognito, and publishes provision messages
 to SQS for the downstream provisioner service.
 
-Go version: 1.25 (see `go.mod`). Entry point: `cmd/server/main.go`.
+Go version: 1.26 (see `go.mod`, which is authoritative: the deploy workflow
+reads the builder image tag out of the go directive, and `setup-go` reads the
+test toolchain from the same line). Entry point: `cmd/server/main.go`.
 
 ## Commands
 

@@ -26,7 +26,7 @@ An event-driven system designed for resilience and independent scaling.
 
 ```
                          ┌──────────────────┐
-   Developer ──HTTP──▶   │       API        │   (Go 1.25)
+   Developer ──HTTP──▶   │       API        │   (Go 1.26)
                          │  REST interface  │
                          └────────┬─────────┘
                                   │ publish

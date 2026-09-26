@@ -6,7 +6,7 @@ Monorepo for an internal developer platform that provisions cloud resources.
 
 Event-driven, multi-service platform on AWS (EKS, SQS, Cognito):
 
-1. **API** (`/services/api`) — Go 1.25 REST API. Receives provision requests — one request carries both the application to scaffold and the cloud resources it needs — and publishes them to SQS.
+1. **API** (`/services/api`) — Go 1.26 REST API. Receives provision requests — one request carries both the application to scaffold and the cloud resources it needs — and publishes them to SQS.
 2. **Provisioner** (`/services/provisioner`) — Go 1.25 service and the control plane. Consumes SQS messages and splits each request into the work each downstream worker owns: the repository half for the scaffolder, the resources half for the infra worker. Its Terraform component owns the **scaffold Step Functions state machine** and the request-state table; the service does not start executions yet.
 3. **Scaffolder** (`/services/scaffolder`) — .NET 10 container on EKS. Owns the repository domain: creates GitHub repos from golden-path templates and wires their CI/CD. Consumes Step Functions `.waitForTaskToken` messages off its own SQS queues, as two Deployments of one image split by what they are trusted with — only the `github` one can read the GitHub App private key. **Under construction** — the solution, the `ReserveName` and `CreateRepository` tasks, the GitHub App adapter, the image and its Terraform component exist, and the state machine now targets both queues; nothing is deployed yet, and no code upstream starts an execution.
 
