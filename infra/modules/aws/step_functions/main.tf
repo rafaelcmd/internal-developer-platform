@@ -124,6 +124,15 @@ resource "aws_sfn_state_machine" "this" {
     enabled = var.tracing_enabled
   }
 
+  # Deleting a STANDARD state machine is asynchronous: the API returns while the
+  # machine sits in DELETING, and it disappears only once Step Functions has
+  # finished, which regularly outlasts the provider's five-minute default. A
+  # destroy that gives up early reports failure for a deletion that then
+  # completes, and leaves the role and log group behind.
+  timeouts {
+    delete = var.delete_timeout
+  }
+
   # The role's policies are attached separately from the role, and a state
   # machine whose first execution starts before they land fails on the first
   # action it takes.
