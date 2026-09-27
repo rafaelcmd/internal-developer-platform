@@ -120,6 +120,27 @@ terraform plan  -var-file=dev.tfvars
 terraform apply -var-file=dev.tfvars
 ```
 
+## Teardown
+
+Deleting a STANDARD state machine is asynchronous, and Step Functions removes it
+only once every running execution has ended. A `.waitForTaskToken` execution
+waiting on a callback nobody answers therefore holds the destroy open until that
+task's timeout expires, which is 30 minutes by default.
+
+Stop them first, or the destroy waits out the module's `delete_timeout` and
+fails on a deletion that then completes on its own, leaving the role and the log
+group behind:
+
+```sh
+sm=$(terraform output -raw scaffold_state_machine_arn)
+aws stepfunctions list-executions --state-machine-arn "$sm" --status-filter RUNNING \
+  --query 'executions[].executionArn' --output text |
+  xargs -r -n1 aws stepfunctions stop-execution --cause "platform teardown" --execution-arn
+```
+
+A destroy that already failed this way is safe to re-run: the machine is gone
+from AWS, so the provider treats the delete as done and removes the rest.
+
 ## What is deliberately not here
 
 - **The SQS queue the consumer reads.** It is the seam between the API and this

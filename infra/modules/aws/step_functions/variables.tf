@@ -69,6 +69,12 @@ variable "tracing_enabled" {
   default     = true
 }
 
+variable "delete_timeout" {
+  description = "How long a destroy waits for the state machine to leave DELETING. Above the provider's five-minute default, which a STANDARD machine's asynchronous deletion regularly exceeds. A machine with running executions is deleted only once they end, so raise this or stop them first."
+  type        = string
+  default     = "20m"
+}
+
 variable "enable_failure_alarm" {
   description = "Alarm on failed executions"
   type        = bool
