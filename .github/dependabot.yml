@@ -26,6 +26,7 @@ updates:
     directories:
       - /services/api
       - /services/provisioner
+      - /services/infra-workers/aws
     schedule:
       interval: weekly
     groups:
