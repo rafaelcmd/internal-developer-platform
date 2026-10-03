@@ -17,14 +17,15 @@
 # Teardown order, enforced by `needs:` so a component is never destroyed while
 # something still depends on it:
 #
-#   api-gateway ──────────────┬─▶ api (EKS) ─┬─▶ identity ─┐
-#   provisioner ─▶ scaffolder ┘               └─▶ datadog ──┴─▶ ecr ─▶ vpc
+#   api-gateway ────────────────────┬─▶ api (EKS) ─┬─▶ identity ─┐
+#   provisioner ─┬─▶ scaffolder ─────┤               └─▶ datadog ──┴─▶ ecr ─▶ vpc
+#                └─▶ infra-worker-aws┘
 #
-# The provisioner goes before the scaffolder: its state machine resolves the
-# scaffolder's task queues through data sources, which a destroy refreshes like
-# any other run.
+# The provisioner goes before the scaffolder and the AWS infra worker: its state
+# machine resolves their task queues through data sources, which a destroy
+# refreshes like any other run.
 #
-# Kubernetes workloads (API, provisioner, Redis, collector) need no jobs of
+# Kubernetes workloads (API, provisioner, workers, Redis, collector) need no jobs of
 # their own: they disappear with the EKS cluster when the `api` component is
 # destroyed.
 
@@ -97,9 +98,18 @@ jobs:
     with: { component: provisioner, action: destroy }
     secrets: inherit
 
+  infra-worker-aws:
+    name: AWS Infra Worker / task queue + IRSA (destroy)
+    # Before the cluster, because this stack owns a ServiceAccount inside it.
+    # After the provisioner, whose state machine reads this queue by name.
+    needs: [guard, provisioner]
+    uses: ./.github/workflows/_terraform.yml
+    with: { component: infra-worker-aws, action: destroy }
+    secrets: inherit
+
   api:
     name: API / EKS (destroy)
-    needs: [api-gateway, scaffolder, provisioner]
+    needs: [api-gateway, scaffolder, provisioner, infra-worker-aws]
     uses: ./.github/workflows/_terraform.yml
     with: { component: api, action: destroy }
     secrets: inherit

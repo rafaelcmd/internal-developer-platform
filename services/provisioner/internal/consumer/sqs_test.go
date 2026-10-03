@@ -2,6 +2,7 @@ package consumer
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -52,7 +53,7 @@ func (f *fakeSQS) deletedHandles() []string {
 	return append([]string(nil), f.deleted...)
 }
 
-func runOnce(t *testing.T, client *fakeSQS) {
+func runOnce(t *testing.T, client *fakeSQS, starter ExecutionStarter) {
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -61,7 +62,7 @@ func runOnce(t *testing.T, client *fakeSQS) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		_ = RunSQS(ctx, client, "https://sqs.test/queue", otel.Tracer("test"), NewMetrics(otel.Meter("test")), logger.NopLogger{})
+		_ = RunSQS(ctx, client, "https://sqs.test/queue", starter, otel.Tracer("test"), NewMetrics(otel.Meter("test")), logger.NopLogger{})
 	}()
 
 	// The batch is handled before the second receive blocks; cancelling then
@@ -90,7 +91,7 @@ func TestRunSQS_LeavesUnparseableMessageOnTheQueue(t *testing.T) {
 		MessageId:     aws.String("msg-bad"),
 	}}}
 
-	runOnce(t, client)
+	runOnce(t, client, &fakeStarter{})
 
 	if got := client.deletedHandles(); len(got) != 0 {
 		t.Fatalf("unparseable message was deleted (handles: %v); it must be left for redrive", got)
@@ -104,7 +105,7 @@ func TestRunSQS_DeletesHandledMessage(t *testing.T) {
 		MessageId:     aws.String("msg-good"),
 	}}}
 
-	runOnce(t, client)
+	runOnce(t, client, &fakeStarter{})
 
 	got := client.deletedHandles()
 	if len(got) != 1 || got[0] != "receipt-good" {
@@ -119,10 +120,66 @@ func TestRunSQS_MixedBatchDeletesOnlyTheHandledMessage(t *testing.T) {
 		{Body: aws.String(validRequest), ReceiptHandle: aws.String("receipt-good"), MessageId: aws.String("msg-good")},
 	}}
 
-	runOnce(t, client)
+	runOnce(t, client, &fakeStarter{})
 
 	got := client.deletedHandles()
 	if len(got) != 1 || got[0] != "receipt-good" {
 		t.Fatalf("only the handled message should be deleted, got %v", got)
+	}
+}
+
+// fakeStarter records the executions Dispatch asks for and returns err.
+type fakeStarter struct {
+	err error
+
+	mu     sync.Mutex
+	names  []string
+	inputs []string
+}
+
+func (f *fakeStarter) Start(_ context.Context, name string, input []byte) (Started, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.names = append(f.names, name)
+	f.inputs = append(f.inputs, string(input))
+	if f.err != nil {
+		return Started{}, f.err
+	}
+	return Started{ExecutionArn: "arn:aws:states:us-east-1:000000000000:execution:sm:" + name}, nil
+}
+
+// The execution is named after the request and receives the message body
+// unchanged; both are what the state machine and its idempotency rely on.
+func TestRunSQS_StartsExecutionNamedAfterTheRequest(t *testing.T) {
+	client := &fakeSQS{messages: []types.Message{{
+		Body:          aws.String(validRequest),
+		ReceiptHandle: aws.String("receipt-good"),
+		MessageId:     aws.String("msg-good"),
+	}}}
+	starter := &fakeStarter{}
+
+	runOnce(t, client, starter)
+
+	if len(starter.names) != 1 || starter.names[0] != "11111111-1111-1111-1111-111111111111" {
+		t.Fatalf("execution names = %v, want the request id once", starter.names)
+	}
+	if starter.inputs[0] != validRequest {
+		t.Fatalf("execution input was rewritten:\n got %s\nwant %s", starter.inputs[0], validRequest)
+	}
+}
+
+// A request whose execution could not be started has not been handled, so it
+// stays on the queue for redelivery.
+func TestRunSQS_LeavesMessageWhenExecutionCannotStart(t *testing.T) {
+	client := &fakeSQS{messages: []types.Message{{
+		Body:          aws.String(validRequest),
+		ReceiptHandle: aws.String("receipt-good"),
+		MessageId:     aws.String("msg-good"),
+	}}}
+
+	runOnce(t, client, &fakeStarter{err: errors.New("throttled")})
+
+	if got := client.deletedHandles(); len(got) != 0 {
+		t.Fatalf("message was deleted although no execution started (handles: %v)", got)
 	}
 }

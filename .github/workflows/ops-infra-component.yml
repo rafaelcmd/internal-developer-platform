@@ -33,6 +33,7 @@ on:
           - provisioner
           - api-gateway
           - scaffolder
+          - infra-worker-aws
       action:
         description: Terraform action
         required: true

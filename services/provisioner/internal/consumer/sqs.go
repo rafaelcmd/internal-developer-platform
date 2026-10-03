@@ -23,7 +23,7 @@ type SQSClient interface {
 // message once it has been handled (at-least-once). A message the consumer
 // cannot understand is left on the queue for the redrive policy to move to the
 // dead-letter queue.
-func RunSQS(ctx context.Context, client SQSClient, queueURL string, tracer trace.Tracer, metrics Metrics, log logger.Logger) error {
+func RunSQS(ctx context.Context, client SQSClient, queueURL string, starter ExecutionStarter, tracer trace.Tracer, metrics Metrics, log logger.Logger) error {
 	log.WithContext(ctx).Info("polling messages from SQS queue", logger.F("queue_url", queueURL))
 
 	for ctx.Err() == nil {
@@ -58,10 +58,9 @@ func RunSQS(ctx context.Context, client SQSClient, queueURL string, tracer trace
 			processCtx, span := tracer.Start(msgCtx, "ProcessMessage")
 			log.WithContext(processCtx).Info("received message", logger.F("body", aws.ToString(message.Body)))
 
-			// Control-plane step: decode the request and separate it into the
-			// scaffold and infrastructure halves. See Dispatch for the point at
-			// which the state machine executions will be started.
-			if !Dispatch(processCtx, []byte(aws.ToString(message.Body)), tracer, log) {
+			// Control-plane step: decode the request, separate it into the
+			// scaffold and infrastructure halves, and start the state machine.
+			if !Dispatch(processCtx, []byte(aws.ToString(message.Body)), starter, tracer, log) {
 				// Left on the queue deliberately. SQS makes it visible again
 				// after the visibility timeout and the queue's redrive policy
 				// moves it to the dead-letter queue once maxReceiveCount is
@@ -72,7 +71,7 @@ func RunSQS(ctx context.Context, client SQSClient, queueURL string, tracer trace
 				// long ago, so the caller waits for an application that will
 				// never be scaffolded. It also meant the dead-letter queue could
 				// never receive anything.
-				span.SetStatus(codes.Error, "provision request could not be understood")
+				span.SetStatus(codes.Error, "provision request was not handled")
 				metrics.Failed.Add(processCtx, 1)
 				log.WithContext(processCtx).Error("leaving message on the queue for redelivery",
 					logger.F("message_id", aws.ToString(message.MessageId)))

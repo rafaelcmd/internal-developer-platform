@@ -58,8 +58,9 @@ func RunKafka(ctx context.Context, cfg KafkaConfig, tracer trace.Tracer, metrics
 		log.WithContext(processCtx).Info("received message", logger.F("body", string(message.Value)))
 
 		// Control-plane step, identical to the SQS path so that local development
-		// exercises the same separation as the deployed environments.
-		if !Dispatch(processCtx, message.Value, tracer, log) {
+		// exercises the same separation as the deployed environments. No
+		// starter: local dev has no state machine to start.
+		if !Dispatch(processCtx, message.Value, nil, tracer, log) {
 			span.SetStatus(codes.Error, "provision request could not be understood")
 		}
 

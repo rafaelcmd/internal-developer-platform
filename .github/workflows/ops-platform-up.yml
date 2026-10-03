@@ -27,12 +27,13 @@
 #         └─▶ api (EKS/SQS) ─┬─▶ redis ────────────────▶ api-deploy
 #                            ├─▶ otel-collector ──┬────▶ api-deploy
 #                            │                    └────▶ provisioner-deploy
-#                            ├─▶ scaffolder ──────▶ provisioner
+#                            ├─▶ scaffolder ──────────┬─▶ provisioner
+#                            ├─▶ infra-worker-aws ────┘
 #                            └─▶ api-gateway
 #
-# The scaffolder comes before the provisioner because the scaffold state machine
-# targets the scaffolder's task queues and resolves them from the SSM parameters
-# that stack publishes.
+# The scaffolder and the AWS infra worker come before the provisioner because
+# the scaffold state machine targets their task queues and resolves them by name
+# when it plans.
 #
 # The gateway depends on the Terraform-managed NLB from the `api` component,
 # not on Kubernetes Service reconciliation.
@@ -106,9 +107,9 @@ jobs:
     # IAM role and the ServiceAccount its Deployment binds to. Reads the
     # cluster's OIDC provider and API-server coordinates, and the queue ARN,
     # from the SSM parameters the api component publishes, and the scaffolder's
-    # task queue names from the ones the scaffolder publishes — so it cannot run
-    # before either of those stacks.
-    needs: [api-infra, scaffolder-infra]
+    # task queue names from the ones the scaffolder publishes, and the AWS infra
+    # worker's queue by name — so it cannot run before any of those stacks.
+    needs: [api-infra, scaffolder-infra, infra-worker-aws-infra]
     uses: ./.github/workflows/_terraform.yml
     with: { component: provisioner, action: apply }
     secrets: inherit
@@ -124,6 +125,16 @@ jobs:
     needs: [api-infra]
     uses: ./.github/workflows/_terraform.yml
     with: { component: scaffolder, action: apply }
+    secrets: inherit
+
+  infra-worker-aws-infra:
+    name: AWS Infra Worker / task queue + IRSA
+    # Reads the cluster's OIDC provider and API-server coordinates from the
+    # SSM parameters the api component publishes, and creates a ServiceAccount
+    # in the cluster, so it cannot run before the cluster exists.
+    needs: [api-infra]
+    uses: ./.github/workflows/_terraform.yml
+    with: { component: infra-worker-aws, action: apply }
     secrets: inherit
 
   # --- Kubernetes workloads --------------------------------------------------
@@ -169,4 +180,13 @@ jobs:
     # its table or task queue are missing.
     needs: [scaffolder-infra, otel-collector, shared-ecr]
     uses: ./.github/workflows/cd-scaffolder.yml
+    secrets: inherit
+
+  infra-worker-aws:
+    name: K8s / AWS Infra Worker
+    # infra-worker-aws-infra is a hard prerequisite, not just ordering: the pod
+    # binds to the ServiceAccount that stack creates and exits on startup if its
+    # task queue is missing.
+    needs: [infra-worker-aws-infra, otel-collector, shared-ecr]
+    uses: ./.github/workflows/cd-infra-worker-aws.yml
     secrets: inherit

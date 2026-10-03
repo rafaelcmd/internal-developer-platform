@@ -12,6 +12,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sfn"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/sirupsen/logrus"
@@ -26,7 +27,10 @@ import (
 
 const serviceName = "resource-provisioner-consumer"
 
-var errEmptyQueueURL = errors.New("SQS queue URL is empty")
+var (
+	errEmptyQueueURL        = errors.New("SQS queue URL is empty")
+	errEmptyStateMachineArn = errors.New("scaffold state machine ARN is empty")
+)
 
 func main() {
 	// Root context cancels on SIGINT/SIGTERM so the consumer drains and the
@@ -87,8 +91,9 @@ func main() {
 	}
 }
 
-// runSQS loads AWS config, resolves the queue URL from Parameter Store, and
-// consumes from SQS. Isolated from the Kafka path so local dev needs no AWS.
+// runSQS loads AWS config, resolves the queue URL and the state machine ARN from
+// Parameter Store, and consumes from SQS. Isolated from the Kafka path so local
+// dev needs no AWS.
 func runSQS(ctx context.Context, tracer trace.Tracer, metrics consumer.Metrics, log logger.Logger) error {
 	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion("us-east-1"))
 	if err != nil {
@@ -104,7 +109,41 @@ func runSQS(ctx context.Context, tracer trace.Tracer, metrics consumer.Metrics, 
 	if err != nil {
 		return err
 	}
-	return consumer.RunSQS(ctx, sqsClient, queueURL, tracer, metrics, log)
+
+	stateMachineArn, err := getStateMachineArn(ctx, tracer, ssmClient)
+	if err != nil {
+		return err
+	}
+	log.WithContext(ctx).Info("starting scaffold executions", logger.F("state_machine_arn", stateMachineArn))
+
+	starter := consumer.StepFunctionsStarter{
+		Client:          sfn.NewFromConfig(cfg),
+		StateMachineArn: stateMachineArn,
+	}
+	return consumer.RunSQS(ctx, sqsClient, queueURL, starter, tracer, metrics, log)
+}
+
+// getStateMachineArn reads the scaffold state machine ARN the provisioner stack
+// publishes (infra/live/provisioner/dev/state_machine.tf). Resolved at startup
+// rather than set in the manifest, so no account id lands in a committed file.
+func getStateMachineArn(ctx context.Context, tracer trace.Tracer, ssmClient *ssm.Client) (string, error) {
+	ctx, span := tracer.Start(ctx, "GetStateMachineArn")
+	defer span.End()
+
+	key := envOrDefault("STATE_MACHINE_ARN_PARAM_KEY",
+		"/idp/provisioner/"+envOrDefault("ENVIRONMENT", "dev")+"/scaffold_state_machine_arn")
+
+	param, err := ssmClient.GetParameter(ctx, &ssm.GetParameterInput{Name: aws.String(key)})
+	if err != nil {
+		span.RecordError(err)
+		return "", fmt.Errorf("read %s: %w", key, err)
+	}
+
+	arn := aws.ToString(param.Parameter.Value)
+	if arn == "" {
+		return "", errEmptyStateMachineArn
+	}
+	return arn, nil
 }
 
 // getQueueURL reads the provisioning queue URL from Parameter Store within its

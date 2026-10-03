@@ -21,7 +21,7 @@ at the top level — so the tier is encoded in the filename prefix instead.
 
 | Workflow | Fires on | What it does |
 | --- | --- | --- |
-| [`ci-services-test.yml`](ci-services-test.yml) | PR touching `services/**` | Builds, vets, format-checks and tests both Go services. |
+| [`ci-services-test.yml`](ci-services-test.yml) | PR touching `services/**` | Builds, vets, format-checks and tests the Go services. |
 | [`ci-infra-plan.yml`](ci-infra-plan.yml) | PR touching `infra/**` | Runs `terraform plan` per affected component and posts each plan as a PR comment. |
 | [`ci-infra-policy.yml`](ci-infra-policy.yml) | PR touching `infra/**` | Repo-wide `terraform fmt` check (blocking), plus a Checkov security scan and an Infracost cost diff (both advisory — see below). |
 
@@ -33,6 +33,7 @@ at the top level — so the tier is encoded in the filename prefix instead.
 | [`cd-api.yml`](cd-api.yml) | manual / orchestrated | Builds the API image → ECR → rolling update on EKS. |
 | [`cd-provisioner.yml`](cd-provisioner.yml) | manual / orchestrated | Same, for the SQS consumer. |
 | [`cd-scaffolder.yml`](cd-scaffolder.yml) | manual / orchestrated | Same, for the scaffolder task workers — one image, both Deployments (state and github). |
+| [`cd-infra-worker-aws.yml`](cd-infra-worker-aws.yml) | manual / orchestrated | Same, for the AWS infra worker. |
 | [`cd-redis.yml`](cd-redis.yml) | manual / orchestrated | Applies the in-cluster Redis manifests. |
 | [`cd-otel-collector.yml`](cd-otel-collector.yml) | manual / orchestrated | Applies the OTel Collector manifests and forces a restart. |
 
@@ -76,7 +77,7 @@ flowchart TD
     UP --> TF
     DOWN --> TF
 
-    UP --> DEPLOYS["cd-api · cd-provisioner · cd-scaffolder<br/>cd-redis · cd-otel-collector"]
+    UP --> DEPLOYS["cd-api · cd-provisioner · cd-scaffolder<br/>cd-infra-worker-aws · cd-redis · cd-otel-collector"]
 
     TF --> AWS[(AWS)]
     DEPLOYS --> EKS[(EKS cluster)]

@@ -1,0 +1,99 @@
+# =============================================================================
+# PURPOSE   Builds the AWS infra worker image, pushes it to ECR and rolls it out
+#           on the same EKS cluster as the API.
+# TRIGGER   Manual (workflow_dispatch), or called by ops-platform-up.yml.
+# AUTH      Shared `github-actions-deploy` role, via OIDC.
+# EFFECT    MUTATES the cluster. Replaces the running worker pod.
+# REQUIRES  The `infra-worker-aws` Terraform component, which owns this
+#           service's task queue and IRSA ServiceAccount. Telemetry needs the
+#           OTel Collector Service in-cluster, so orchestrated runs deploy the
+#           collector first.
+# DOCS      .github/workflows/README.md
+# =============================================================================
+
+name: CD · Deploy AWS Infra Worker → EKS
+
+on:
+  workflow_dispatch:
+  workflow_call: {}
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_ROLE_ARN: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/github-actions-deploy
+  EKS_CLUSTER_NAME: internal-developer-platform-cluster
+
+# One deploy of this workload at a time, and never cancel one mid-rollout.
+concurrency:
+  group: deploy-infra-worker-aws
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy AWS Infra Worker to EKS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Assume AWS role
+        uses: ./.github/actions/aws-oidc-login
+        with:
+          role-arn: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to ECR
+        id: ecr
+        uses: ./.github/actions/ecr-login
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+
+      # The builder image tracks the go directive, as in cd-provisioner.yml.
+      - name: Read Go version from go.mod
+        working-directory: services/infra-workers/aws
+        run: |
+          version=$(sed -n 's/^go \([0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' go.mod)
+          if [ -z "$version" ]; then
+            echo "No go directive found in services/infra-workers/aws/go.mod" >&2
+            exit 1
+          fi
+          echo "Building with Go $version"
+          echo "GO_VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Build and push image
+        working-directory: services/infra-workers/aws
+        env:
+          ECR_URL: ${{ steps.ecr.outputs.repository-url }}
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            --build-arg GO_VERSION="$GO_VERSION" \
+            -t "$ECR_URL:infra-worker-aws-latest" \
+            -t "$ECR_URL:infra-worker-aws-${{ github.sha }}" \
+            .
+          docker push "$ECR_URL:infra-worker-aws-latest"
+          docker push "$ECR_URL:infra-worker-aws-${{ github.sha }}"
+
+      # Immutable sha tag; see cd-api.yml for why the stable tag is not used.
+      - name: Pin image in deployment manifest
+        env:
+          ECR_URL: ${{ steps.ecr.outputs.repository-url }}
+        run: sed -i "s|PLACEHOLDER-INFRA-WORKER-AWS-IMAGE|${ECR_URL}:infra-worker-aws-${{ github.sha }}|g" k8s/infra-worker-aws/deployment.yaml
+
+      - name: Configure kubectl
+        uses: ./.github/actions/eks-kubeconfig
+        with:
+          cluster-name: ${{ env.EKS_CLUSTER_NAME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Apply manifests
+        run: kubectl apply -f k8s/infra-worker-aws/deployment.yaml
+
+      # The sha-tagged image makes the apply itself start the rollout; this
+      # step only gates the job on it finishing.
+      - name: Wait for rollout
+        run: kubectl rollout status deployment/internal-developer-platform-infra-worker-aws -n default --timeout=10m

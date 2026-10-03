@@ -3,12 +3,12 @@
 Go SQS consumer and the platform's **control plane**: it polls the provisioning
 queue, decodes the request the API published, and splits it into the work each
 downstream worker owns — the repository half for the scaffolder, the cloud
-resources half for the (not yet built) infra worker.
+resources half for the infra worker — and starts the scaffold state machine
+that carries both out.
 
 The component also owns the **scaffold state machine** and the **request-state
 table**, in `infra/live/provisioner/dev`. Those are infrastructure, not code in
-this directory: the machine exists and can be started by hand, but the consumer
-does not call `StartExecution` yet. See [ADR-0006](../../docs/adr/0006-step-functions-as-provisioning-orchestrator.md)
+this directory; the consumer starts one execution per request. See [ADR-0006](../../docs/adr/0006-step-functions-as-provisioning-orchestrator.md)
 and `infra/live/provisioner/dev/README.md`.
 
 Go version: 1.25 (see `go.mod`). Entry point: `cmd/consumer/main.go`.
@@ -19,7 +19,8 @@ Go version: 1.25 (see `go.mod`). Entry point: `cmd/consumer/main.go`.
 cmd/consumer/main.go   - entry point: picks the transport, sets up telemetry
 internal/consumer/      - the consume loops: kafka.go, sqs.go, shared metrics.go,
                           queue trace-context extraction (propagation.go), and
-                          dispatch.go - the split, shared by both loops
+                          dispatch.go - the split, shared by both loops, and
+                          execution.go - StartExecution behind ExecutionStarter
 internal/provision/    - the wire contract the API publishes, and Request.Split()
 internal/telemetry/    - OpenTelemetry setup (OTLP traces, metrics, logs)
 internal/logger/       - logrus-backed JSON logger behind a small interface
@@ -31,7 +32,8 @@ Runs on the EKS cluster alongside the API: `k8s/provisioner/deployment.yaml`
 (default namespace, Fargate), deployed by the `cd-provisioner.yml` workflow
 (build + push to the shared ECR repo as immutable `provisioner-<sha>` — also
 tagged `provisioner-latest` for convenience — then apply; the sha tag makes the
-apply itself roll the Deployment). AWS access (SQS consume, SSM read) comes
+apply itself roll the Deployment). AWS access (SQS consume, SSM read,
+`states:StartExecution`) comes
 from the IRSA-annotated
 ServiceAccount `internal-developer-platform-provisioner`
 (`infra/live/provisioner/dev/irsa.tf` — the service owns its own identity
@@ -73,27 +75,29 @@ Two details that matter downstream:
   scaffolder takes the org from its own `GITHUB_ORG` config precisely so a queue
   message cannot choose where it writes.
 
-**Nothing is dispatched yet.** `Dispatch` logs both halves and the message is
-acknowledged. The state machine now exists, so what is missing is the call:
-`StartExecution` belongs exactly where that logging is.
-
-When it is written, three things are already decided by the infrastructure:
+**Dispatch starts the execution.** After logging both halves, `Dispatch` calls
+`ExecutionStarter.Start` and the message is acknowledged only once that
+succeeds. Three rules, fixed by the infrastructure:
 
 - **The execution input is the request message, unchanged.** The machine reads
   `request_id`, `application.*` and `resources` in the same snake_case shape the
-  API publishes, so the consumer passes through what it parsed rather than
+  API publishes, so the consumer passes the body through rather than
   translating. `Split()` stays what it is: the control plane's statement of who
   owns which half, and the thing the log fields are built from.
-- **Execution identity comes from `request_id`.** A deterministic execution name
-  makes a redelivered SQS message collide with `ExecutionAlreadyExists` instead
-  of starting a second saga. That is the idempotency mechanism; the request
-  table is not.
+- **Execution identity comes from `request_id`.** The execution is named after
+  it, so a redelivered SQS message collides with `ExecutionAlreadyExists`, which
+  `StepFunctionsStarter` reports as `AlreadyStarted` and the message is deleted.
+  That is the idempotency mechanism; the request table is not.
 - **The state machine is the single writer of a request row.** The consumer
   reads it (`dynamodb:GetItem` only) and never writes it.
 
-The ARN and the table name are resolved at startup from
-`/idp/provisioner/<env>/scaffold_state_machine_arn` and
-`/idp/provisioner/<env>/requests_table_name`, the same way the queue URL is.
+A `StartExecution` that fails for any other reason leaves the message on the
+queue, so a throttle or network fault is retried by redelivery.
+
+The ARN is resolved at startup from `/idp/provisioner/<env>/scaffold_state_machine_arn`
+(override with `STATE_MACHINE_ARN_PARAM_KEY`), the same way the queue URL is;
+the consumer exits if it cannot be read. The Kafka path passes no starter: local
+dev logs the split and starts nothing.
 
 ## Observability
 
@@ -103,7 +107,8 @@ the former AWS X-Ray SDK.
 
 - **Traces:** `internal/telemetry` builds an OTLP/gRPC TracerProvider and installs
   W3C propagators. Each consumed message gets a `ProcessMessage` span; the SQS
-  path adds `PollSQSMessages` / `GetSQSQueueURL` and instruments AWS SDK calls
+  path adds `PollSQSMessages` / `GetSQSQueueURL` / `GetStateMachineArn` /
+  `StartScaffoldExecution` and instruments AWS SDK calls
   with `otelaws` middleware (replaces `xray.Client`). `ProcessMessage` **continues
   the API's trace**: the consumer extracts the W3C trace context the API injected
   into each message (SQS message attributes / Kafka headers, via
