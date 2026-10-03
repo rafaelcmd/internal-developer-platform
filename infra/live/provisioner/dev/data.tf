@@ -52,8 +52,9 @@ data "aws_sqs_queue" "scaffolder_github_tasks" {
   name = data.aws_ssm_parameter.scaffolder_github_task_queue_name.value
 }
 
-# The infra worker's queue exists only once that service is built. Absent, the
-# state machine's infrastructure branch is a Fail state.
+# The AWS infra worker's queue, owned by infra/live/infra_worker_aws. With
+# infra_worker_task_queue_name null, the state machine's infrastructure branch
+# is a Fail state instead.
 data "aws_sqs_queue" "infra_worker_tasks" {
   count = var.infra_worker_task_queue_name == null ? 0 : 1
 

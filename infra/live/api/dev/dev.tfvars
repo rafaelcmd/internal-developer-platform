@@ -28,7 +28,8 @@ notification_email = "rafaelcmd@gmail.com"
 # github-actions-tf-api, which is the creator on every CI-applied cluster; it
 # would equally exclude the operator user on a cluster applied from a laptop.
 #
-# github-actions-tf-scaffolder and github-actions-tf-provisioner are here
+# github-actions-tf-scaffolder, github-actions-tf-provisioner and
+# github-actions-tf-infra-worker-aws are here
 # because those stacks create the ServiceAccounts their pods bind to, in this
 # cluster, which they do not own. A stack that manages Kubernetes objects in
 # someone else's cluster needs an access entry or its kubernetes provider fails
@@ -38,6 +39,7 @@ cluster_admin_principal_arns = [
   "arn:aws:iam::413703165862:role/github-actions-deploy",
   "arn:aws:iam::413703165862:role/github-actions-tf-scaffolder",
   "arn:aws:iam::413703165862:role/github-actions-tf-provisioner",
+  "arn:aws:iam::413703165862:role/github-actions-tf-infra-worker-aws",
 ]
 
 # Terraform-managed API NLB + target group consumed by API Gateway and

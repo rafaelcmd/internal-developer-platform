@@ -1,8 +1,9 @@
 # The scaffold state machine: one execution turns one accepted provision request
 # into a repository and the cloud resources that go with it. Every worker step is
 # a callback, so workflow state lives here rather than in whichever pod picked
-# the message up. The queues it sends to belong to the scaffolder, which
-# publishes their names to SSM. See docs/adr/0006 for why it is owned here.
+# the message up. The queues it sends to belong to the workers that consume
+# them: the scaffolder's, and the AWS infra worker's. See docs/adr/0006 for why
+# it is owned here.
 
 locals {
   state_machine_name = "${var.project}-scaffold-${var.environment}"
@@ -96,10 +97,10 @@ locals {
   # a join state after this Parallel rather than by ordering the two branches.
   # See docs/adr/0007.
   #
-  # Until the infra worker exists there is no queue to send to, and a request
-  # naming resources fails here rather than reporting success for a database
-  # nothing created. Setting infra_worker_task_queue_name replaces the Fail
-  # state with the callback task.
+  # Without infra_worker_task_queue_name there is no queue to send to, and a
+  # request naming resources fails here rather than reporting success for a
+  # database nothing created. Setting it replaces the Fail state with the
+  # callback task.
   #
   # The two states are encoded and decoded around the conditional because the
   # arms of a Terraform conditional must share one type, and a Fail state and a
@@ -135,6 +136,110 @@ locals {
       Retry          = local.task_retry
       End            = true
     })
+  )
+
+  # With scaffold_enabled false, the repository states become Pass states and an
+  # execution exercises only the infrastructure branch. A Pass state marks each
+  # skipped step, so the execution history shows what did not run rather than a
+  # shorter workflow. The same encode/decode applies as above, for the same
+  # reason.
+  scaffold_skipped = { Skipped = true }
+
+  reserve_name_state = jsondecode(
+    var.scaffold_enabled
+    ? jsonencode({
+      Type = "Task"
+      Comment = join(" ", [
+        "Claims the application name for this request, ahead of both branches.",
+        "Two requests for one name have to collide before either creates anything.",
+      ])
+      Resource = "arn:aws:states:::sqs:sendMessage.waitForTaskToken"
+
+      Parameters = {
+        QueueUrl = data.aws_sqs_queue.scaffolder_state_tasks.url
+        MessageBody = {
+          Task          = "ReserveName"
+          "TaskToken.$" = "$$.Task.Token"
+          Input = {
+            "ApplicationName.$" = "$.application.name"
+            "RequestId.$"       = "$.request_id"
+          }
+        }
+      }
+
+      ResultPath     = "$.reservation"
+      TimeoutSeconds = var.reserve_name_timeout_seconds
+      Retry          = local.task_retry
+      Catch          = [{ ErrorEquals = ["States.ALL"], ResultPath = "$.error", Next = "RecordRequestFailed" }]
+      Next           = "ScaffoldAndProvision"
+    })
+    : jsonencode({
+      Type       = "Pass"
+      Comment    = "scaffold_enabled is false: no name is reserved."
+      Result     = local.scaffold_skipped
+      ResultPath = "$.reservation"
+      Next       = "ScaffoldAndProvision"
+    })
+  )
+
+  repository_branch = jsondecode(
+    var.scaffold_enabled
+    ? jsonencode({
+      StartAt = "HasDescription"
+      States = merge(
+        {
+          HasDescription = {
+            Type    = "Choice"
+            Comment = "Routes around the optional description field. See create_repository_states in state_machine.tf."
+            Choices = [
+              {
+                Variable  = "$.application.description"
+                IsPresent = true
+                Next      = "CreateRepositoryWithDescription"
+              },
+            ]
+            Default = "CreateRepository"
+          }
+        },
+        local.create_repository_states,
+      )
+    })
+    : jsonencode({
+      StartAt = "RepositorySkipped"
+      States = {
+        RepositorySkipped = {
+          Type       = "Pass"
+          Comment    = "scaffold_enabled is false: no repository is created."
+          Result     = local.scaffold_skipped
+          ResultPath = "$.repository"
+          End        = true
+        }
+      }
+    })
+  )
+
+  # A skipped scaffold has no repository to record, and a "$." path to the
+  # absent FullName would fail the state with States.Runtime.
+  record_succeeded_update = (
+    var.scaffold_enabled
+    ? {
+      UpdateExpression = "SET #status = :status, RepositoryFullName = :repositoryFullName, RepositoryUrl = :repositoryUrl, CompletedAt = :completedAt, UpdatedAt = :updatedAt"
+      ExpressionAttributeValues = {
+        ":status"             = { S = "SUCCEEDED" }
+        ":repositoryFullName" = { "S.$" = "$.results[0].repository.FullName" }
+        ":repositoryUrl"      = { "S.$" = "$.results[0].repository.HtmlUrl" }
+        ":completedAt"        = { "S.$" = "$$.State.EnteredTime" }
+        ":updatedAt"          = { "S.$" = "$$.State.EnteredTime" }
+      }
+    }
+    : {
+      UpdateExpression = "SET #status = :status, CompletedAt = :completedAt, UpdatedAt = :updatedAt"
+      ExpressionAttributeValues = {
+        ":status"      = { S = "SUCCEEDED" }
+        ":completedAt" = { "S.$" = "$$.State.EnteredTime" }
+        ":updatedAt"   = { "S.$" = "$$.State.EnteredTime" }
+      }
+    }
   )
 
   definition = {
@@ -184,58 +289,14 @@ locals {
         Next           = "ReserveName"
       }
 
-      ReserveName = {
-        Type = "Task"
-        Comment = join(" ", [
-          "Claims the application name for this request, ahead of both branches.",
-          "Two requests for one name have to collide before either creates anything.",
-        ])
-        Resource = "arn:aws:states:::sqs:sendMessage.waitForTaskToken"
-
-        Parameters = {
-          QueueUrl = data.aws_sqs_queue.scaffolder_state_tasks.url
-          MessageBody = {
-            Task          = "ReserveName"
-            "TaskToken.$" = "$$.Task.Token"
-            Input = {
-              "ApplicationName.$" = "$.application.name"
-              "RequestId.$"       = "$.request_id"
-            }
-          }
-        }
-
-        ResultPath     = "$.reservation"
-        TimeoutSeconds = var.reserve_name_timeout_seconds
-        Retry          = local.task_retry
-        Catch          = [{ ErrorEquals = ["States.ALL"], ResultPath = "$.error", Next = "RecordRequestFailed" }]
-        Next           = "ScaffoldAndProvision"
-      }
+      ReserveName = local.reserve_name_state
 
       ScaffoldAndProvision = {
         Type    = "Parallel"
         Comment = "The repository and the infrastructure are independent. Both branches receive the whole request."
 
         Branches = [
-          {
-            StartAt = "HasDescription"
-            States = merge(
-              {
-                HasDescription = {
-                  Type    = "Choice"
-                  Comment = "Routes around the optional description field. See create_repository_states in state_machine.tf."
-                  Choices = [
-                    {
-                      Variable  = "$.application.description"
-                      IsPresent = true
-                      Next      = "CreateRepositoryWithDescription"
-                    },
-                  ]
-                  Default = "CreateRepository"
-                }
-              },
-              local.create_repository_states,
-            )
-          },
+          local.repository_branch,
           {
             StartAt = "HasResources"
             States = {
@@ -276,19 +337,11 @@ locals {
         Comment  = "The terminal record a caller polls for. Written before the Succeed state, so a request is never reported complete without one."
         Resource = "arn:aws:states:::dynamodb:updateItem"
 
-        Parameters = {
+        Parameters = merge(local.record_succeeded_update, {
           TableName                = module.requests.table_name
           Key                      = local.request_state_key
-          UpdateExpression         = "SET #status = :status, RepositoryFullName = :repositoryFullName, RepositoryUrl = :repositoryUrl, CompletedAt = :completedAt, UpdatedAt = :updatedAt"
           ExpressionAttributeNames = { "#status" = "Status" }
-          ExpressionAttributeValues = {
-            ":status"             = { S = "SUCCEEDED" }
-            ":repositoryFullName" = { "S.$" = "$.results[0].repository.FullName" }
-            ":repositoryUrl"      = { "S.$" = "$.results[0].repository.HtmlUrl" }
-            ":completedAt"        = { "S.$" = "$$.State.EnteredTime" }
-            ":updatedAt"          = { "S.$" = "$$.State.EnteredTime" }
-          }
-        }
+        })
 
         ResultPath     = null
         TimeoutSeconds = var.record_state_timeout_seconds

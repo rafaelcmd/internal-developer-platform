@@ -10,15 +10,16 @@ resource carries a `cloud_provider` (`AWS`, `Azure`, `GCP`), and each provider h
 infra worker. See [ADR-0008](docs/adr/0008-one-infra-worker-per-cloud-provider.md).
 
 1. **API** (`/services/api`) — Go 1.26 REST API. Receives provision requests — one request carries both the application to scaffold and the cloud resources it needs — and publishes them to SQS.
-2. **Provisioner** (`/services/provisioner`) — Go 1.25 service and the control plane. Consumes SQS messages and splits each request into the work each downstream worker owns: the repository half for the scaffolder, the resources half for the infra worker. Its Terraform component owns the **scaffold Step Functions state machine** and the request-state table; the service does not start executions yet.
+2. **Provisioner** (`/services/provisioner`) — Go 1.25 service and the control plane. Consumes SQS messages and splits each request into the work each downstream worker owns: the repository half for the scaffolder, the resources half for the infra worker. Its Terraform component owns the **scaffold Step Functions state machine** and the request-state table, and the service starts one execution per request, named after its `request_id`.
 3. **Scaffolder** (`/services/scaffolder`) — .NET 10 container on EKS. Owns the repository domain: creates GitHub repos from golden-path templates and wires their CI/CD. Consumes Step Functions `.waitForTaskToken` messages off its own SQS queues, as two Deployments of one image split by what they are trusted with — only the `github` one can read the GitHub App private key. **Under construction** — the solution, the `ReserveName` and `CreateRepository` tasks, the GitHub App adapter, the image and its Terraform component exist, and the state machine now targets both queues; nothing is deployed yet, and no code upstream starts an execution.
 4. **Infra workers** (`/services/infra-workers/<provider>`) — one Go service per cloud
    provider, each with its own queue and its own credentials for that cloud only. Each executes
    infrastructure-as-code as a `.waitForTaskToken` task in the same state machine, and receives
    only resources whose `cloud_provider` it owns; routing by provider is the control plane's job.
    **AWS** (`/services/infra-workers/aws`) is the first and only one: it logs each `ProvisionInfra`
-   task and acknowledges it, with no Terraform, no reply to Step Functions and nothing deployed.
-   Azure and GCP workers are planned.
+   task, reports it to Step Functions as succeeded with `Provisioned: false`, and runs no
+   Terraform yet. Its queue and role are the `infra-worker-aws` Terraform component
+   (`infra/live/infra_worker_aws/dev`). Azure and GCP workers are planned.
 
 Message flow: API → SQS → Provisioner → Step Functions → task workers
 
@@ -33,11 +34,11 @@ The request contract is defined in `services/api/internal/domain/model/resource.
 separate deployables, so a shared struct would make a field rename in one a compile break in the
 other — the coupling a queue exists to remove. Change them together.
 
-Until a worker reports results, the machine's `ProvisionInfra` state is a `Fail` state, so a
-request naming cloud resources fails rather than reporting success for resources nothing
-created; setting `infra_worker_task_queue_name` turns it into the callback task.
-The provisioner service itself is still a bare consume loop: it logs both halves of a request
-instead of calling `StartExecution`.
+`ProvisionInfra` targets the AWS worker's queue through `infra_worker_task_queue_name`; with it
+null the state is a `Fail` state, so a request naming cloud resources fails rather than reporting
+success for resources nothing created. In dev, `scaffold_enabled = false` turns the scaffolder's
+states into Pass states, so an execution runs API → provisioner → state machine → AWS infra worker
+without the scaffolder.
 
 ## Conventions
 

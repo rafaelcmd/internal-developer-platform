@@ -19,6 +19,14 @@ data "aws_iam_policy_document" "provisioner" {
     ]
   }
 
+  # The state machine ARN and the request table name this stack publishes,
+  # resolved by the consumer at startup like the queue URL above.
+  statement {
+    sid       = "ReadOwnParameters"
+    actions   = ["ssm:GetParameter"]
+    resources = ["arn:aws:ssm:${var.aws_region}:*:parameter/idp/${var.service_name}/${var.environment}/*"]
+  }
+
   # The consume side of the provisioning queue. The API holds the send side, in
   # live/api/dev/irsa.tf.
   statement {

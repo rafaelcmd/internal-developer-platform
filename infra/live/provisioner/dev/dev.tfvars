@@ -10,7 +10,11 @@ cluster_name = "internal-developer-platform-cluster"
 point_in_time_recovery_enabled = false
 deletion_protection_enabled    = false
 
-# No infra worker is deployed yet, so the state machine's infrastructure branch
-# fails a request that asks for cloud resources instead of silently skipping it.
-# Set this to the worker's queue name when that service exists.
-infra_worker_task_queue_name = null
+# The AWS infra worker's queue, from infra/live/infra_worker_aws. That stack has
+# to be applied first: the data source in data.tf fails the plan otherwise.
+infra_worker_task_queue_name = "internal-developer-platform-infra-worker-aws-tasks-dev"
+
+# The scaffolder is not deployed with a GitHub App key in dev yet, so the
+# repository states are skipped and an execution runs the infrastructure branch
+# alone. Set to true once the scaffolder workers are serving their queues.
+scaffold_enabled = false

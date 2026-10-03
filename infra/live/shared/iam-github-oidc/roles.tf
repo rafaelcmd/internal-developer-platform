@@ -24,14 +24,15 @@ locals {
   ]
 
   component_policy_arns = {
-    vpc           = aws_iam_policy.pipeline_vpc.arn
-    ecr           = aws_iam_policy.pipeline_ecr.arn
-    datadog       = aws_iam_policy.pipeline_datadog.arn
-    identity      = aws_iam_policy.pipeline_identity.arn
-    api           = aws_iam_policy.pipeline_api.arn
-    provisioner   = aws_iam_policy.pipeline_provisioner.arn
-    "api-gateway" = aws_iam_policy.pipeline_api_gateway.arn
-    scaffolder    = aws_iam_policy.pipeline_scaffolder.arn
+    vpc                = aws_iam_policy.pipeline_vpc.arn
+    ecr                = aws_iam_policy.pipeline_ecr.arn
+    datadog            = aws_iam_policy.pipeline_datadog.arn
+    identity           = aws_iam_policy.pipeline_identity.arn
+    api                = aws_iam_policy.pipeline_api.arn
+    provisioner        = aws_iam_policy.pipeline_provisioner.arn
+    "api-gateway"      = aws_iam_policy.pipeline_api_gateway.arn
+    scaffolder         = aws_iam_policy.pipeline_scaffolder.arn
+    "infra-worker-aws" = aws_iam_policy.pipeline_infra_worker_aws.arn
   }
 }
 

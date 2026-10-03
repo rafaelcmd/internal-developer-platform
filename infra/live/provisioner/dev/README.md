@@ -15,8 +15,9 @@ The platform's control plane, as infrastructure. Three things:
 
 The queue the consumer reads and the cluster it runs on belong to the
 [`api`](../../api/dev) component; the task queues the state machine sends to
-belong to [`scaffolder`](../../scaffolder/dev). This stack owns neither and
-reaches both by name through SSM.
+belong to [`scaffolder`](../../scaffolder/dev) and
+[`infra_worker_aws`](../../infra_worker_aws/dev). This stack owns none of them
+and reaches each by name.
 
 See [ADR-0006](../../../../docs/adr/0006-step-functions-as-provisioning-orchestrator.md)
 for why orchestration is a state machine rather than a loop in the consumer.
@@ -30,11 +31,28 @@ RecordRequestAccepted  DynamoDB UpdateItem, Status=RUNNING
             ├─ HasDescription → CreateRepository
             │                     → scaffolder github queue          (callback)
             └─ HasResources   → ProvisionInfra
-                                  → infra worker queue               (callback)
+                                  → AWS infra worker queue           (callback)
                                or NoInfrastructureRequested (Pass)
   └─ RecordRequestSucceeded  Status=SUCCEEDED → Succeed
   (Catch from any state) → RecordRequestFailed  Status=FAILED → Fail
 ```
+
+### `scaffold_enabled`
+
+With `scaffold_enabled = false` (the dev setting while the scaffolder has no
+GitHub App key), `ReserveName` and the repository branch are Pass states that
+record `{"Skipped": true}`, and `RecordRequestSucceeded` writes no repository
+fields. An execution then runs only the infrastructure branch:
+
+```
+RecordRequestAccepted → ReserveName (Pass) → ScaffoldAndProvision
+    ├─ RepositorySkipped (Pass)
+    └─ HasResources → ProvisionInfra → AWS infra worker → SendTaskSuccess
+→ RecordRequestSucceeded → RequestSucceeded
+```
+
+With it `true` the definition is the full saga above. The scaffolder's queues
+are read either way, so its stack must still be applied first.
 
 ### Execution input
 
@@ -68,8 +86,9 @@ scaffolder's command records and the fixtures in
 
 ## Running it by hand
 
-Until the provisioner calls `StartExecution` itself, an execution is started
-from the CLI. Both queues must have a worker polling them or the callbacks time
+The provisioner starts one execution per consumed message, named after its
+`request_id`. To start one without going through the API, use the CLI. Every
+queue the execution reaches must have a worker polling it or the callback times
 out.
 
 ```sh
@@ -85,8 +104,9 @@ aws dynamodb get-item \
 
 ## Dependencies
 
-Apply order is `api` → `scaffolder` → `provisioner`. Everything this stack needs
-arrives through SSM:
+Apply order is `api` → `scaffolder` and `infra-worker-aws` → `provisioner`.
+Everything this stack needs arrives through SSM, except the infra worker's queue,
+which `dev.tfvars` names directly:
 
 | Parameter | Published by | Used for |
 |---|---|---|
@@ -95,8 +115,10 @@ arrives through SSM:
 | `/idp/shared/provisioner/queue_arn` | `api` | The resource the consume-side policy is written against |
 | `/idp/shared/observability/alerts_topic_arn` | `api` | Where the failed-execution alarm notifies |
 | `/idp/scaffolder/dev/state_task_queue_name`, `/idp/scaffolder/dev/github_task_queue_name` | `scaffolder` | The queues the callback states target |
+| `infra_worker_task_queue_name` (tfvars) | `infra-worker-aws` | The queue `ProvisionInfra` targets |
 
-It publishes two of its own, for the consumer to resolve at startup:
+It publishes two of its own, for the consumer to resolve at startup (the
+consumer's role may read `/idp/provisioner/dev/*`):
 
 | Parameter | Value |
 |---|---|
@@ -147,9 +169,8 @@ from AWS, so the provider treats the delete as done and removes the rest.
   service; the API component owns it, and both services are granted one side.
 - **The scaffolder's task queues.** The scaffolder owns them along with the IAM
   split that makes them separate queues at all; this stack is only a sender.
-- **The infra worker's queue.** That service does not exist yet. Until
-  `infra_worker_task_queue_name` is set, a request naming cloud resources fails
-  at `ProvisionInfra` rather than reporting success for resources nothing
-  created.
+- **The infra worker's queue.** The `infra-worker-aws` component owns it. With
+  `infra_worker_task_queue_name` null, a request naming cloud resources fails at
+  `ProvisionInfra` rather than reporting success for resources nothing created.
 - **The Deployment.** Kubernetes workloads are applied with `kubectl` from
   `k8s/provisioner/`, never by Terraform.

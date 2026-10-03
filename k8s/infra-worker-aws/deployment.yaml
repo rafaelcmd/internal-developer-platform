@@ -1,0 +1,71 @@
+# AWS infra worker: consumes ProvisionInfra tasks the scaffold state machine
+# puts on its queue, logs them, and reports them to Step Functions. It runs no
+# Terraform yet. Same shape as the provisioner consumer: no inbound traffic, so
+# no Service, ports or HTTP probes; liveness is "the container is running".
+#
+# Single replica. Reporting a task twice is harmless (the second
+# SendTaskSuccess is refused for a token already used), but a worker that
+# applies Terraform will not be, so scaling out waits for that work.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: internal-developer-platform-infra-worker-aws
+  namespace: default
+  labels:
+    app: internal-developer-platform-infra-worker-aws
+    "tags.datadoghq.com/service": infra-worker-aws
+    "tags.datadoghq.com/env": dev
+    "tags.datadoghq.com/version": "0.1.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: internal-developer-platform-infra-worker-aws
+  template:
+    metadata:
+      labels:
+        app: internal-developer-platform-infra-worker-aws
+        "tags.datadoghq.com/service": infra-worker-aws
+        "tags.datadoghq.com/env": dev
+        "tags.datadoghq.com/version": "0.1.0"
+        # Opts into datadog-agent sidecar injection (live pod status in the
+        # K8s Explorer; see k8s/api/deployment.yaml). The SA below is
+        # registered for the sidecar's kubelet-read RBAC in
+        # infra/live/api/dev/main.tf.
+        "agent.datadoghq.com/sidecar": fargate
+    spec:
+      # Created and IRSA-annotated by infra/live/infra_worker_aws/dev.
+      serviceAccountName: internal-developer-platform-infra-worker-aws
+      # A 20s long poll can be in flight when SIGTERM arrives; the worker stops
+      # receiving and lets the telemetry exporters flush.
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: internal-developer-platform-infra-worker-aws
+          # Replaced by cd-infra-worker-aws.yml with the immutable
+          # infra-worker-aws-<sha> build; see the api manifest for the pattern.
+          image: PLACEHOLDER-INFRA-WORKER-AWS-IMAGE
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: ENVIRONMENT
+              value: dev
+            # Feeds the OTel resource (service.version -> Datadog version tag);
+            # service.name is fixed in code (infra-worker-aws).
+            - name: SERVICE_VERSION
+              value: "0.1.0"
+            # Owned by infra/live/infra_worker_aws/dev. A name, not a URL: the
+            # worker resolves it with GetQueueUrl, so no account id lands here.
+            - name: TASK_QUEUE_NAME
+              value: internal-developer-platform-infra-worker-aws-tasks-dev
+            # OTLP egress to the Collector, which ships logs, traces and metrics
+            # to Datadog. Telemetry is a no-op when this is unset.
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel-collector.observability.svc.cluster.local:4317
+            - name: OTEL_EXPORTER_OTLP_INSECURE
+              value: "true"
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

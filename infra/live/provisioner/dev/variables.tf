@@ -36,9 +36,15 @@ variable "scaffolder_service_name" {
 }
 
 variable "infra_worker_task_queue_name" {
-  description = "Queue the ProvisionInfra callback task targets. Null until the infra worker is built, which makes a request naming cloud resources fail rather than report success for resources nothing created."
+  description = "Queue the ProvisionInfra callback task targets, owned by infra/live/infra_worker_aws. Null makes a request naming cloud resources fail rather than report success for resources nothing created."
   type        = string
   default     = null
+}
+
+variable "scaffold_enabled" {
+  description = "Runs ReserveName and CreateRepository against the scaffolder queues. False replaces both with Pass states, so an execution exercises only the infrastructure branch and needs no scaffolder pod or GitHub App key."
+  type        = bool
+  default     = true
 }
 
 # Request state. The table is the platform's record of what it was asked to

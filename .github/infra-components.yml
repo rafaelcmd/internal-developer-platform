@@ -50,3 +50,8 @@ api-gateway:
 scaffolder:
   - "infra/live/scaffolder/**"
   - "infra/modules/aws/irsa/**"
+
+infra-worker-aws:
+  - "infra/live/infra_worker_aws/**"
+  - "infra/modules/aws/sqs/**"
+  - "infra/modules/aws/irsa/**"

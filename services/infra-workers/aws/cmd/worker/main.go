@@ -1,138 +1,122 @@
 // Command worker is the AWS infra worker: it consumes ProvisionInfra tasks from
 // the scaffold state machine and provisions the AWS resources they name.
 //
-// It does not provision anything yet. Each task is logged and acknowledged, and
-// no result is reported to Step Functions, so the ProvisionInfra state stays a
-// Fail state until the worker calls SendTaskSuccess and SendTaskFailure.
+// It does not provision anything yet. Each task is logged, reported to Step
+// Functions as succeeded with Provisioned=false, and acknowledged.
 package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
-	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sfn"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws"
+	"go.opentelemetry.io/otel"
 
+	"github.com/rafaelcmd/internal-developer-platform/infra-worker-aws/internal/logger"
 	"github.com/rafaelcmd/internal-developer-platform/infra-worker-aws/internal/task"
+	"github.com/rafaelcmd/internal-developer-platform/infra-worker-aws/internal/telemetry"
+	"github.com/rafaelcmd/internal-developer-platform/infra-worker-aws/internal/worker"
 )
+
+const serviceName = "infra-worker-aws"
 
 func main() {
 	file := flag.String("file", "", "log a single task message read from this file instead of polling SQS")
 	flag.Parse()
 
-	log := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With("provider", task.Provider)
-
+	// Cancels on SIGINT/SIGTERM so the loop stops polling and the telemetry
+	// batch exporters flush before exit.
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	shutdownTelemetry, logHook, err := telemetry.Setup(ctx, telemetry.Config{
+		ServiceName: serviceName,
+		Version:     os.Getenv("SERVICE_VERSION"),
+		Environment: envOrDefault("ENVIRONMENT", "dev"),
+	})
+
+	// Built after Setup so the OTLP bridge hook, which is what carries these
+	// logs to the Collector and on to Datadog, is attached at construction.
+	logCfg := logger.DefaultConfig()
+	if logHook != nil {
+		logCfg.Hooks = []logrus.Hook{logHook}
+	}
+	log := logger.New(logCfg).WithField("provider", task.Provider)
+
+	if err != nil {
+		log.WithContext(ctx).Error("unable to set up telemetry", logger.F("error", err.Error()))
+		os.Exit(1)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := shutdownTelemetry(shutdownCtx); err != nil {
+			log.WithContext(shutdownCtx).Error("telemetry shutdown error", logger.F("error", err.Error()))
+		}
+	}()
+
 	if err := run(ctx, log, *file); err != nil {
-		log.Error("worker stopped", "error", err.Error())
+		log.WithContext(ctx).Error("worker stopped", logger.F("error", err.Error()))
+		// os.Exit skips deferred calls, so flush before leaving.
+		stop()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		_ = shutdownTelemetry(shutdownCtx)
+		cancel()
 		os.Exit(1)
 	}
 }
 
-func run(ctx context.Context, log *slog.Logger, file string) error {
+func run(ctx context.Context, log logger.Logger, file string) error {
 	if file != "" {
 		body, err := os.ReadFile(file)
 		if err != nil {
 			return err
 		}
-		return handle(log, body)
+		_, err = worker.Handle(ctx, log, body)
+		return err
 	}
 
-	queueURL := os.Getenv("TASK_QUEUE_URL")
-	if queueURL == "" {
-		return errors.New("TASK_QUEUE_URL is not set; pass -file to log a message without SQS")
+	queueName := os.Getenv("TASK_QUEUE_NAME")
+	if queueName == "" {
+		return fmt.Errorf("TASK_QUEUE_NAME is not set; pass -file to log a message without SQS")
 	}
 
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("load AWS config: %w", err)
 	}
+	otelaws.AppendMiddlewares(&cfg.APIOptions)
 
-	return poll(ctx, log, sqs.NewFromConfig(cfg), queueURL)
-}
+	sqsClient := sqs.NewFromConfig(cfg)
 
-func poll(ctx context.Context, log *slog.Logger, client *sqs.Client, queueURL string) error {
-	log.Info("polling for tasks", "queue_url", queueURL)
-
-	for ctx.Err() == nil {
-		output, err := client.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
-			QueueUrl:            aws.String(queueURL),
-			MaxNumberOfMessages: 10,
-			WaitTimeSeconds:     20,
-		})
-		if err != nil {
-			if ctx.Err() != nil {
-				break
-			}
-			log.Error("receive failed", "error", err.Error())
-			continue
-		}
-
-		for _, message := range output.Messages {
-			// A message that cannot be parsed stays on the queue, so the redrive
-			// policy moves it to the dead-letter queue instead of it being lost.
-			if err := handle(log, []byte(aws.ToString(message.Body))); err != nil {
-				continue
-			}
-
-			if _, err := client.DeleteMessage(ctx, &sqs.DeleteMessageInput{
-				QueueUrl:      aws.String(queueURL),
-				ReceiptHandle: message.ReceiptHandle,
-			}); err != nil {
-				log.Error("delete failed", "error", err.Error())
-			}
-		}
-	}
-
-	log.Info("shutting down")
-	return nil
-}
-
-// handle logs a ProvisionInfra task. It returns an error only when the message
-// cannot be understood; that is the one case where it must not be acknowledged.
-func handle(log *slog.Logger, body []byte) error {
-	message, err := task.Parse(body)
+	// Configured by name so no account id lands in the manifest.
+	queue, err := sqsClient.GetQueueUrl(ctx, &sqs.GetQueueUrlInput{QueueName: aws.String(queueName)})
 	if err != nil {
-		log.Error("could not understand task message", "error", err.Error(), "body", string(body))
-		return err
+		return fmt.Errorf("resolve queue %s: %w", queueName, err)
 	}
 
-	input := message.Input
-	log = log.With("request_id", input.RequestID, "application_name", input.ApplicationName)
+	return worker.Worker{
+		SQS:      sqsClient,
+		SFN:      sfn.NewFromConfig(cfg),
+		QueueURL: aws.ToString(queue.QueueUrl),
+		Tracer:   otel.Tracer(serviceName),
+		Log:      log,
+	}.Run(ctx)
+}
 
-	owned, foreign := input.Partition()
-
-	for _, resource := range owned {
-		log.Info("resource to provision",
-			"resource_name", resource.Name,
-			"resource_type", resource.ResourceType,
-			"specification", resource.Specification,
-		)
+func envOrDefault(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
 	}
-
-	// The control plane routes resources by provider, so a foreign resource here
-	// means that routing is wrong. It is reported and never provisioned.
-	for _, resource := range foreign {
-		log.Warn("resource belongs to another provider",
-			"resource_name", resource.Name,
-			"resource_type", resource.ResourceType,
-			"cloud_provider", resource.CloudProvider,
-		)
-	}
-
-	log.Info("provision infra task received",
-		"resource_count", len(owned),
-		"foreign_resource_count", len(foreign),
-	)
-
-	return nil
+	return fallback
 }
