@@ -8,7 +8,7 @@
 # DOCS      .github/workflows/README.md
 # =============================================================================
 #
-# The two Go services are independent modules, so the matrix runs one job per
+# The Go services are independent modules, so the matrix runs one job per
 # service and a failure in one still reports the other. The scaffolder is .NET
 # and gets its own job rather than a matrix entry — the Go matrix is
 # Go-specific from setup-go down to gofmt.
@@ -40,7 +40,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [api, provisioner]
+        service: [api, provisioner, infra-workers/aws]
     defaults:
       run:
         working-directory: services/${{ matrix.service }}
@@ -156,7 +156,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [api, provisioner]
+        service: [api, provisioner, infra-workers/aws]
 
     steps:
       - name: Checkout repository

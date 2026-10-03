@@ -1,0 +1,24 @@
+{
+  "Task": "ProvisionInfra",
+  "TaskToken": "example-task-token",
+  "Input": {
+    "RequestId": "3f2b8c1e-6d4a-4b7f-9e2a-1c5d8f0a7b3e",
+    "ApplicationName": "orders",
+    "Resources": [
+      {
+        "name": "orders-db",
+        "resource_type": "rds",
+        "cloud_provider": "AWS",
+        "specification": {
+          "engine": "postgres",
+          "instance_class": "db.t4g.micro"
+        }
+      },
+      {
+        "name": "orders-events",
+        "resource_type": "sqs",
+        "cloud_provider": "AWS"
+      }
+    ]
+  }
+}
