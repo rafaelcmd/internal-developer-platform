@@ -72,7 +72,7 @@ jobs:
       # soft_fail: findings are reported but do not fail the check. Flip it to
       # false (or enforce a subset with --check) once the baseline is clean.
       - name: Run Checkov
-        uses: bridgecrewio/checkov-action@2f9fbe2d1e51440f8f5c42abc829aad8e9e4faab # v12.3127.0
+        uses: bridgecrewio/checkov-action@6f26dc90000b74feb589a906cdfae540f5119895 # v12.3134.0
         with:
           directory: infra
           framework: terraform
@@ -83,7 +83,7 @@ jobs:
           output_format: sarif
 
       - name: Upload findings to Security tab
-        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:
           sarif_file: results.sarif
 
@@ -97,7 +97,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Setup Infracost
-        uses: infracost/actions/setup@fb736a8f219195d6efdca58682069b16fe1bc280 # v4.2.0
+        uses: infracost/actions/setup@a5783eb98adc93aa7a0049fce0abb06fdd30770a # v5.0.1
         with:
           api-key: ${{ secrets.INFRACOST_API_KEY }}
 
