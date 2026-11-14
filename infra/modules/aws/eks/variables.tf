@@ -52,6 +52,26 @@ variable "public_access_cidrs" {
   default     = ["0.0.0.0/0"]
 }
 
+# The add-on roles (load balancer controller, OTel Collector) and the Fargate
+# logging policy are created by the api pipeline, which may only manage IAM under
+# this path and only on roles carrying the boundary. See docs/adr/0009.
+variable "workload_iam_path" {
+  description = "IAM path for the add-on IRSA roles and the Fargate logging policy, such as /idp/workload/api/"
+  type        = string
+  default     = "/"
+
+  validation {
+    condition     = startswith(var.workload_iam_path, "/") && endswith(var.workload_iam_path, "/")
+    error_message = "workload_iam_path must begin and end with a slash."
+  }
+}
+
+variable "workload_permissions_boundary" {
+  description = "ARN of the permissions boundary attached to the Fargate pod execution role and the add-on IRSA roles. Null attaches none."
+  type        = string
+  default     = null
+}
+
 # Every principal that runs kubectl or manages Kubernetes objects needs an entry
 # here: operator workstations, the deploy role, and the CI role of any stack
 # whose Terraform uses the kubernetes provider. The cluster creator already has

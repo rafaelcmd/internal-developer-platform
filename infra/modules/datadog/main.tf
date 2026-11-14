@@ -83,6 +83,7 @@ module "aws_integration" {
 
   role_name   = var.role_name
   external_id = datadog_integration_aws_account.this.auth_config.aws_auth_config_role.external_id
+  policy_arns = var.integration_policy_arns
   environment = var.environment
   project     = var.project
 }

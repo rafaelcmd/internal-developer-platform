@@ -1,10 +1,21 @@
 # An IAM role assumable through an OIDC provider that already exists.
 #
-# Distinct from modules/aws/oidc, which creates the provider and one role. An
-# account holds only one provider per issuer URL, so every role beyond the first
-# attaches to the provider that module created. This is what gives each
-# Terraform component its own github-actions-tf-<component> role instead of one
-# shared role across every stack.
+# The provider itself comes from modules/aws/oidc, which an account holds once
+# per issuer URL; every role attaches to it. This is what gives each Terraform
+# component its own github-actions-tf-<component> role instead of one shared
+# role across every stack. The trust conditions are the security boundary: they
+# decide which repository, workflow, branch and environment may assume the role.
+
+locals {
+  # IAM rejects a condition operator with no keys, so an operator the caller
+  # left empty is dropped rather than rendered as {}.
+  trust_conditions = {
+    for operator, keys in {
+      StringEquals = var.string_equals
+      StringLike   = var.string_like
+    } : operator => keys if length(keys) > 0
+  }
+}
 
 resource "aws_iam_role" "this" {
   name = var.role_name
@@ -18,10 +29,7 @@ resource "aws_iam_role" "this" {
         Principal = {
           Federated = var.oidc_provider_arn
         }
-        Condition = {
-          StringEquals = var.string_equals
-          StringLike   = var.string_like
-        }
+        Condition = local.trust_conditions
       }
     ]
   })

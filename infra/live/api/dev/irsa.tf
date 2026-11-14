@@ -55,6 +55,9 @@ module "irsa" {
   policy_description = "Permissions for the internal-developer-platform API pod"
   policy_json        = data.aws_iam_policy_document.api.json
 
+  path                 = local.iam_path
+  permissions_boundary = data.aws_ssm_parameter.workload_boundary_arn.value
+
   oidc_provider_arn = module.eks.oidc_provider_arn
   oidc_provider_url = module.eks.oidc_provider_url
 

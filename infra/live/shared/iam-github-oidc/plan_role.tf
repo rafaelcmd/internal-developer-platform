@@ -1,16 +1,14 @@
 # Read-only role for pull-request plan runs.
 #
 # GitHub issues PR-triggered OIDC tokens with the subject
-# `repo:<org>/<repo>:pull_request`, which the main role's trust policy accepts
-# only main-branch refs and so rejects. That is deliberate: unmerged code must
-# never hold write-capable credentials. Pull-request plans assume this role
-# instead, and the
-# workflow selects it via the AWS_PLAN_ROLE_ARN repo variable, which must
-# hold the `github_actions_plan_role_arn` output of this stack.
+# `repo:<org>/<repo>:pull_request`, which the component roles' trust policies,
+# accepting only main-branch refs, reject. That is deliberate: unmerged code
+# must never hold write-capable credentials. Pull-request plans assume this role
+# instead, and the workflow selects it via the AWS_PLAN_ROLE_ARN repo variable,
+# which must hold the `github_actions_plan_role_arn` output of this stack.
 #
-# Plain resources rather than a second instance of the oidc module, because
-# that module also creates the OIDC provider and an account holds exactly one
-# per issuer. This role reuses the provider from module.github_actions_oidc.
+# Plain resources rather than modules/aws/oidc_role, because its managed policy
+# is AWS's ReadOnlyAccess rather than one of this stack's pipeline policies.
 
 resource "aws_iam_role" "github_actions_plan" {
   name = "github-actions-oidc-plan-role"
@@ -25,11 +23,13 @@ resource "aws_iam_role" "github_actions_plan" {
           Federated = module.github_actions_oidc.oidc_provider_arn
         }
         Condition = {
-          StringEquals = {
-            "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
-          }
+          StringEquals = merge(local.github_trust_base, {
+            "token.actions.githubusercontent.com:sub" = ["repo:${var.github_repository}:pull_request"]
+          })
+          # A pull request's ref is refs/pull/<number>/merge, so the workflow
+          # file is pinned and the ref is not.
           StringLike = {
-            "token.actions.githubusercontent.com:sub" = "repo:rafaelcmd/internal-developer-platform:pull_request"
+            "token.actions.githubusercontent.com:job_workflow_ref" = ["${var.github_repository}/.github/workflows/_terraform.yml@refs/pull/*"]
           }
         }
       }

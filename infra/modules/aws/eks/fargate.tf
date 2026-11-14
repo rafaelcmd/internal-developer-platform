@@ -11,10 +11,15 @@ data "aws_iam_policy_document" "fargate_assume_role" {
   }
 }
 
+# The name stays at the root path because Fargate profiles cannot change their
+# execution role in place: moving it would replace every profile and reschedule
+# every pod. The boundary is what caps the role instead, since the api pipeline
+# also owns the logging policy attached to it.
 resource "aws_iam_role" "fargate" {
-  name               = "${var.cluster_name}-fargate-role"
-  assume_role_policy = data.aws_iam_policy_document.fargate_assume_role.json
-  tags               = local.common_tags
+  name                 = "${var.cluster_name}-fargate-role"
+  assume_role_policy   = data.aws_iam_policy_document.fargate_assume_role.json
+  permissions_boundary = var.workload_permissions_boundary
+  tags                 = local.common_tags
 }
 
 resource "aws_iam_role_policy_attachment" "fargate_execution" {

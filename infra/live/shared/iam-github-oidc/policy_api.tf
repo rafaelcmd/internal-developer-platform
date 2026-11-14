@@ -4,6 +4,9 @@
 # Terraform-managed NLB, cluster log groups, and the SNS/CloudWatch alerting
 # this stack owns. The kubernetes provider authenticates through
 # eks:DescribeCluster, covered by the read statement.
+#
+# Its IAM grants are a separate policy, policy_api_iam.tf, because together
+# they exceed the 6,144-character limit of one managed policy.
 
 resource "aws_iam_policy" "pipeline_api" {
   name        = "${var.project}-${var.environment}-pipeline-api-policy"
@@ -42,7 +45,7 @@ resource "aws_iam_policy" "pipeline_api" {
           "eks:CreateAccessEntry",
           "eks:TagResource"
         ]
-        Resource = "*"
+        Resource = local.project_eks_arns
         Condition = {
           StringEquals = {
             "aws:RequestTag/Project" = var.project
@@ -90,7 +93,7 @@ resource "aws_iam_policy" "pipeline_api" {
           "eks:AssociateIdentityProviderConfig",
           "eks:TagResource"
         ]
-        Resource = "arn:aws:eks:*:*:cluster/*"
+        Resource = "arn:aws:eks:*:${local.account_id}:cluster/${var.project}-*"
         Condition = {
           StringEquals = {
             "aws:ResourceTag/Project" = var.project
@@ -98,28 +101,9 @@ resource "aws_iam_policy" "pipeline_api" {
         }
       },
       {
-        Sid    = "IAMOpenIDConnectProviderForIRSA"
-        Effect = "Allow"
-        Action = [
-          "iam:CreateOpenIDConnectProvider",
-          "iam:DeleteOpenIDConnectProvider",
-          "iam:UpdateOpenIDConnectProviderThumbprint",
-          "iam:AddClientIDToOpenIDConnectProvider",
-          "iam:RemoveClientIDFromOpenIDConnectProvider",
-          "iam:TagOpenIDConnectProvider",
-          "iam:UntagOpenIDConnectProvider"
-        ]
-        Resource = "*"
-      },
-      {
-        Sid    = "IAMCreateTaggedRolesAndPolicies"
-        Effect = "Allow"
-        Action = [
-          "iam:CreateRole",
-          "iam:CreatePolicy",
-          "iam:TagRole",
-          "iam:TagPolicy"
-        ]
+        Sid      = "EKSManagedSecurityGroups"
+        Effect   = "Allow"
+        Action   = "ec2:CreateSecurityGroup"
         Resource = "*"
         Condition = {
           StringEquals = {
@@ -127,64 +111,17 @@ resource "aws_iam_policy" "pipeline_api" {
           }
         }
       },
+      # ec2:CreateAction is present only while the tags are applied as part of
+      # the named create call, so this cannot tag anything that already exists.
       {
-        Sid    = "IAMManageProjectRolesAndPolicies"
-        Effect = "Allow"
-        Action = [
-          "iam:DeleteRole",
-          "iam:UpdateRole",
-          "iam:UpdateAssumeRolePolicy",
-          "iam:AttachRolePolicy",
-          "iam:DetachRolePolicy",
-          "iam:PutRolePolicy",
-          "iam:DeleteRolePolicy",
-          "iam:DeletePolicy",
-          "iam:CreatePolicyVersion",
-          "iam:DeletePolicyVersion",
-          "iam:SetDefaultPolicyVersion",
-          "iam:TagRole",
-          "iam:UntagRole",
-          "iam:TagPolicy",
-          "iam:UntagPolicy"
-        ]
-        Resource = "*"
-        Condition = {
-          StringEquals = {
-            "aws:ResourceTag/Project" = var.project
-          }
-        }
-      },
-      {
-        Sid      = "IAMServiceLinkedRole"
+        Sid      = "TagSecurityGroupsOnCreate"
         Effect   = "Allow"
-        Action   = ["iam:CreateServiceLinkedRole"]
-        Resource = "arn:aws:iam::*:role/aws-service-role/*"
-      },
-      {
-        Sid      = "IAMPassRoleToClusterServices"
-        Effect   = "Allow"
-        Action   = "iam:PassRole"
-        Resource = "*"
-        Condition = {
-          StringLike = {
-            "iam:PassedToService" = [
-              "eks.amazonaws.com",
-              "eks-fargate-pods.amazonaws.com"
-            ]
-          }
-        }
-      },
-      {
-        Sid    = "EKSManagedSecurityGroups"
-        Effect = "Allow"
-        Action = [
-          "ec2:CreateSecurityGroup",
-          "ec2:CreateTags"
-        ]
+        Action   = "ec2:CreateTags"
         Resource = "*"
         Condition = {
           StringEquals = {
             "aws:RequestTag/Project" = var.project
+            "ec2:CreateAction"       = "CreateSecurityGroup"
           }
         }
       },
@@ -309,4 +246,13 @@ resource "aws_iam_policy" "pipeline_api" {
   })
 
   tags = local.tags
+}
+
+locals {
+  # The cluster and every sub-resource ARN EKS builds from its name: Fargate
+  # profiles, addons, node groups and access entries.
+  project_eks_arns = [
+    "arn:aws:eks:*:${local.account_id}:cluster/${var.project}-*",
+    "arn:aws:eks:*:${local.account_id}:*/${var.project}-*/*"
+  ]
 }

@@ -9,6 +9,9 @@ module "eks" {
   vpc_id             = data.aws_ssm_parameter.vpc_id.value
   private_subnet_ids = split(",", data.aws_ssm_parameter.private_subnet_ids.value)
 
+  workload_iam_path             = local.iam_path
+  workload_permissions_boundary = data.aws_ssm_parameter.workload_boundary_arn.value
+
   aws_region  = var.aws_region
   environment = var.environment
   project     = var.project

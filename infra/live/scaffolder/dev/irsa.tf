@@ -107,6 +107,9 @@ module "worker_irsa" {
   policy_description = "Permissions for the scaffolder ${each.key} worker pod"
   policy_json        = data.aws_iam_policy_document.worker[each.key].json
 
+  path                 = local.iam_path
+  permissions_boundary = data.aws_ssm_parameter.workload_boundary_arn.value
+
   oidc_provider_arn = data.aws_ssm_parameter.eks_oidc_provider_arn.value
   oidc_provider_url = local.eks_oidc_provider_url
 

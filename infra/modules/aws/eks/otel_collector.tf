@@ -55,6 +55,9 @@ module "otel_collector_irsa" {
   policy_description = "Allow the OTel Collector to remote-write to Amazon Managed Prometheus"
   policy_json        = one(data.aws_iam_policy_document.otel_collector_amp[*].json)
 
+  path                 = var.workload_iam_path
+  permissions_boundary = var.workload_permissions_boundary
+
   oidc_provider_arn = aws_iam_openid_connect_provider.cluster.arn
   oidc_provider_url = replace(aws_iam_openid_connect_provider.cluster.url, "https://", "")
 

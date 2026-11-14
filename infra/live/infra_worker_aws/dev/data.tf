@@ -30,3 +30,10 @@ data "aws_ssm_parameter" "eks_oidc_provider_url" {
 data "aws_ssm_parameter" "observability_alerts_topic_arn" {
   name = "/idp/shared/observability/alerts_topic_arn"
 }
+
+# Published by shared/iam-github-oidc. Every role this stack creates carries it:
+# the pipeline is allowed to create and change roles only with this boundary
+# attached. See docs/adr/0009.
+data "aws_ssm_parameter" "workload_boundary_arn" {
+  name = "/idp/shared/iam/workload_boundary_arn"
+}

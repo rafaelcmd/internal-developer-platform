@@ -437,6 +437,9 @@ module "state_machine" {
 
   policy_json = data.aws_iam_policy_document.state_machine.json
 
+  role_path                 = local.iam_path
+  role_permissions_boundary = data.aws_ssm_parameter.workload_boundary_arn.value
+
   log_level             = var.state_machine_log_level
   log_retention_in_days = var.state_machine_log_retention_in_days
   tracing_enabled       = var.state_machine_tracing_enabled

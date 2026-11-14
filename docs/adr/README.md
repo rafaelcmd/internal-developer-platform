@@ -31,6 +31,7 @@ None exist yet; create them only when the first such decision arises.
 | 0006 | [Step Functions orchestrates provisioning, workers execute it](0006-step-functions-as-provisioning-orchestrator.md) | Proposed | 2026-09-20 |
 | 0007 | [Scaffolded applications resolve infrastructure by reference](0007-infrastructure-outputs-reach-applications-by-reference.md) | Proposed | 2026-09-20 |
 | 0008 | [One infra worker per cloud provider](0008-one-infra-worker-per-cloud-provider.md) | Proposed | 2026-10-03 |
+| 0009 | [Pipeline roles manage IAM only by path, under a permissions boundary](0009-iam-permissions-boundary-and-paths.md) | Proposed | 2026-11-10 |
 
 ## How to add a new ADR
 

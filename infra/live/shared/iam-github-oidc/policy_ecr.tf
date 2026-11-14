@@ -30,7 +30,7 @@ resource "aws_iam_policy" "pipeline_ecr" {
           "ecr:CreateRepository",
           "ecr:TagResource"
         ]
-        Resource = "*"
+        Resource = "arn:aws:ecr:*:${local.account_id}:repository/${var.project}-*"
         Condition = {
           StringEquals = {
             "aws:RequestTag/Project" = var.project

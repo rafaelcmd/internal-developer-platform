@@ -1,8 +1,10 @@
 # CI role for the scaffolder component (live/scaffolder/dev).
 # The scaffolder's own state (one DynamoDB table), its Step Functions task queue
-# and DLQ, and the IRSA role + policy its pod assumes. The kubernetes provider in
-# that stack authenticates through eks:DescribeCluster, which is why the read
-# statement includes it. The stack reads the cluster but never modifies it.
+# and DLQ, and the IRSA roles + policies its pods assume, under
+# /idp/workload/scaffolder/ with the workload boundary
+# (local.workload_iam_statements). The kubernetes provider in that stack
+# authenticates through eks:DescribeCluster, which is why the read statement
+# includes it. The stack reads the cluster but never modifies it.
 # The SSM parameters it publishes are covered by the common policy.
 #
 # It also creates the Secrets Manager secret that holds the GitHub App private
@@ -16,7 +18,7 @@ resource "aws_iam_policy" "pipeline_scaffolder" {
   description = "Pipeline policy for the scaffolder stack (DynamoDB, SQS, IRSA)"
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
+    Statement = concat([
       {
         Sid    = "ReadServicesInStack"
         Effect = "Allow"
@@ -48,7 +50,7 @@ resource "aws_iam_policy" "pipeline_scaffolder" {
           "dynamodb:CreateTable",
           "dynamodb:TagResource"
         ]
-        Resource = "*"
+        Resource = "arn:aws:dynamodb:*:${local.account_id}:table/${var.project}-*"
         Condition = {
           StringEquals = {
             "aws:RequestTag/Project" = var.project
@@ -272,51 +274,8 @@ resource "aws_iam_policy" "pipeline_scaffolder" {
             "aws:ResourceTag/Project" = var.project
           }
         }
-      },
-      {
-        Sid    = "IAMCreateTaggedRolesAndPolicies"
-        Effect = "Allow"
-        Action = [
-          "iam:CreateRole",
-          "iam:CreatePolicy",
-          "iam:TagRole",
-          "iam:TagPolicy"
-        ]
-        Resource = "*"
-        Condition = {
-          StringEquals = {
-            "aws:RequestTag/Project" = var.project
-          }
-        }
-      },
-      {
-        Sid    = "IAMManageProjectRolesAndPolicies"
-        Effect = "Allow"
-        Action = [
-          "iam:DeleteRole",
-          "iam:UpdateRole",
-          "iam:UpdateAssumeRolePolicy",
-          "iam:AttachRolePolicy",
-          "iam:DetachRolePolicy",
-          "iam:PutRolePolicy",
-          "iam:DeleteRolePolicy",
-          "iam:DeletePolicy",
-          "iam:CreatePolicyVersion",
-          "iam:DeletePolicyVersion",
-          "iam:SetDefaultPolicyVersion",
-          "iam:TagRole",
-          "iam:UntagRole",
-          "iam:TagPolicy",
-          "iam:UntagPolicy"
-        ]
-        Resource = "*"
-        Condition = {
-          StringEquals = {
-            "aws:ResourceTag/Project" = var.project
-          }
-        }
       }
-    ]
+    ], local.workload_iam_statements["scaffolder"])
   })
 
   tags = local.tags

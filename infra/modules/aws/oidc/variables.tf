@@ -4,7 +4,7 @@ variable "url" {
 }
 
 variable "client_id_list" {
-  description = "List of client IDs for the OIDC provider"
+  description = "List of client IDs (audiences) the provider accepts"
   type        = list(string)
 }
 
@@ -13,30 +13,8 @@ variable "thumbprint" {
   type        = string
 }
 
-variable "role_name" {
-  description = "Name of the IAM role to create"
-  type        = string
-}
-
-variable "string_equals" {
-  description = "Map of StringEquals conditions for the assume role policy"
-  type        = map(string)
-  default     = {}
-}
-
-variable "string_like" {
-  description = "Map of StringLike conditions for the assume role policy"
-  type        = map(any)
-  default     = {}
-}
-
-variable "policy_arns" {
-  description = "Policy ARNs to attach to the IAM role (use least privilege)"
-  type        = list(string)
-}
-
 variable "tags" {
-  description = "Tags to apply to resources"
+  description = "Tags to apply to the provider"
   type        = map(string)
   default     = {}
 }
