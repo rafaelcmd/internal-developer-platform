@@ -8,17 +8,19 @@
 # and the queue the consumer reads) and modifies none of them. The SSM
 # parameters it reads and writes are covered by the common policy.
 #
-# iam:PassRole is the one grant here that is not a create: a state machine names
-# the role it assumes, and IAM treats handing a role to a service as its own
-# privilege. It is restricted to roles this project tagged and to Step Functions
-# as the consuming service, so the pipeline cannot pass an unrelated role.
+# Its IAM reach is the /idp/workload/provisioner/ path, on roles carrying the
+# workload boundary (local.workload_iam_statements). iam:PassRole is the one
+# grant that is not a create: a state machine names the role it assumes, and IAM
+# treats handing a role to a service as its own privilege. It is restricted to
+# that same path and to Step Functions as the consuming service, so the pipeline
+# cannot pass an unrelated role.
 
 resource "aws_iam_policy" "pipeline_provisioner" {
   name        = "${var.project}-${var.environment}-pipeline-provisioner-policy"
   description = "Pipeline policy for the provisioner stack (Step Functions, DynamoDB, IRSA)"
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
+    Statement = concat([
       {
         Sid    = "ReadServicesInStack"
         Effect = "Allow"
@@ -45,7 +47,7 @@ resource "aws_iam_policy" "pipeline_provisioner" {
           "dynamodb:CreateTable",
           "dynamodb:TagResource"
         ]
-        Resource = "*"
+        Resource = "arn:aws:dynamodb:*:${local.account_id}:table/${var.project}-*"
         Condition = {
           StringEquals = {
             "aws:RequestTag/Project" = var.project
@@ -102,14 +104,10 @@ resource "aws_iam_policy" "pipeline_provisioner" {
         Sid      = "PassStateMachineExecutionRole"
         Effect   = "Allow"
         Action   = "iam:PassRole"
-        Resource = "*"
+        Resource = local.workload_role_arns["provisioner"]
         Condition = {
           StringEquals = {
-            # iam:ResourceTag, not aws:ResourceTag. Step Functions is the caller
-            # when a role is passed, and the global key is unpopulated in that
-            # request, so the condition never matches and the pass is denied.
-            "iam:ResourceTag/Project" = var.project
-            "iam:PassedToService"     = "states.amazonaws.com"
+            "iam:PassedToService" = "states.amazonaws.com"
           }
         }
       },
@@ -179,51 +177,8 @@ resource "aws_iam_policy" "pipeline_provisioner" {
             "aws:ResourceTag/Project" = var.project
           }
         }
-      },
-      {
-        Sid    = "IAMCreateTaggedRolesAndPolicies"
-        Effect = "Allow"
-        Action = [
-          "iam:CreateRole",
-          "iam:CreatePolicy",
-          "iam:TagRole",
-          "iam:TagPolicy"
-        ]
-        Resource = "*"
-        Condition = {
-          StringEquals = {
-            "aws:RequestTag/Project" = var.project
-          }
-        }
-      },
-      {
-        Sid    = "IAMManageProjectRolesAndPolicies"
-        Effect = "Allow"
-        Action = [
-          "iam:DeleteRole",
-          "iam:UpdateRole",
-          "iam:UpdateAssumeRolePolicy",
-          "iam:AttachRolePolicy",
-          "iam:DetachRolePolicy",
-          "iam:PutRolePolicy",
-          "iam:DeleteRolePolicy",
-          "iam:DeletePolicy",
-          "iam:CreatePolicyVersion",
-          "iam:DeletePolicyVersion",
-          "iam:SetDefaultPolicyVersion",
-          "iam:TagRole",
-          "iam:UntagRole",
-          "iam:TagPolicy",
-          "iam:UntagPolicy"
-        ]
-        Resource = "*"
-        Condition = {
-          StringEquals = {
-            "aws:ResourceTag/Project" = var.project
-          }
-        }
       }
-    ]
+    ], local.workload_iam_statements["provisioner"])
   })
 
   tags = local.tags

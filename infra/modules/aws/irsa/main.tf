@@ -34,10 +34,15 @@ data "aws_iam_policy_document" "assume_role" {
   }
 }
 
+# The path and the boundary are what the pipelines' IAM grants key on: a
+# pipeline may only create or change roles under its own component path, and
+# only while they carry the workload boundary. See docs/adr/0009.
 resource "aws_iam_role" "this" {
-  name               = var.role_name
-  description        = var.role_description
-  assume_role_policy = data.aws_iam_policy_document.assume_role.json
+  name                 = var.role_name
+  path                 = var.path
+  description          = var.role_description
+  assume_role_policy   = data.aws_iam_policy_document.assume_role.json
+  permissions_boundary = var.permissions_boundary
 
   tags = var.tags
 }
@@ -55,6 +60,7 @@ resource "aws_iam_policy" "this" {
   count = var.create_policy ? 1 : 0
 
   name        = coalesce(var.policy_name, "${var.role_name}-policy")
+  path        = var.path
   description = var.policy_description
   policy      = var.policy_json
 

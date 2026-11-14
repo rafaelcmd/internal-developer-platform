@@ -39,10 +39,14 @@ data "aws_iam_policy_document" "assume_role" {
   }
 }
 
+# The path and the boundary scope which pipeline may manage this role and cap
+# what its policies can grant. See docs/adr/0009.
 resource "aws_iam_role" "this" {
-  name               = "${var.name}-execution"
-  description        = var.role_description
-  assume_role_policy = data.aws_iam_policy_document.assume_role.json
+  name                 = "${var.name}-execution"
+  path                 = var.role_path
+  description          = var.role_description
+  assume_role_policy   = data.aws_iam_policy_document.assume_role.json
+  permissions_boundary = var.role_permissions_boundary
 
   tags = var.tags
 }

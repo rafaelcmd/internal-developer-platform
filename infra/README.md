@@ -81,8 +81,8 @@ infra/
     │   ├── ecr/                     # the only image registry
     │   ├── identity/                # Cognito; standalone so other stacks need only SSM reads
     │   ├── datadog/                 # AWS↔Datadog integration + API key in SSM
-    │   ├── iam-github-oidc/         # AWS role assumed by GitHub Actions
-    │   └── iam-tfc-oidc/            # AWS role assumed by Terraform Cloud
+    │   ├── iam-github-oidc/         # GitHub OIDC trust, pipeline roles, workload boundary
+    │   └── iam-tfc-oidc/            # Terraform Cloud OIDC provider (no role)
     ├── api/dev/                     # EKS + SQS + Redis SSM + Datadog Lambda forwarder
     ├── provisioner/dev/             # the consumer's IRSA role + ServiceAccount
     ├── scaffolder/dev/              # scaffolder table, task queues, App key, IRSA
@@ -101,8 +101,8 @@ Module composition stays inside the repo. Live workspaces reference modules by *
 | `shared/ecr` | `internal-developer-platform-shared-ecr` | ECR repo, lifecycle, repo URL in SSM | — |
 | `shared/identity` | `internal-developer-platform-shared-identity` | Cognito user pool + client, identity params in SSM | — |
 | `shared/datadog` | `internal-developer-platform-shared-datadog` | AWS↔Datadog integration role, Datadog API key in SSM | — |
-| `shared/iam-github-oidc` | `internal-developer-platform-iam-github-oidc` | IAM role assumed by GitHub Actions via OIDC | — |
-| `shared/iam-tfc-oidc` | `internal-developer-platform-iam-tfc-oidc` | IAM role assumed by Terraform Cloud via OIDC | — |
+| `shared/iam-github-oidc` | `internal-developer-platform-iam-github-oidc` | GitHub OIDC provider, pipeline roles, workload permissions boundary | — |
+| `shared/iam-tfc-oidc` | `internal-developer-platform-iam-tfc-oidc` | Terraform Cloud OIDC provider, trusted by no role | — |
 | `api/dev` | `internal-developer-platform-api-dev` | EKS cluster (Fargate), IRSA scaffolding, AWS Load Balancer Controller, SQS queue, Redis endpoint in SSM, Datadog Lambda forwarder | `/idp/shared/vpc/*`, `/idp/shared/datadog/*` |
 | `provisioner/dev` | `internal-developer-platform-provisioner-dev` | The scaffold state machine, the request-state table, and the consumer's IRSA role and ServiceAccount. The queue and the cluster belong to `api/dev`; the task queues belong to the workers. | `/idp/shared/eks/*`, `/idp/shared/provisioner/queue_arn`, `/idp/scaffolder/dev/*` |
 | `api_gateway/dev` | `internal-developer-platform-api-gateway-dev` | REST API Gateway, VPC Link, Cognito authorizer, WAF Web ACL | `/idp/shared/identity/*`, `data.aws_lb` (NLB by name) |
@@ -230,9 +230,11 @@ AWS authentication is OIDC end-to-end:
 - Each Terraform component assumes its own role, `github-actions-tf-<component>`, carrying only the services that component provisions (`infra/live/shared/iam-github-oidc/policy_*.tf`). Workflows build the ARN from the component name plus the `AWS_ACCOUNT_ID` variable, so a new component needs no new repo configuration.
 - Workload deploys assume `github-actions-deploy` — SSM reads, ECR push, and cluster auth only. It appears in `cluster_admin_principal_arns` so EKS grants it kubectl access through an access entry.
 - Pull-request plans assume `github-actions-oidc-plan-role`, which holds `ReadOnlyAccess`: unmerged code can compute a diff but never mutate AWS.
-- Trust policies allow three subjects — `...:ref:refs/heads/main`, `...:environment:dev` and `...:environment:dev-auto` — so write-capable credentials are only issued to jobs on `main` or inside a deployment environment (`dev-auto` replaces `dev` when `DISABLE_DEPLOYMENT_APPROVALS` is set). Pull requests match neither.
-- Component policies authorize creation on the `Project` request tag and mutation on the `Project` resource tag, so a role cannot modify resources outside this project even within its own services.
-- Terraform Cloud holds state only. Runs execute on the GitHub runner in Local execution mode, so the identity applying a stack is always its `github-actions-tf-<component>` role — never a single shared role across every stack. The `shared/iam-tfc-oidc` stack predates this and is retained for the remote-run path; nothing currently uses it.
+- Trust policies pin the repository by its immutable `repository_id` and `repository_owner_id`, and the workflow file by `job_workflow_ref`: Terraform roles accept only `_terraform.yml` on `main`, the deploy role only the `cd-*.yml` workflows on `main`. Terraform roles allow three subjects — `...:ref:refs/heads/main`, `...:environment:dev` and `...:environment:dev-auto` — so write-capable credentials are only issued to jobs on `main` or inside a deployment environment (`dev-auto` replaces `dev` when `DISABLE_DEPLOYMENT_APPROVALS` is set). Pull requests match neither.
+- Component policies authorize creation on the `Project` request tag and mutation on the `Project` resource tag, so a role cannot modify resources outside this project even within its own services. The tag cannot be removed, and EC2 resources can only be tagged by the call that creates them.
+- IAM is authorized by path rather than by tag ([ADR-0009](../docs/adr/0009-iam-permissions-boundary-and-paths.md)). A component's pipeline may manage roles and policies only under `/idp/workload/<component>/`, and only while they carry the workload permissions boundary, whose ARN component stacks read from `/idp/shared/iam/workload_boundary_arn`. The EKS cluster, Fargate, API Gateway CloudWatch and Datadog roles keep their names and are granted by exact ARN.
+- Every pipeline role is denied `sts:AssumeRole`, any change to the pipeline roles, the OIDC provider, the pipeline policies and the boundary, and attaching `AdministratorAccess`, `IAMFullAccess` or `PowerUserAccess` (`policy_common.tf`).
+- Terraform Cloud holds state only. Runs execute on the GitHub runner in Local execution mode, so the identity applying a stack is always its `github-actions-tf-<component>` role — never a single shared role across every stack. The `shared/iam-tfc-oidc` stack keeps the Terraform Cloud OIDC provider for a future remote-run path; no role trusts it.
 - A stack that manages Kubernetes objects needs an EKS access entry for its own role, granted through `cluster_admin_principal_arns` in `api/dev`. Without one the kubernetes provider fails with a bare `Unauthorized`, which says nothing about IAM.
 
 ---
@@ -245,7 +247,7 @@ AWS authentication is OIDC end-to-end:
 2. Terraform Cloud organization (`internal-developer-platform-org`).
 3. Apply `shared/iam-tfc-oidc` and `shared/iam-github-oidc` once, locally or by hand, to bootstrap the OIDC trust.
 4. Create each TFC workspace listed in [the ten stacks table](#the-ten-stacks), pointed at this repo with the matching working directory. **Set its execution mode to Local.** Terraform runs on the GitHub runner under the per-component `github-actions-tf-<component>` role; a workspace left on Terraform Cloud's default of Remote executes on TFC's infrastructure instead, under a different identity, and fails with *"No valid credential sources found"*. Workspaces are not managed as code, so nothing in this repo enforces this.
-5. Populate GitHub repository secrets: `TF_API_TOKEN`, `DD_API_KEY`. Populate variables: `AWS_REGION`, `AWS_ROLE_ARN`, `AWS_ACCOUNT_ID`.
+5. Populate GitHub repository secrets: `TF_API_TOKEN`, `DD_API_KEY`. Populate variables: `AWS_REGION`, `AWS_ACCOUNT_ID`, and `AWS_PLAN_ROLE_ARN` from the `github_actions_plan_role_arn` output of `shared/iam-github-oidc`.
 
 ### Full platform up
 

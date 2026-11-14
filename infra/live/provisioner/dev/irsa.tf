@@ -76,6 +76,9 @@ module "irsa" {
   policy_description = "Permissions for the internal-developer-platform provisioner pod"
   policy_json        = data.aws_iam_policy_document.provisioner.json
 
+  path                 = local.iam_path
+  permissions_boundary = data.aws_ssm_parameter.workload_boundary_arn.value
+
   oidc_provider_arn = data.aws_ssm_parameter.eks_oidc_provider_arn.value
   oidc_provider_url = data.aws_ssm_parameter.eks_oidc_provider_url.value
 

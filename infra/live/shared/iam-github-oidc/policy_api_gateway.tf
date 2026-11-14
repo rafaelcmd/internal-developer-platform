@@ -4,7 +4,8 @@
 # so its statements are action-scoped rather than tag-conditioned.
 #
 # The stack also provisions its own observability plumbing: access log and WAF
-# log groups, plus the role API Gateway assumes to write them.
+# log groups, plus the role API Gateway assumes to write them. That role is the
+# only one this pipeline may manage, and only with its one AWS-managed policy.
 
 resource "aws_iam_policy" "pipeline_api_gateway" {
   name        = "${var.project}-${var.environment}-pipeline-api-gateway-policy"
@@ -42,10 +43,20 @@ resource "aws_iam_policy" "pipeline_api_gateway" {
           "ec2:CreateVpcEndpointServiceConfiguration",
           "ec2:DeleteVpcEndpointServiceConfigurations",
           "ec2:ModifyVpcEndpointServiceConfiguration",
-          "ec2:ModifyVpcEndpointServicePermissions",
-          "ec2:CreateTags"
+          "ec2:ModifyVpcEndpointServicePermissions"
         ]
         Resource = "*"
+      },
+      {
+        Sid      = "TagEndpointServiceOnCreate"
+        Effect   = "Allow"
+        Action   = "ec2:CreateTags"
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "ec2:CreateAction" = "CreateVpcEndpointServiceConfiguration"
+          }
+        }
       },
       {
         Sid    = "CloudWatchLogsRead"
@@ -105,38 +116,33 @@ resource "aws_iam_policy" "pipeline_api_gateway" {
         ]
         Resource = "*"
       },
+      # The role API Gateway assumes to write its logs, by name. It holds one
+      # AWS-managed policy, pinned here, and no inline policy.
       {
-        Sid    = "CreateTaggedCloudWatchRole"
+        Sid    = "CloudWatchRoleLifecycle"
         Effect = "Allow"
         Action = [
           "iam:CreateRole",
-          "iam:TagRole"
-        ]
-        Resource = "*"
-        Condition = {
-          StringEquals = {
-            "aws:RequestTag/Project" = var.project
-          }
-        }
-      },
-      {
-        Sid    = "ManageProjectCloudWatchRole"
-        Effect = "Allow"
-        Action = [
           "iam:DeleteRole",
           "iam:UpdateRole",
+          "iam:UpdateRoleDescription",
           "iam:UpdateAssumeRolePolicy",
-          "iam:AttachRolePolicy",
-          "iam:DetachRolePolicy",
-          "iam:PutRolePolicy",
-          "iam:DeleteRolePolicy",
           "iam:TagRole",
           "iam:UntagRole"
         ]
-        Resource = "*"
+        Resource = local.api_gateway_cloudwatch_role_arn
+      },
+      {
+        Sid    = "CloudWatchRoleManagedPolicyOnly"
+        Effect = "Allow"
+        Action = [
+          "iam:AttachRolePolicy",
+          "iam:DetachRolePolicy"
+        ]
+        Resource = local.api_gateway_cloudwatch_role_arn
         Condition = {
-          StringEquals = {
-            "aws:ResourceTag/Project" = var.project
+          ArnEquals = {
+            "iam:PolicyARN" = "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
           }
         }
       },
@@ -146,9 +152,9 @@ resource "aws_iam_policy" "pipeline_api_gateway" {
         Sid      = "PassCloudWatchRoleToApiGateway"
         Effect   = "Allow"
         Action   = "iam:PassRole"
-        Resource = "*"
+        Resource = local.api_gateway_cloudwatch_role_arn
         Condition = {
-          StringLike = {
+          StringEquals = {
             "iam:PassedToService" = "apigateway.amazonaws.com"
           }
         }
@@ -225,4 +231,8 @@ resource "aws_iam_policy" "pipeline_api_gateway" {
   })
 
   tags = local.tags
+}
+
+locals {
+  api_gateway_cloudwatch_role_arn = "arn:aws:iam::${local.account_id}:role/${var.api_gateway_name}-api-gateway-cloudwatch-role"
 }

@@ -34,6 +34,7 @@ resource "aws_iam_policy" "fargate_logging" {
   count = var.enable_fargate_logging ? 1 : 0
 
   name        = "${var.cluster_name}-fargate-logging"
+  path        = var.workload_iam_path
   description = "Allow Fargate pods' execution role to write to the pod log group"
   policy      = data.aws_iam_policy_document.fargate_logging[0].json
   tags        = local.common_tags

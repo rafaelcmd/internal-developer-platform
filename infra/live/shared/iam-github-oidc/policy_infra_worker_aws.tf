@@ -1,6 +1,7 @@
 # CI role for the AWS infra worker component (live/infra_worker_aws/dev).
 # The worker's task queue and DLQ, the dead-letter alarm, and the IRSA role +
-# policy its pod assumes. The kubernetes provider in that stack authenticates
+# policy its pod assumes, under /idp/workload/infra-worker-aws/ with the
+# workload boundary (local.workload_iam_statements). The kubernetes provider in that stack authenticates
 # through eks:DescribeCluster to create the ServiceAccount; the stack reads the
 # cluster but never modifies it. The SSM parameters it reads and publishes are
 # covered by the common policy.
@@ -10,7 +11,7 @@ resource "aws_iam_policy" "pipeline_infra_worker_aws" {
   description = "Pipeline policy for the AWS infra worker stack (SQS, IRSA)"
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
+    Statement = concat([
       {
         Sid    = "ReadServicesInStack"
         Effect = "Allow"
@@ -83,51 +84,8 @@ resource "aws_iam_policy" "pipeline_infra_worker_aws" {
             "aws:ResourceTag/Project" = var.project
           }
         }
-      },
-      {
-        Sid    = "IAMCreateTaggedRolesAndPolicies"
-        Effect = "Allow"
-        Action = [
-          "iam:CreateRole",
-          "iam:CreatePolicy",
-          "iam:TagRole",
-          "iam:TagPolicy"
-        ]
-        Resource = "*"
-        Condition = {
-          StringEquals = {
-            "aws:RequestTag/Project" = var.project
-          }
-        }
-      },
-      {
-        Sid    = "IAMManageProjectRolesAndPolicies"
-        Effect = "Allow"
-        Action = [
-          "iam:DeleteRole",
-          "iam:UpdateRole",
-          "iam:UpdateAssumeRolePolicy",
-          "iam:AttachRolePolicy",
-          "iam:DetachRolePolicy",
-          "iam:PutRolePolicy",
-          "iam:DeleteRolePolicy",
-          "iam:DeletePolicy",
-          "iam:CreatePolicyVersion",
-          "iam:DeletePolicyVersion",
-          "iam:SetDefaultPolicyVersion",
-          "iam:TagRole",
-          "iam:UntagRole",
-          "iam:TagPolicy",
-          "iam:UntagPolicy"
-        ]
-        Resource = "*"
-        Condition = {
-          StringEquals = {
-            "aws:ResourceTag/Project" = var.project
-          }
-        }
       }
-    ]
+    ], local.workload_iam_statements["infra-worker-aws"])
   })
 
   tags = local.tags

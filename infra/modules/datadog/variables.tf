@@ -10,6 +10,11 @@ variable "role_name" {
   default     = "DatadogIntegrationRole"
 }
 
+variable "integration_policy_arns" {
+  description = "ARNs of the managed policies attached to the Datadog integration role. Must be known at plan time."
+  type        = list(string)
+}
+
 variable "environment" {
   description = "Environment name"
   type        = string

@@ -137,14 +137,20 @@ families exist, each scoped to what it needs:
 
 | Role | Used by | Can do |
 | --- | --- | --- |
-| `github-actions-tf-<component>` | `_terraform.yml` | Manage only the services that component provisions. Trusts `main` only. |
-| `AWS_PLAN_ROLE_ARN` | pull-request plans | Read AWS to compute a diff. **Cannot mutate anything.** |
-| `github-actions-deploy` | the `cd-*` deploy workflows | Push to ECR and run `kubectl`. |
+| `github-actions-tf-<component>` | `_terraform.yml` | Manage only the services that component provisions. Trusts `_terraform.yml` on `main` only. |
+| `AWS_PLAN_ROLE_ARN` | pull-request plans | Read AWS to compute a diff. **Cannot mutate anything.** Trusts `_terraform.yml` on pull requests only. |
+| `github-actions-deploy` | the `cd-*` deploy workflows | Push to ECR and run `kubectl`. Trusts the `cd-*.yml` workflows on `main` only. |
 
 Pull requests get the read-only role because unmerged code must never hold
 write credentials. Role definitions live in `infra/live/shared/iam-github-oidc/`.
 The per-component roles are addressed by naming convention, so adding a
 component needs no new repository variable.
+
+Each trust policy pins the workflow file through the `job_workflow_ref` claim.
+A new workflow that assumes one of these roles directly, rather than calling
+`_terraform.yml` or living in a `cd-*.yml` file, is rejected by
+`AssumeRoleWithWebIdentity` until its trust policy in
+`infra/live/shared/iam-github-oidc/roles.tf` names it.
 
 ## Composite actions
 

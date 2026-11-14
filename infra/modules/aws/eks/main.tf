@@ -23,6 +23,9 @@ data "aws_iam_policy_document" "cluster_assume_role" {
   }
 }
 
+# Left at the root path with no boundary: EKS cannot change a cluster's role in
+# place, so moving it would replace the cluster. The api pipeline can attach
+# only AmazonEKSClusterPolicy to it and holds no inline-policy grant on it.
 resource "aws_iam_role" "cluster" {
   name               = "${var.cluster_name}-cluster-role"
   assume_role_policy = data.aws_iam_policy_document.cluster_assume_role.json

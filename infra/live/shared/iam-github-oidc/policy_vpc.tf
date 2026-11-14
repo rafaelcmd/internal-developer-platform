@@ -1,8 +1,8 @@
 # CI role for the vpc component (live/shared/vpc).
 # EC2 networking only: VPC, subnets, gateways, route tables, security groups,
 # VPC endpoints and elastic IPs. Creation is gated on the Project request tag
-# and mutation on the Project resource tag, so this role cannot touch
-# networking it did not create.
+# and mutation on the Project resource tag, and the tag can only be applied by a
+# create call, so this role cannot touch networking it did not create.
 
 resource "aws_iam_policy" "pipeline_vpc" {
   name        = "${var.project}-${var.environment}-pipeline-vpc-policy"
@@ -21,13 +21,36 @@ resource "aws_iam_policy" "pipeline_vpc" {
           "ec2:CreateRouteTable",
           "ec2:CreateSecurityGroup",
           "ec2:CreateVpcEndpoint",
-          "ec2:AllocateAddress",
-          "ec2:CreateTags"
+          "ec2:AllocateAddress"
         ]
         Resource = "*"
         Condition = {
           StringEquals = {
             "aws:RequestTag/Project" = var.project
+          }
+        }
+      },
+      # ec2:CreateAction is present only while the tags are applied as part of
+      # one of these create calls, so this cannot tag a resource that already
+      # exists and pull it into the tag-scoped statements below.
+      {
+        Sid      = "TagVPCResourcesOnCreate"
+        Effect   = "Allow"
+        Action   = "ec2:CreateTags"
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/Project" = var.project
+            "ec2:CreateAction" = [
+              "CreateVpc",
+              "CreateSubnet",
+              "CreateInternetGateway",
+              "CreateNatGateway",
+              "CreateRouteTable",
+              "CreateSecurityGroup",
+              "CreateVpcEndpoint",
+              "AllocateAddress"
+            ]
           }
         }
       },

@@ -30,6 +30,23 @@ variable "role_description" {
   default     = null
 }
 
+variable "role_path" {
+  description = "IAM path for the execution role, such as /idp/workload/provisioner/. Pipeline IAM grants are scoped to a component's path."
+  type        = string
+  default     = "/"
+
+  validation {
+    condition     = startswith(var.role_path, "/") && endswith(var.role_path, "/")
+    error_message = "role_path must begin and end with a slash."
+  }
+}
+
+variable "role_permissions_boundary" {
+  description = "ARN of the permissions boundary attached to the execution role. Null attaches none."
+  type        = string
+  default     = null
+}
+
 # Execution history is the record of what a workflow did and where it stopped.
 # Without it, a failed execution can only be read for as long as Step Functions
 # keeps its history, and never queried.

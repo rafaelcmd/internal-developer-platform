@@ -253,6 +253,9 @@ module "lbc_irsa" {
   policy_description = "Permissions for the AWS Load Balancer Controller"
   policy_json        = local.lbc_policy_json
 
+  path                 = var.workload_iam_path
+  permissions_boundary = var.workload_permissions_boundary
+
   oidc_provider_arn = aws_iam_openid_connect_provider.cluster.arn
   oidc_provider_url = replace(aws_iam_openid_connect_provider.cluster.url, "https://", "")
 

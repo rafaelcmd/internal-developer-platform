@@ -24,3 +24,10 @@ data "aws_ssm_parameter" "datadog_api_key" {
 data "aws_ssm_parameter" "cognito_user_pool_arn" {
   name = "/idp/shared/identity/user_pool_arn"
 }
+
+# Published by shared/iam-github-oidc. Every role this stack creates carries it:
+# the pipeline is allowed to create and change roles only with this boundary
+# attached. See docs/adr/0009.
+data "aws_ssm_parameter" "workload_boundary_arn" {
+  name = "/idp/shared/iam/workload_boundary_arn"
+}

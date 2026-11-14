@@ -9,14 +9,14 @@ variable "oidc_provider_arn" {
 }
 
 variable "string_equals" {
-  description = "Map of StringEquals conditions for the assume role policy"
-  type        = map(any)
+  description = "StringEquals trust conditions: claim key to the list of accepted values. A key matches if any value does; all keys must match."
+  type        = map(list(string))
   default     = {}
 }
 
 variable "string_like" {
-  description = "Map of StringLike conditions for the assume role policy"
-  type        = map(any)
+  description = "StringLike trust conditions, for claims that need a wildcard: claim key to the list of accepted patterns"
+  type        = map(list(string))
   default     = {}
 }
 

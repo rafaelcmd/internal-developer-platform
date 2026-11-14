@@ -9,6 +9,23 @@ variable "role_description" {
   default     = null
 }
 
+variable "path" {
+  description = "IAM path for the role and its managed policy, such as /idp/workload/api/. Pipeline IAM grants are scoped to a component's path, so a role outside it cannot be managed by that pipeline."
+  type        = string
+  default     = "/"
+
+  validation {
+    condition     = startswith(var.path, "/") && endswith(var.path, "/")
+    error_message = "path must begin and end with a slash."
+  }
+}
+
+variable "permissions_boundary" {
+  description = "ARN of the permissions boundary attached to the role, which caps what any policy on it can grant. Null attaches none."
+  type        = string
+  default     = null
+}
+
 variable "oidc_provider_arn" {
   description = "ARN of the cluster's IAM OIDC provider"
   type        = string
