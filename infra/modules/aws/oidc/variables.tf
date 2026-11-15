@@ -1,5 +1,5 @@
 variable "url" {
-  description = "OIDC provider URL (e.g., https://token.actions.githubusercontent.com or https://app.terraform.io)"
+  description = "OIDC provider URL (e.g., https://token.actions.githubusercontent.com)"
   type        = string
 }
 

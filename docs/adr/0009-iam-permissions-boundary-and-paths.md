@@ -85,8 +85,9 @@ with the branch subject only, and the plan role to `_terraform.yml` on pull
 requests.
 
 **Removed.** `github-actions-oidc-role` and the Terraform Cloud role
-(`terraform-cloud-oidc-role`) with its four policies. The Terraform Cloud OIDC
-provider remains with no role trusting it.
+(`terraform-cloud-oidc-role`) with its four policies, together with the
+`shared/iam-tfc-oidc` stack and its OIDC provider. Runs execute locally under the
+pipeline roles, so nothing used that trust.
 
 ## Consequences
 
