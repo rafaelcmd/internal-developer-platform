@@ -103,7 +103,7 @@ resource "aws_iam_policy" "pipeline_scaffolder" {
           "sqs:AddPermission",
           "sqs:RemovePermission"
         ]
-        Resource = "arn:aws:sqs:*:*:${var.project}-scaffolder-*"
+        Resource = "arn:aws:sqs:*:${local.account_id}:${var.project}-scaffolder-*"
       },
       {
         # The dead-letter queue alarms modules/aws/sqs creates. Without them a
@@ -208,8 +208,8 @@ resource "aws_iam_policy" "pipeline_scaffolder" {
           "kms:UpdateAlias"
         ]
         Resource = [
-          "arn:aws:kms:*:*:alias/${var.project}-scaffolder-*",
-          "arn:aws:kms:*:*:key/*"
+          "arn:aws:kms:*:${local.account_id}:alias/${var.project}-scaffolder-*",
+          "arn:aws:kms:*:${local.account_id}:key/*"
         ]
       },
       {

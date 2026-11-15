@@ -1,24 +1,31 @@
 # The EKS control plane, its IAM role and security group, the access entries
-# that grant operators kubectl, and the IAM OIDC provider that makes IRSA
+# that grant operators and pipelines kubectl, and the IAM OIDC provider that makes IRSA
 # possible. Every platform workload runs on this cluster.
 #
 # Compute is Fargate only; see fargate.tf. The add-ons the cluster needs to be
 # usable are in the sibling files: coredns_fargate.tf, aws_lb_controller.tf,
 # fargate_logging.tf, otel_collector.tf and datadog_cluster_agent.tf.
 
-locals {
-  common_tags = merge(var.tags, {
-    Project     = var.project
-    Environment = var.environment
-  })
-}
+data "aws_caller_identity" "current" {}
 
+# The source conditions stop EKS from assuming this role on behalf of a cluster
+# in another account, or of another cluster in this one.
 data "aws_iam_policy_document" "cluster_assume_role" {
   statement {
     actions = ["sts:AssumeRole"]
     principals {
       type        = "Service"
       identifiers = ["eks.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = ["arn:aws:eks:${var.aws_region}:${data.aws_caller_identity.current.account_id}:cluster/${var.cluster_name}"]
     }
   }
 }
@@ -78,10 +85,11 @@ resource "aws_eks_cluster" "this" {
     public_access_cidrs     = var.public_access_cidrs
   }
 
-  # Cluster auth uses the Access Entries API. CONFIG_MAP remains enabled so
-  # tooling that still expects the aws-auth ConfigMap keeps working.
+  # Access entries only. Every principal, including the Fargate pod execution
+  # role, is authorized through an entry, so the aws-auth ConfigMap has no
+  # effect. EKS cannot switch a cluster back to CONFIG_MAP once it is API.
   access_config {
-    authentication_mode                         = "API_AND_CONFIG_MAP"
+    authentication_mode                         = "API"
     bootstrap_cluster_creator_admin_permissions = true
   }
 
@@ -96,33 +104,49 @@ resource "aws_eks_cluster" "this" {
   ]
 }
 
-# Grants cluster-admin to additional IAM principals: operator workstations and
-# the CI roles for any stack that manages Kubernetes objects. Without an entry,
-# the kubernetes provider fails with a bare "Unauthorized" that says nothing
-# about IAM. The cluster creator already has admin through
+# Grants kubectl to additional IAM principals: operator workstations, the
+# deploy role, and the CI role of any stack that manages Kubernetes objects.
+# Without an entry, the kubernetes provider fails with a bare "Unauthorized" that
+# says nothing about IAM. The cluster creator already has admin through
 # bootstrap_cluster_creator_admin_permissions above.
-resource "aws_eks_access_entry" "admins" {
-  for_each = toset(var.cluster_admin_principal_arns)
+locals {
+  access_entries = { for entry in var.access_entries : entry.principal_arn => entry }
+}
 
-  cluster_name  = aws_eks_cluster.this.name
-  principal_arn = each.value
-  type          = "STANDARD"
+resource "aws_eks_access_entry" "this" {
+  for_each = local.access_entries
+
+  cluster_name      = aws_eks_cluster.this.name
+  principal_arn     = each.key
+  type              = "STANDARD"
+  kubernetes_groups = each.value.kubernetes_groups
 
   tags = local.common_tags
 }
 
-resource "aws_eks_access_policy_association" "admins" {
-  for_each = toset(var.cluster_admin_principal_arns)
+resource "aws_eks_access_policy_association" "this" {
+  for_each = local.access_entries
 
   cluster_name  = aws_eks_cluster.this.name
-  principal_arn = each.value
-  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+  principal_arn = each.key
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/${each.value.access_policy}"
 
   access_scope {
-    type = "cluster"
+    type       = length(each.value.namespaces) > 0 ? "namespace" : "cluster"
+    namespaces = length(each.value.namespaces) > 0 ? each.value.namespaces : null
   }
 
-  depends_on = [aws_eks_access_entry.admins]
+  depends_on = [aws_eks_access_entry.this]
+}
+
+moved {
+  from = aws_eks_access_entry.admins
+  to   = aws_eks_access_entry.this
+}
+
+moved {
+  from = aws_eks_access_policy_association.admins
+  to   = aws_eks_access_policy_association.this
 }
 
 # Registers the cluster's OIDC issuer with IAM, which is the prerequisite for

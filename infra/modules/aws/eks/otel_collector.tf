@@ -3,14 +3,16 @@
 # Collector and the Collector forwards to the observability vendor, so swapping
 # vendors is a Collector config change rather than a change to every service.
 #
-# The Collector workload itself (Deployment, Service, ConfigMap, RBAC) is raw
-# manifests in /k8s/otel-collector. Only the pieces that depend on cluster
-# identity are Terraform-owned:
+# The Collector workload itself (Deployment, Service, ConfigMap) is raw
+# manifests in /k8s/otel-collector. The pieces that depend on cluster identity
+# or reach beyond the namespace are Terraform-owned:
 #
 #   1. The observability namespace, which fargate.tf also adds to the Fargate
 #      profile so the pod can schedule.
 #   2. An IRSA-annotated ServiceAccount.
 #   3. A copy of the Datadog API key secret, read by the datadog exporter.
+#   4. The cluster-wide read RBAC, which the deploy role's namespace-scoped
+#      access entry cannot create.
 
 resource "kubernetes_namespace" "observability" {
   count = var.install_otel_collector ? 1 : 0
@@ -86,4 +88,53 @@ resource "kubernetes_secret" "otel_datadog_api_key" {
   }
 
   type = "Opaque"
+}
+
+# Cluster-wide read access for Kubernetes metadata: the k8sattributes processor
+# resolves a pod IP to its pod, namespace, deployment and node, and the
+# prometheus receiver discovers scrape targets. Read-only throughout.
+resource "kubernetes_cluster_role" "otel_collector" {
+  count = var.install_otel_collector ? 1 : 0
+
+  metadata {
+    name = "otel-collector"
+    labels = {
+      "app.kubernetes.io/name" = "otel-collector"
+    }
+  }
+
+  rule {
+    api_groups = [""]
+    resources  = ["pods", "namespaces", "nodes", "services", "endpoints"]
+    verbs      = ["get", "list", "watch"]
+  }
+
+  rule {
+    api_groups = ["apps", "extensions"]
+    resources  = ["replicasets"]
+    verbs      = ["get", "list", "watch"]
+  }
+}
+
+resource "kubernetes_cluster_role_binding" "otel_collector" {
+  count = var.install_otel_collector ? 1 : 0
+
+  metadata {
+    name = "otel-collector"
+    labels = {
+      "app.kubernetes.io/name" = "otel-collector"
+    }
+  }
+
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "ClusterRole"
+    name      = kubernetes_cluster_role.otel_collector[0].metadata[0].name
+  }
+
+  subject {
+    kind      = "ServiceAccount"
+    name      = var.otel_collector_service_account
+    namespace = kubernetes_namespace.observability[0].metadata[0].name
+  }
 }

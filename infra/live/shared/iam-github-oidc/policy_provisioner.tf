@@ -96,7 +96,7 @@ resource "aws_iam_policy" "pipeline_provisioner" {
           "states:DeleteStateMachine",
           "states:UntagResource"
         ]
-        Resource = "arn:aws:states:*:*:stateMachine:${var.project}-*"
+        Resource = "arn:aws:states:*:${local.account_id}:stateMachine:${var.project}-*"
       },
       {
         # Creating a state machine means naming the role it assumes, which IAM
@@ -124,7 +124,7 @@ resource "aws_iam_policy" "pipeline_provisioner" {
           "logs:TagResource",
           "logs:UntagResource"
         ]
-        Resource = "arn:aws:logs:*:*:log-group:/aws/vendedlogs/states/${var.project}-*"
+        Resource = "arn:aws:logs:*:${local.account_id}:log-group:/aws/vendedlogs/states/${var.project}-*"
       },
       {
         # Setting up the delivery itself, and the log-group resource policy that

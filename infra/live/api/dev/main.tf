@@ -67,7 +67,7 @@ module "eks" {
   # Operator workstations, the deploy role, and the CI role of every stack whose
   # Terraform touches Kubernetes objects. Without an entry the kubernetes
   # provider fails with a bare "Unauthorized".
-  cluster_admin_principal_arns = var.cluster_admin_principal_arns
+  access_entries = var.access_entries
 
   tags = local.tags
 }

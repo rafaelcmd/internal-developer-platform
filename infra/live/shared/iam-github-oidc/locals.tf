@@ -13,4 +13,21 @@ locals {
   workload_path_prefix    = "/idp/workload/"
   boundary_path           = "/idp/boundary/"
   integration_policy_path = "/idp/integration/"
+
+  # Every SSM prefix the platform's stacks publish under, and so every
+  # parameter a pipeline reads.
+  project_parameter_arns = [
+    "arn:aws:ssm:*:${local.account_id}:parameter/idp/*",
+    "arn:aws:ssm:*:${local.account_id}:parameter/INTERNAL_DEVELOPER_PLATFORM/*",
+    "arn:aws:ssm:*:${local.account_id}:parameter/${var.project}/*"
+  ]
+
+  # Claims every GitHub OIDC trust in this stack pins. The numeric repository
+  # IDs survive a rename and are not reused by a re-created repository. Each
+  # role adds its own subject and workflow claims (roles.tf, plan_role.tf).
+  github_trust_base = {
+    "token.actions.githubusercontent.com:aud"                 = ["sts.amazonaws.com"]
+    "token.actions.githubusercontent.com:repository_id"       = [var.github_repository_id]
+    "token.actions.githubusercontent.com:repository_owner_id" = [var.github_repository_owner_id]
+  }
 }

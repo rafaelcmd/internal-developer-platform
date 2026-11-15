@@ -7,8 +7,9 @@
 # EFFECT    MUTATES the cluster, in the `observability` namespace.
 # REQUIRES  The `api` Terraform component, which owns this workload's
 #           prerequisites: the observability namespace, the IRSA
-#           ServiceAccount, the datadog-api-key secret and the namespace's
-#           Fargate profile (infra/modules/aws/eks/otel_collector.tf).
+#           ServiceAccount, the datadog-api-key secret, the Collector's
+#           cluster-wide read RBAC and the namespace's Fargate profile
+#           (infra/modules/aws/eks/otel_collector.tf).
 # DOCS      .github/workflows/README.md
 # =============================================================================
 
@@ -55,7 +56,6 @@ jobs:
       - name: Apply manifests
         run: |
           kubectl apply -f k8s/otel-collector/configmap.yaml
-          kubectl apply -f k8s/otel-collector/rbac.yaml
           kubectl apply -f k8s/otel-collector/deployment.yaml
           kubectl apply -f k8s/otel-collector/service.yaml
 

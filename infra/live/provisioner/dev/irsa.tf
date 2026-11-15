@@ -15,7 +15,7 @@ data "aws_iam_policy_document" "provisioner" {
       "ssm:GetParameters",
     ]
     resources = [
-      "arn:aws:ssm:${var.aws_region}:*:parameter/INTERNAL_DEVELOPER_PLATFORM/*",
+      "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/INTERNAL_DEVELOPER_PLATFORM/*",
     ]
   }
 
@@ -24,7 +24,7 @@ data "aws_iam_policy_document" "provisioner" {
   statement {
     sid       = "ReadOwnParameters"
     actions   = ["ssm:GetParameter"]
-    resources = ["arn:aws:ssm:${var.aws_region}:*:parameter/idp/${var.service_name}/${var.environment}/*"]
+    resources = ["arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/idp/${var.service_name}/${var.environment}/*"]
   }
 
   # The consume side of the provisioning queue. The API holds the send side, in

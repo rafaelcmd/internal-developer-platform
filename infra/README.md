@@ -88,6 +88,8 @@ infra/
     └── api_gateway/dev/             # API Gateway + WAF (consumes identity + NLB)
 ```
 
+Within a module or stack, a local read by more than one file is declared in its `locals.tf`; one read by a single file stays beside the resources that use it. The full rule is under "Terraform locals" in the root `CLAUDE.md`.
+
 Module composition stays inside the repo. Live workspaces reference modules by **relative path** (`source = "../../../modules/aws/eks"`), not by git URL — there is no push-before-apply trap and no version drift between live and module code.
 
 ---
@@ -146,7 +148,7 @@ The platform's workload pattern (long-tail traffic, infrequent invocations) is p
 
 - **CoreDNS patch baked in** — EKS ships CoreDNS with `eks.amazonaws.com/compute-type: ec2`, which prevents Fargate scheduling. A `kubernetes_annotations` resource strips it on apply.
 - **AWS Load Balancer Controller installed via Helm** with an IRSA-backed ServiceAccount and an explicit IAM policy (no AWS-managed policy — minimum permissions matched to the controller's needs).
-- **Access Entries API** (not the legacy `aws-auth` ConfigMap) for granting cluster-admin to operator IAM principals.
+- **Access Entries API only** (`authentication_mode = "API"`; the `aws-auth` ConfigMap has no effect). Each entry in `access_entries` names an EKS access policy and, for pipeline principals, the namespaces it is confined to; only operator users hold cluster admin.
 
 ### 4. The NLB is a Kubernetes resource, not a Terraform resource
 
@@ -226,14 +228,14 @@ AWS authentication is OIDC end-to-end:
 
 - No long-lived AWS keys exist in CI; every job exchanges a GitHub OIDC token for temporary credentials via `aws-actions/configure-aws-credentials`.
 - Each Terraform component assumes its own role, `github-actions-tf-<component>`, carrying only the services that component provisions (`infra/live/shared/iam-github-oidc/policy_*.tf`). Workflows build the ARN from the component name plus the `AWS_ACCOUNT_ID` variable, so a new component needs no new repo configuration.
-- Workload deploys assume `github-actions-deploy` — SSM reads, ECR push, and cluster auth only. It appears in `cluster_admin_principal_arns` so EKS grants it kubectl access through an access entry.
-- Pull-request plans assume `github-actions-oidc-plan-role`, which holds `ReadOnlyAccess`: unmerged code can compute a diff but never mutate AWS.
+- Workload deploys assume `github-actions-deploy` — reads of the platform's SSM prefixes, push to the platform's ECR repository, and `DescribeCluster` on its cluster only. Its access entry in `access_entries` grants `AmazonEKSEditPolicy` in `default` and `observability`, plus TargetGroupBinding management in `default` through the `idp:target-group-binding-editors` group.
+- Pull-request plans assume `github-actions-oidc-plan-role`, which holds `ReadOnlyAccess`: unmerged code can compute a diff but never mutate AWS. An inline deny removes the data reads `ReadOnlyAccess` carries (DynamoDB items, S3 objects, log events, queue messages, Cognito users, secret values) and any KMS decrypt outside SSM.
 - Trust policies pin the repository by its immutable `repository_id` and `repository_owner_id`, and the workflow file by `job_workflow_ref`: Terraform roles accept only `_terraform.yml` on `main`, the deploy role only the `cd-*.yml` workflows on `main`. Terraform roles allow three subjects — `...:ref:refs/heads/main`, `...:environment:dev` and `...:environment:dev-auto` — so write-capable credentials are only issued to jobs on `main` or inside a deployment environment (`dev-auto` replaces `dev` when `DISABLE_DEPLOYMENT_APPROVALS` is set). Pull requests match neither.
 - Component policies authorize creation on the `Project` request tag and mutation on the `Project` resource tag, so a role cannot modify resources outside this project even within its own services. The tag cannot be removed, and EC2 resources can only be tagged by the call that creates them.
 - IAM is authorized by path rather than by tag ([ADR-0009](../docs/adr/0009-iam-permissions-boundary-and-paths.md)). A component's pipeline may manage roles and policies only under `/idp/workload/<component>/`, and only while they carry the workload permissions boundary, whose ARN component stacks read from `/idp/shared/iam/workload_boundary_arn`. The EKS cluster, Fargate, API Gateway CloudWatch and Datadog roles keep their names and are granted by exact ARN.
 - Every pipeline role is denied `sts:AssumeRole`, any change to the pipeline roles, the OIDC provider, the pipeline policies and the boundary, and attaching `AdministratorAccess`, `IAMFullAccess` or `PowerUserAccess` (`policy_common.tf`).
 - Terraform Cloud holds state only. Runs execute on the GitHub runner in Local execution mode, so the identity applying a stack is always its `github-actions-tf-<component>` role — never a single shared role across every stack. No Terraform Cloud OIDC trust exists in AWS; a remote-execution path would add one, scoped and bounded like the pipeline roles.
-- A stack that manages Kubernetes objects needs an EKS access entry for its own role, granted through `cluster_admin_principal_arns` in `api/dev`. Without one the kubernetes provider fails with a bare `Unauthorized`, which says nothing about IAM.
+- A stack that manages Kubernetes objects needs an EKS access entry for its own role, granted through `access_entries` in `api/dev` and scoped to the namespaces it writes to. Without one the kubernetes provider fails with a bare `Unauthorized`, which says nothing about IAM.
 
 ---
 

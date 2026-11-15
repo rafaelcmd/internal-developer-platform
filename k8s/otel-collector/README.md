@@ -15,15 +15,15 @@ Terraform (`infra/modules/aws/eks/otel_collector.tf`) and raw manifests here:
 | ServiceAccount `otel-collector` | Terraform | IRSA annotation needs the IAM role ARN (a TF output) |
 | Secret `datadog-api-key` | Terraform | Same key material as the rest of the stack |
 | IAM role (IRSA) | Terraform | For AMP `aps:RemoteWrite` once AMP is added |
+| ClusterRole + binding `otel-collector` | Terraform | Cluster-scoped, so out of reach of the deploy role's namespace-scoped access entry |
 | ConfigMap / Deployment / Service | manifests here | The workload |
-| ClusterRole + binding (`rbac.yaml`) | manifests here | Read-only K8s metadata access |
 
 ## Deploy order
 
 1. `terraform apply` with `install_otel_collector = true` (creates namespace,
-   ServiceAccount, secret, IRSA role).
+   ServiceAccount, secret, IRSA role, read-only RBAC).
 2. The `cd-otel-collector.yml` workflow applies the manifests here
-   (ConfigMap, RBAC, Deployment, Service) and restarts the Deployment so config
+   (ConfigMap, Deployment, Service) and restarts the Deployment so config
    changes take effect. It runs in `ops-platform-up.yml` after the EKS stack
    and before `cd-api`, or on demand via workflow_dispatch. Manual
    equivalent: `kubectl apply -f k8s/otel-collector/` + rollout restart.

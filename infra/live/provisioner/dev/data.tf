@@ -74,3 +74,6 @@ data "aws_ssm_parameter" "observability_alerts_topic_arn" {
 data "aws_ssm_parameter" "workload_boundary_arn" {
   name = "/idp/shared/iam/workload_boundary_arn"
 }
+
+# Pins the IRSA policy's SSM ARNs to this account rather than any account.
+data "aws_caller_identity" "current" {}

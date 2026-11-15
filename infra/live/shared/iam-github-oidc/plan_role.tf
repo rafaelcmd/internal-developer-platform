@@ -46,3 +46,56 @@ resource "aws_iam_role_policy_attachment" "github_actions_plan_readonly" {
   role       = aws_iam_role.github_actions_plan.name
   policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
 }
+
+# ReadOnlyAccess also reads data: table items, objects, log events, queue
+# messages and user records. A plan only needs configuration, and this role runs
+# unmerged code, so those reads are denied outright.
+resource "aws_iam_role_policy" "github_actions_plan_deny_data_reads" {
+  name = "deny-data-reads"
+  role = aws_iam_role.github_actions_plan.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "DenyDataReads"
+        Effect = "Deny"
+        Action = [
+          "cognito-idp:AdminGetUser",
+          "cognito-idp:ListUsers",
+          "cognito-idp:ListUsersInGroup",
+          "dynamodb:BatchGetItem",
+          "dynamodb:GetItem",
+          "dynamodb:GetRecords",
+          "dynamodb:Query",
+          "dynamodb:Scan",
+          "logs:FilterLogEvents",
+          "logs:GetLogEvents",
+          "logs:GetQueryResults",
+          "logs:StartLiveTail",
+          "logs:StartQuery",
+          "s3:GetObject",
+          "s3:GetObjectVersion",
+          "secretsmanager:GetSecretValue",
+          "sqs:ReceiveMessage",
+          "states:GetExecutionHistory"
+        ]
+        Resource = "*"
+      },
+      # The api plan reads the Datadog API key, a SecureString, through the
+      # aws_ssm_parameter data source, so decryption through SSM stays allowed.
+      # Any other use of a key is denied.
+      {
+        Sid      = "DenyDecryptOutsideSSM"
+        Effect   = "Deny"
+        Action   = "kms:Decrypt"
+        Resource = "*"
+        Condition = {
+          StringNotLike = {
+            "kms:ViaService" = "ssm.*.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+}

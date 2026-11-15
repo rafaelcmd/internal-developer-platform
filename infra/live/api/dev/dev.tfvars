@@ -18,9 +18,10 @@ datadog_chart_version                      = "3.227.1"
 # this is left blank; only the auto-created email subscription is skipped.
 notification_email = "rafaelcmd@gmail.com"
 
-# IAM principals granted cluster-admin via EKS Access Entries, for principals
-# that need kubectl but never create the cluster — the deploy workflows, and
-# operator users working from a workstation.
+# IAM principals granted kubectl via EKS Access Entries, for principals that
+# need kubectl but never create the cluster: the deploy workflows, the CI roles
+# of stacks that create ServiceAccounts here, and operator users working from a
+# workstation.
 #
 # Never list whoever applies this stack. bootstrap_cluster_creator_admin_permissions
 # already grants the creator an access entry, and creating a second one for the
@@ -28,18 +29,41 @@ notification_email = "rafaelcmd@gmail.com"
 # github-actions-tf-api, which is the creator on every CI-applied cluster; it
 # would equally exclude the operator user on a cluster applied from a laptop.
 #
-# github-actions-tf-scaffolder, github-actions-tf-provisioner and
-# github-actions-tf-infra-worker-aws are here
-# because those stacks create the ServiceAccounts their pods bind to, in this
-# cluster, which they do not own. A stack that manages Kubernetes objects in
-# someone else's cluster needs an access entry or its kubernetes provider fails
-# with a bare "Unauthorized".
-cluster_admin_principal_arns = [
-  "arn:aws:iam::413703165862:user/rafael",
-  "arn:aws:iam::413703165862:role/github-actions-deploy",
-  "arn:aws:iam::413703165862:role/github-actions-tf-scaffolder",
-  "arn:aws:iam::413703165862:role/github-actions-tf-provisioner",
-  "arn:aws:iam::413703165862:role/github-actions-tf-infra-worker-aws",
+# Only the operator holds cluster admin. Every pipeline principal gets
+# AmazonEKSEditPolicy confined to the namespaces it writes to:
+#   - github-actions-deploy applies the workload manifests in default and
+#     observability. The kubernetes group, which must match the eks module's
+#     target_group_binding_editor_group output, adds the API's
+#     TargetGroupBinding, a CRD the Edit policy does not cover.
+#   - github-actions-tf-scaffolder, -provisioner and -infra-worker-aws create
+#     the ServiceAccounts their pods bind to, all in default. Without an entry
+#     their kubernetes provider fails with a bare "Unauthorized".
+access_entries = [
+  {
+    principal_arn = "arn:aws:iam::413703165862:user/rafael"
+    access_policy = "AmazonEKSClusterAdminPolicy"
+  },
+  {
+    principal_arn     = "arn:aws:iam::413703165862:role/github-actions-deploy"
+    access_policy     = "AmazonEKSEditPolicy"
+    namespaces        = ["default", "observability"]
+    kubernetes_groups = ["idp:target-group-binding-editors"]
+  },
+  {
+    principal_arn = "arn:aws:iam::413703165862:role/github-actions-tf-scaffolder"
+    access_policy = "AmazonEKSEditPolicy"
+    namespaces    = ["default"]
+  },
+  {
+    principal_arn = "arn:aws:iam::413703165862:role/github-actions-tf-provisioner"
+    access_policy = "AmazonEKSEditPolicy"
+    namespaces    = ["default"]
+  },
+  {
+    principal_arn = "arn:aws:iam::413703165862:role/github-actions-tf-infra-worker-aws"
+    access_policy = "AmazonEKSEditPolicy"
+    namespaces    = ["default"]
+  },
 ]
 
 # Terraform-managed API NLB + target group consumed by API Gateway and

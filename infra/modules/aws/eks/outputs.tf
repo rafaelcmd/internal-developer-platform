@@ -57,3 +57,8 @@ output "otel_collector_role_arn" {
   description = "ARN of the OTel Collector's IRSA role (only when install_otel_collector is true). Annotated onto the Terraform-managed ServiceAccount."
   value       = one(module.otel_collector_irsa[*].role_arn)
 }
+
+output "target_group_binding_editor_group" {
+  description = "Kubernetes group granted TargetGroupBinding management in target_group_binding_editor_namespaces. List it in an access entry's kubernetes_groups."
+  value       = local.target_group_binding_editor_group
+}
