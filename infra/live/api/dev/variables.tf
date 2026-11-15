@@ -77,10 +77,15 @@ variable "notification_email" {
   default     = ""
 }
 
-variable "cluster_admin_principal_arns" {
-  description = "IAM principal ARNs granted cluster-admin via EKS Access Entries. Add operator IAM users/roles here so they can use kubectl against the cluster."
-  type        = list(string)
-  default     = []
+variable "access_entries" {
+  description = "IAM principals granted kubectl via EKS access entries, each with an EKS access policy name and, for a namespace-scoped grant, the namespaces it covers. See the eks module's access_entries variable."
+  type = list(object({
+    principal_arn     = string
+    access_policy     = string
+    namespaces        = optional(list(string), [])
+    kubernetes_groups = optional(list(string), [])
+  }))
+  default = []
 }
 
 # The NLB and its target group are Terraform-owned so the gateway stack can

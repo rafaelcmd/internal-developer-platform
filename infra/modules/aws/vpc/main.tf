@@ -9,11 +9,6 @@ locals {
   az_count             = length(var.availability_zones)
   public_subnet_count  = length(var.public_subnet_cidrs)
   private_subnet_count = length(var.private_subnet_cidrs)
-
-  common_tags = {
-    Project     = var.project
-    Environment = var.environment
-  }
 }
 
 resource "aws_vpc" "this" {

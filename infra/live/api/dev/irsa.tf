@@ -20,8 +20,8 @@ data "aws_iam_policy_document" "api" {
       "ssm:GetParameters",
     ]
     resources = [
-      "arn:aws:ssm:${var.aws_region}:*:parameter/INTERNAL_DEVELOPER_PLATFORM/*",
-      "arn:aws:ssm:${var.aws_region}:*:parameter/idp/shared/identity/*",
+      "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/INTERNAL_DEVELOPER_PLATFORM/*",
+      "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/idp/shared/identity/*",
     ]
   }
 

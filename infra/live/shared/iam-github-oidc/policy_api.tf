@@ -134,8 +134,8 @@ resource "aws_iam_policy" "pipeline_api" {
         Effect = "Allow"
         Action = ["ec2:CreateSecurityGroup"]
         Resource = [
-          "arn:aws:ec2:*:*:vpc/*",
-          "arn:aws:ec2:*:*:security-group/*"
+          "arn:aws:ec2:*:${local.account_id}:vpc/*",
+          "arn:aws:ec2:*:${local.account_id}:security-group/*"
         ]
         Condition = {
           StringEquals = {

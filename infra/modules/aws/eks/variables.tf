@@ -75,11 +75,22 @@ variable "workload_permissions_boundary" {
 # Every principal that runs kubectl or manages Kubernetes objects needs an entry
 # here: operator workstations, the deploy role, and the CI role of any stack
 # whose Terraform uses the kubernetes provider. The cluster creator already has
-# admin implicitly.
-variable "cluster_admin_principal_arns" {
-  description = "List of IAM principal ARNs to grant cluster-admin via EKS Access Entries"
-  type        = list(string)
-  default     = []
+# admin implicitly. An entry with namespaces is confined to them, which is what
+# every pipeline principal should be.
+variable "access_entries" {
+  description = "IAM principals granted kubectl through EKS access entries. access_policy is the EKS access policy name, such as AmazonEKSEditPolicy; namespaces scopes it to those namespaces, and an empty list grants it cluster-wide. kubernetes_groups binds the principal to in-cluster RBAC, such as the target_group_binding_editor_group."
+  type = list(object({
+    principal_arn     = string
+    access_policy     = string
+    namespaces        = optional(list(string), [])
+    kubernetes_groups = optional(list(string), [])
+  }))
+  default = []
+
+  validation {
+    condition     = length(distinct([for entry in var.access_entries : entry.principal_arn])) == length(var.access_entries)
+    error_message = "Each principal_arn may appear in access_entries only once."
+  }
 }
 
 # The cluster has no EC2 nodes, so a namespace missing from this list schedules
@@ -133,6 +144,12 @@ variable "aws_load_balancer_controller_namespace" {
   description = "Namespace the AWS Load Balancer Controller runs in"
   type        = string
   default     = "kube-system"
+}
+
+variable "target_group_binding_editor_namespaces" {
+  description = "Namespaces where principals in the target_group_binding_editor_group may manage TargetGroupBindings. Each namespace must already exist."
+  type        = list(string)
+  default     = ["default"]
 }
 
 # Cluster-level visibility on Fargate: pod inventory and the orchestrator

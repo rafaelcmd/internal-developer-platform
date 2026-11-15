@@ -130,8 +130,9 @@ any other workspace's state.
 
 Because it creates a ServiceAccount in a cluster it does not own, its pipeline
 role `github-actions-tf-provisioner` needs an EKS access entry — granted through
-`cluster_admin_principal_arns` in `infra/live/api/dev/dev.tfvars`. Without one
-the kubernetes provider fails with a bare `Unauthorized`.
+`access_entries` in `infra/live/api/dev/dev.tfvars`, as `AmazonEKSEditPolicy`
+scoped to `default`. Without one the kubernetes provider fails with a bare
+`Unauthorized`.
 
 ## Usage
 

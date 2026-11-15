@@ -51,7 +51,7 @@ resource "aws_iam_policy" "pipeline_infra_worker_aws" {
           "sqs:AddPermission",
           "sqs:RemovePermission"
         ]
-        Resource = "arn:aws:sqs:*:*:${var.project}-infra-worker-aws-*"
+        Resource = "arn:aws:sqs:*:${local.account_id}:${var.project}-infra-worker-aws-*"
       },
       {
         Sid    = "CloudWatchCreateTaggedAlarms"

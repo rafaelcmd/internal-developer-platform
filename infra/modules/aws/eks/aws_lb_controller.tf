@@ -320,3 +320,44 @@ resource "helm_release" "aws_load_balancer_controller" {
     aws_eks_fargate_profile.this,
   ]
 }
+
+# AmazonEKSEditPolicy covers the built-in Kubernetes resources and none of the
+# controller's CRDs, so a namespace-scoped deploy principal cannot apply the
+# API's TargetGroupBinding with it alone. An access entry carrying
+# local.target_group_binding_editor_group gets that one resource, in the
+# namespaces listed.
+resource "kubernetes_cluster_role" "target_group_binding_editor" {
+  count = var.install_aws_load_balancer_controller ? 1 : 0
+
+  metadata {
+    name = "idp-target-group-binding-editor"
+  }
+
+  rule {
+    api_groups = ["elbv2.k8s.aws"]
+    resources  = ["targetgroupbindings"]
+    verbs      = ["get", "list", "watch", "create", "update", "patch", "delete"]
+  }
+}
+
+# A RoleBinding to a ClusterRole grants the rules in that namespace only.
+resource "kubernetes_role_binding" "target_group_binding_editor" {
+  for_each = var.install_aws_load_balancer_controller ? toset(var.target_group_binding_editor_namespaces) : toset([])
+
+  metadata {
+    name      = "idp-target-group-binding-editor"
+    namespace = each.value
+  }
+
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "ClusterRole"
+    name      = kubernetes_cluster_role.target_group_binding_editor[0].metadata[0].name
+  }
+
+  subject {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "Group"
+    name      = local.target_group_binding_editor_group
+  }
+}

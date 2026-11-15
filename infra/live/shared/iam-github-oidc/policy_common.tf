@@ -15,16 +15,34 @@ resource "aws_iam_policy" "pipeline_common" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
+      # Describe and list calls mostly take no resource, so the account
+      # condition is IfExists: it binds wherever the request names a resource
+      # and leaves the resource-less calls working.
       {
         Sid    = "DescribeForRefreshAndDataSources"
         Effect = "Allow"
         Action = [
           "ec2:Describe*",
-          "iam:Get*",
-          "iam:List*",
           "kms:Describe*",
           "kms:List*",
+          "ssm:DescribeParameters",
           "tag:GetResources"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEqualsIfExists = {
+            "aws:ResourceAccount" = local.account_id
+          }
+        }
+      },
+      # Without the account condition: AWS managed policies, which the stacks
+      # attach and refresh, are owned by AWS rather than by this account.
+      {
+        Sid    = "IAMReadForRefresh"
+        Effect = "Allow"
+        Action = [
+          "iam:Get*",
+          "iam:List*"
         ]
         Resource = "*"
       },
@@ -32,14 +50,13 @@ resource "aws_iam_policy" "pipeline_common" {
         Sid    = "SSMRead"
         Effect = "Allow"
         Action = [
-          "ssm:DescribeParameters",
           "ssm:GetParameter",
           "ssm:GetParameters",
           "ssm:GetParameterHistory",
           "ssm:GetParametersByPath",
           "ssm:ListTagsForResource"
         ]
-        Resource = "*"
+        Resource = local.project_parameter_arns
       },
       {
         Sid    = "SSMCreateTagged"
@@ -196,13 +213,4 @@ resource "aws_iam_policy" "pipeline_common" {
   })
 
   tags = local.tags
-}
-
-locals {
-  # Every SSM prefix the platform's stacks publish under.
-  project_parameter_arns = [
-    "arn:aws:ssm:*:${local.account_id}:parameter/idp/*",
-    "arn:aws:ssm:*:${local.account_id}:parameter/INTERNAL_DEVELOPER_PLATFORM/*",
-    "arn:aws:ssm:*:${local.account_id}:parameter/${var.project}/*"
-  ]
 }

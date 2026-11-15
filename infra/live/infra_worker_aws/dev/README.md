@@ -39,7 +39,8 @@ stack has been applied.
 
 Because it creates a ServiceAccount in a cluster it does not own, its pipeline
 role `github-actions-tf-infra-worker-aws` needs an EKS access entry, granted
-through `cluster_admin_principal_arns` in `infra/live/api/dev/dev.tfvars`.
+through `access_entries` in `infra/live/api/dev/dev.tfvars`, as
+`AmazonEKSEditPolicy` scoped to `default`.
 
 ## First-time setup
 

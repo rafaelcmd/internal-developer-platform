@@ -19,12 +19,6 @@
 # Pull-request plans use the separate read-only role in plan_role.tf.
 
 locals {
-  github_trust_base = {
-    "token.actions.githubusercontent.com:aud"                 = ["sts.amazonaws.com"]
-    "token.actions.githubusercontent.com:repository_id"       = [var.github_repository_id]
-    "token.actions.githubusercontent.com:repository_owner_id" = [var.github_repository_owner_id]
-  }
-
   main_branch_sub = "repo:${var.github_repository}:ref:refs/heads/main"
 
   pipeline_trust_subs = [

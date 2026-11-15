@@ -1,12 +1,24 @@
 # Routes pods in the configured namespaces to Fargate. The cluster has no EC2
 # node groups, so a namespace without a profile schedules nothing at all.
 
+# Scoped to this cluster's profiles, so the role cannot run pods for a Fargate
+# profile in another account or another cluster.
 data "aws_iam_policy_document" "fargate_assume_role" {
   statement {
     actions = ["sts:AssumeRole"]
     principals {
       type        = "Service"
       identifiers = ["eks-fargate-pods.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = ["arn:aws:eks:${var.aws_region}:${data.aws_caller_identity.current.account_id}:fargateprofile/${var.cluster_name}/*"]
     }
   }
 }

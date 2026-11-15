@@ -65,11 +65,11 @@ resource "aws_iam_policy" "pipeline_vpc" {
           "ec2:CreateNatGateway"
         ]
         Resource = [
-          "arn:aws:ec2:*:*:vpc/*",
-          "arn:aws:ec2:*:*:subnet/*",
-          "arn:aws:ec2:*:*:security-group/*",
-          "arn:aws:ec2:*:*:route-table/*",
-          "arn:aws:ec2:*:*:elastic-ip/*"
+          "arn:aws:ec2:*:${local.account_id}:vpc/*",
+          "arn:aws:ec2:*:${local.account_id}:subnet/*",
+          "arn:aws:ec2:*:${local.account_id}:security-group/*",
+          "arn:aws:ec2:*:${local.account_id}:route-table/*",
+          "arn:aws:ec2:*:${local.account_id}:elastic-ip/*"
         ]
         Condition = {
           StringEquals = {

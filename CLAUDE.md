@@ -51,6 +51,25 @@ without the scaffolder.
   [ADR-0004](docs/adr/0004-scaffolder-runs-as-a-container-on-eks.md) for why it is not any more.
 - Services own their own data. No service reads another service's table or database.
 
+## Terraform locals
+
+Terraform treats every `.tf` file in a directory as one module, so a local can be
+declared in any file and read from any other. These rules keep that from hiding
+dependencies between files:
+
+- **A local read by more than one file goes in that module's `locals.tf`.**
+  Create the file if the module has none. Reading it from `outputs.tf` counts.
+- **A local read by only one file stays in that file**, next to the
+  resources that use it. When a second file starts reading it, move it to
+  `locals.tf` in the same change.
+- **Exception: a file that declares only locals**, built around one shared
+  construct with a header explaining it, may stay a file of its own.
+  `live/shared/iam-github-oidc/workload_iam.tf`, the IAM statements every
+  component pipeline shares, is the one case today. Use this rarely; plain values
+  such as tags, ARNs, paths and name prefixes always go in `locals.tf`.
+- `locals.tf` declares no resources, so it needs no file header. A comment on an
+  individual local follows the inline-comment rules below.
+
 ## Terraform documentation
 
 Comments in `.tf` files are written for someone reading this repository on GitHub
