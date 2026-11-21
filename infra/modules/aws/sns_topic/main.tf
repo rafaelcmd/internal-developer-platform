@@ -34,26 +34,79 @@ resource "aws_sns_topic_subscription" "this" {
   endpoint  = each.value.endpoint
 }
 
-# A topic policy is created only when publishers are named. CloudWatch alarms in
-# this account publish through the account's own permissions and need no entry;
-# this exists for other AWS services and other accounts.
+# Setting a topic policy replaces the one SNS attaches by default, so the first
+# statement restates that default: it is what lets this account's CloudWatch
+# alarms publish and its operators subscribe. AWS:SourceOwner is the key the
+# SNS default uses for that purpose.
+#
+# The deny refuses any publish made without TLS (aws:SecureTransport). An
+# explicit deny on the resource holds whatever the caller's identity policy
+# allows.
 data "aws_iam_policy_document" "topic" {
-  count = length(var.publisher_service_principals) > 0 ? 1 : 0
-
   statement {
-    sid       = "AllowServicesToPublish"
-    actions   = ["sns:Publish"]
+    sid = "AccountOwnerAccess"
+    actions = [
+      "SNS:AddPermission",
+      "SNS:DeleteTopic",
+      "SNS:GetTopicAttributes",
+      "SNS:ListSubscriptionsByTopic",
+      "SNS:Publish",
+      "SNS:RemovePermission",
+      "SNS:SetTopicAttributes",
+      "SNS:Subscribe",
+    ]
     resources = [aws_sns_topic.this.arn]
 
     principals {
-      type        = "Service"
-      identifiers = var.publisher_service_principals
+      type        = "AWS"
+      identifiers = ["*"]
     }
 
     condition {
       test     = "StringEquals"
-      variable = "aws:SourceAccount"
+      variable = "AWS:SourceOwner"
       values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+
+  statement {
+    sid       = "DenyInsecurePublish"
+    effect    = "Deny"
+    actions   = ["SNS:Publish"]
+    resources = [aws_sns_topic.this.arn]
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+
+  # For other AWS services, which publish through no permissions of this
+  # account's own.
+  dynamic "statement" {
+    for_each = length(var.publisher_service_principals) > 0 ? [1] : []
+
+    content {
+      sid       = "AllowServicesToPublish"
+      actions   = ["sns:Publish"]
+      resources = [aws_sns_topic.this.arn]
+
+      principals {
+        type        = "Service"
+        identifiers = var.publisher_service_principals
+      }
+
+      condition {
+        test     = "StringEquals"
+        variable = "aws:SourceAccount"
+        values   = [data.aws_caller_identity.current.account_id]
+      }
     }
   }
 }
@@ -61,8 +114,11 @@ data "aws_iam_policy_document" "topic" {
 data "aws_caller_identity" "current" {}
 
 resource "aws_sns_topic_policy" "this" {
-  count = length(var.publisher_service_principals) > 0 ? 1 : 0
-
   arn    = aws_sns_topic.this.arn
-  policy = data.aws_iam_policy_document.topic[0].json
+  policy = data.aws_iam_policy_document.topic.json
+}
+
+moved {
+  from = aws_sns_topic_policy.this[0]
+  to   = aws_sns_topic_policy.this
 }

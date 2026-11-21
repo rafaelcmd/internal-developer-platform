@@ -161,6 +161,8 @@ resource "aws_iam_policy" "pipeline_scaffolder" {
           "secretsmanager:DeleteSecret",
           "secretsmanager:UpdateSecret",
           "secretsmanager:RestoreSecret",
+          "secretsmanager:PutResourcePolicy",
+          "secretsmanager:DeleteResourcePolicy",
           "secretsmanager:UntagResource"
         ]
         Resource = "*"

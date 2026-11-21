@@ -41,12 +41,14 @@ resource "aws_sqs_queue" "this" {
   tags = var.tags
 }
 
-# Queue policy. An SQS queue policy is an additive allow, so it grants nothing
-# that a same-account role's identity policy does not already grant. It is
-# needed only for principals with no identity policy to attach: an AWS service
-# principal, or a principal in another account.
+# Queue policy. Every queue gets one, because it carries an explicit deny of
+# any request made without TLS (aws:SecureTransport). A deny on the resource
+# holds whatever the caller's identity policy allows.
 #
-# Two constraints apply to any ARN passed here:
+# The allow statements are additive, so they grant nothing that a same-account
+# role's identity policy does not already grant. They exist only for principals
+# with no identity policy to attach: an AWS service principal, or a principal in
+# another account. Two constraints apply to any ARN passed for them:
 #
 #   - SQS validates principals when the policy is set, so a role that does not
 #     exist yet fails the apply with "InvalidAttributeValue: Invalid value for
@@ -54,11 +56,24 @@ resource "aws_sqs_queue" "this" {
 #     applies later.
 #   - Service principals need aws:SourceAccount, or any account's state machine
 #     could send to this queue.
-#
-# All three principal lists default to empty, and no policy is created when they
-# all are.
 data "aws_iam_policy_document" "queue" {
-  count = local.create_queue_policy ? 1 : 0
+  statement {
+    sid       = "DenyInsecureTransport"
+    effect    = "Deny"
+    actions   = ["sqs:*"]
+    resources = [aws_sqs_queue.this.arn]
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
 
   dynamic "statement" {
     for_each = length(var.producer_role_arns) > 0 ? [1] : []
@@ -121,10 +136,45 @@ data "aws_iam_policy_document" "queue" {
 }
 
 resource "aws_sqs_queue_policy" "this" {
-  count = local.create_queue_policy ? 1 : 0
-
   queue_url = aws_sqs_queue.this.id
-  policy    = data.aws_iam_policy_document.queue[0].json
+  policy    = data.aws_iam_policy_document.queue.json
+}
+
+moved {
+  from = aws_sqs_queue_policy.this[0]
+  to   = aws_sqs_queue_policy.this
+}
+
+# Dead-lettered messages are read and redriven by hand, so the same TLS
+# requirement applies. SQS moves messages into this queue internally, which no
+# queue policy affects.
+data "aws_iam_policy_document" "dlq" {
+  count = var.enable_dlq ? 1 : 0
+
+  statement {
+    sid       = "DenyInsecureTransport"
+    effect    = "Deny"
+    actions   = ["sqs:*"]
+    resources = [aws_sqs_queue.dlq[0].arn]
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+}
+
+resource "aws_sqs_queue_policy" "dlq" {
+  count = var.enable_dlq ? 1 : 0
+
+  queue_url = aws_sqs_queue.dlq[0].id
+  policy    = data.aws_iam_policy_document.dlq[0].json
 }
 
 # A message reaching the dead-letter queue has already exhausted the redrive

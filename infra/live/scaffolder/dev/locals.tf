@@ -11,6 +11,17 @@ locals {
 
   name_prefix = "${var.project}-${var.service_name}"
 
+  worker_role_names = {
+    for worker in keys(local.workers) :
+    worker => "${local.name_prefix}-${worker}-${var.environment}"
+  }
+
+  # Built from the name and path rather than read from module.worker_irsa: the
+  # worker's policy references the secret, so taking the ARN from the role would
+  # make the secret and the role depend on each other. A check in irsa.tf fails
+  # the plan if the two drift.
+  github_app_key_reader_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role${local.iam_path}${local.worker_role_names["github"]}"
+
   # One container image, two Deployments, two IAM roles.
   #
   # The property this buys: nothing that runs name reservations can read the

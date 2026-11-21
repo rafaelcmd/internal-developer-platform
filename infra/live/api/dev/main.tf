@@ -94,15 +94,16 @@ module "sqs" {
   # never carried out, which is invisible to the caller without an alarm.
   alarm_actions = [module.observability_alerts.topic_arn]
 
-  # No queue policy, deliberately. Both counterparties are IAM roles in this
-  # account, authorized by their own identity policies: the API's grant is in
-  # irsa.tf here, the provisioner's in live/provisioner/dev/irsa.tf. An SQS
-  # policy is an additive allow, so it could not restrict them anyway.
+  # No principals passed, deliberately, so the queue policy carries only the
+  # module's TLS deny. Both counterparties are IAM roles in this account,
+  # authorized by their own identity policies: the API's grant is in irsa.tf
+  # here, the provisioner's in live/provisioner/dev/irsa.tf. An allow in an SQS
+  # policy is additive, so it could not restrict them anyway.
   #
   # It also could not name the consumer. SQS validates principals when the
   # policy is set, and the provisioner's role is created by a stack that applies
   # after this one, so a fresh build would fail with "InvalidAttributeValue:
-  # Invalid value for the parameter Policy". The module's queue policy exists
+  # Invalid value for the parameter Policy". The module's allow statements exist
   # for principals that carry no identity policy at all, such as the
   # states.amazonaws.com principal on the scaffolder's task queues.
 

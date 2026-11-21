@@ -37,11 +37,21 @@ The queues have to match the split. Two Deployments polling one queue would each
 receive the other's tasks, and the IAM boundary would surface as random
 `AccessDenied` instead of as a boundary.
 
+The split is also enforced on the resources, not only in the roles' identity
+policies. The secret's resource policy denies `secretsmanager:GetSecretValue` to
+every principal except the github worker's role, and the KMS key policy lets
+only that role decrypt a real secret version. Granting another role
+`GetSecretValue`, even an administrator, does not get it the key. The reader
+ARN is built in `locals.tf` from the role name and IAM path, and a `check` in
+`irsa.tf` fails the plan if it stops matching the role.
+
 ## After the first apply
 
 Terraform creates the secret but **not** its value, so the private key never
 passes through a plan, a state file or a CI log — and the pipeline role is
-explicitly denied `secretsmanager:GetSecretValue`. Put the key in by hand once:
+explicitly denied `secretsmanager:GetSecretValue`. Put the key in by hand once,
+as any principal with `secretsmanager:PutSecretValue` (the key policy lets the
+account encrypt through Secrets Manager; it never needs to decrypt to write):
 
 ```bash
 aws secretsmanager put-secret-value \

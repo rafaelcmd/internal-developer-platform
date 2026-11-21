@@ -29,6 +29,7 @@ on:
           - ecr
           - datadog
           - identity
+          - security
           - api
           - provisioner
           - api-gateway
