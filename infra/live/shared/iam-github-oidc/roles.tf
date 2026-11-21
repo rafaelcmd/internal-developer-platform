@@ -41,6 +41,7 @@ locals {
     "api-gateway"      = [aws_iam_policy.pipeline_api_gateway.arn]
     scaffolder         = [aws_iam_policy.pipeline_scaffolder.arn]
     "infra-worker-aws" = [aws_iam_policy.pipeline_infra_worker_aws.arn]
+    security           = [aws_iam_policy.pipeline_security.arn]
   }
 }
 

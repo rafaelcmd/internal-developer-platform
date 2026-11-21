@@ -53,6 +53,16 @@ variable "recovery_window_in_days" {
   }
 }
 
+variable "reader_role_arns" {
+  description = "IAM role ARNs, path included, that may read the secret value. Every other principal is denied by the secret policy and cannot decrypt through the key policy. The roles need not exist yet."
+  type        = list(string)
+
+  validation {
+    condition     = length(var.reader_role_arns) > 0 && alltrue([for arn in var.reader_role_arns : can(regex("^arn:aws:iam::[0-9]{12}:role/", arn))])
+    error_message = "reader_role_arns must list at least one IAM role ARN."
+  }
+}
+
 variable "tags" {
   description = "Tags applied to the secret and its key"
   type        = map(string)

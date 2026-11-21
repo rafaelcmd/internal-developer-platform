@@ -24,7 +24,7 @@ on:
   workflow_call:
     inputs:
       component:
-        description: "Component: vpc | ecr | datadog | identity | api | provisioner | api-gateway | scaffolder | infra-worker-aws"
+        description: "Component: vpc | ecr | datadog | identity | security | api | provisioner | api-gateway | scaffolder | infra-worker-aws"
         type: string
         required: true
       action:
@@ -75,6 +75,7 @@ jobs:
             ecr)         dir=infra/live/shared/ecr ;;
             datadog)     dir=infra/live/shared/datadog ;;
             identity)    dir=infra/live/shared/identity ;;
+            security)    dir=infra/live/shared/security ;;
             api)         dir=infra/live/api/dev;         var_flags="-var-file=dev.tfvars" ;;
             provisioner) dir=infra/live/provisioner/dev; var_flags="-var-file=dev.tfvars" ;;
             api-gateway) dir=infra/live/api_gateway/dev; var_flags="-var-file=dev.tfvars" ;;

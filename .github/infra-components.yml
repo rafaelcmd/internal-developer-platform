@@ -29,10 +29,15 @@ identity:
   - "infra/live/shared/identity/**"
   - "infra/modules/aws/cognito/**"
 
+security:
+  - "infra/live/shared/security/**"
+  - "infra/modules/aws/cloudtrail/**"
+
 api:
   - "infra/live/api/**"
   - "infra/modules/aws/eks/**"
   - "infra/modules/aws/sqs/**"
+  - "infra/modules/aws/sns_topic/**"
   - "infra/modules/aws/nlb/**"
   - "infra/modules/aws/irsa/**"
 
@@ -50,6 +55,8 @@ api-gateway:
 scaffolder:
   - "infra/live/scaffolder/**"
   - "infra/modules/aws/irsa/**"
+  - "infra/modules/aws/sqs/**"
+  - "infra/modules/aws/secrets_manager/**"
 
 infra-worker-aws:
   - "infra/live/infra_worker_aws/**"

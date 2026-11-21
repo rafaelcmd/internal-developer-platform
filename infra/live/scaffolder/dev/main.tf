@@ -81,7 +81,8 @@ module "task_queue" {
 #     --secret-string file://idp-scaffolder.private-key.pem
 #
 # Only the github worker's role may read it, which is the point of the
-# two-Deployment split in locals.tf.
+# two-Deployment split in locals.tf. The module enforces that on the secret and
+# its key as well as in the roles' identity policies.
 
 module "github_app_key" {
   source = "../../../modules/aws/secrets_manager"
@@ -89,6 +90,8 @@ module "github_app_key" {
   name        = "${local.name_prefix}-github-app-key-${var.environment}"
   description = "PEM private key for the GitHub App the scaffolder authenticates as"
   alias_name  = "alias/${local.name_prefix}-github-app-${var.environment}"
+
+  reader_role_arns = [local.github_app_key_reader_arn]
 
   kms_deletion_window_in_days = var.kms_deletion_window_in_days
 

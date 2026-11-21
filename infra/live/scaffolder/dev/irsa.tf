@@ -102,7 +102,7 @@ module "worker_irsa" {
   source   = "../../../modules/aws/irsa"
   for_each = local.workers
 
-  role_name          = "${local.name_prefix}-${each.key}-${var.environment}"
+  role_name          = local.worker_role_names[each.key]
   role_description   = "Scaffolder ${each.key} worker: ${each.value.description}"
   policy_description = "Permissions for the scaffolder ${each.key} worker pod"
   policy_json        = data.aws_iam_policy_document.worker[each.key].json
@@ -121,4 +121,11 @@ module "worker_irsa" {
   }
 
   tags = local.tags
+}
+
+check "github_app_key_reader_matches_role" {
+  assert {
+    condition     = module.worker_irsa["github"].role_arn == local.github_app_key_reader_arn
+    error_message = "The GitHub App key's reader ARN does not match the github worker's role, so the secret and key policies would lock that worker out."
+  }
 }
