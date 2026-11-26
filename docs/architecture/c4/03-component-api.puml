@@ -1,0 +1,66 @@
+@startuml 03-component-api
+' C4 Level 3: the API's hexagonal structure (services/api/internal).
+!include <C4/C4_Component>
+
+title Component: API (services/api)
+
+LAYOUT_TOP_DOWN()
+
+AddRelTag("local", $lineStyle=DashedLine(), $legendText="local mode only (ENVIRONMENT=local)")
+
+Container_Ext(edge, "Edge", "API Gateway, WAF, NLB", "Forwards authorized requests.")
+ContainerDb_Ext(redis, "Idempotency Store", "Redis")
+ContainerQueue_Ext(provision_queue, "Provisioning Queue", "AWS SQS")
+ContainerQueue_Ext(kafka, "Kafka", "local dev only")
+Container_Ext(cognito, "User Pool", "AWS Cognito")
+Container_Ext(ssm, "Parameter Store", "AWS SSM", "Queue URL, Cognito client ID, Redis address.")
+Container_Ext(otel, "OTel Collector", "OTLP / Prometheus scrape")
+
+Container_Boundary(api, "API") {
+  Component(bootstrap, "Composition Root", "internal/bootstrap", "The only place that knows concrete types; wires every adapter into its port.")
+  Component(config, "Config", "internal/config, internal/infrastructure", "12-factor env vars plus runtime values loaded from Parameter Store.")
+
+  Component(router, "Router and Middleware", "adapters/inbound/http", "otelhttp, active-requests and duration metrics, request logging, recovery, request context, headers, CORS.")
+  Component(idem_mw, "Idempotency Middleware", "adapters/inbound/http", "Replays the stored response for a repeated X-Idempotency-Key.")
+  Component(resource_handler, "Resource Handler", "adapters/inbound/http", "POST /v1/provision: validates the payload (including appname) and mints request_id.")
+  Component(auth_handler, "Auth Handler", "adapters/inbound/http", "POST /v1/auth/signup | signin | confirm.")
+  Component(ops_handlers, "Health, Metrics, Swagger", "adapters/inbound/http", "/v1/health, /metrics, /v1/swagger/.")
+
+  Component(resource_service, "ResourceService", "application/service", "Use case: send a provisioning request.")
+  Component(auth_service, "AuthService", "application/service", "Use case: authentication flows.")
+  Component(domain, "Domain Model and Ports", "internal/domain", "ProvisionRequest contract, value objects, inbound and outbound port interfaces. Depends on nothing.")
+
+  Component(sqs_pub, "SQS Publisher", "adapters/outbound/sqs", "ResourcePublisher; injects W3C trace context into message attributes.")
+  Component(kafka_pub, "Kafka Publisher", "adapters/outbound/kafka", "ResourcePublisher for local mode; trace context in headers.")
+  Component(cognito_adapter, "Cognito Adapter", "adapters/outbound/cognito", "AuthProvider.")
+  Component(idem_store, "Redis Idempotency Store", "adapters/outbound/idempotency", "IdempotencyStore.")
+  Component(telemetry, "Telemetry", "internal/telemetry", "OTel MeterProvider + Prometheus exporter, OTLP traces and logs.")
+}
+
+Rel(edge, router, "HTTPS")
+Rel(router, idem_mw, "")
+Rel(idem_mw, resource_handler, "")
+Rel(router, auth_handler, "")
+Rel(router, ops_handlers, "")
+Rel(idem_mw, idem_store, "Get / Set", "IdempotencyStore port")
+
+Rel(resource_handler, resource_service, "", "ResourceService port")
+Rel(auth_handler, auth_service, "", "AuthService port")
+Rel(resource_service, domain, "Uses")
+Rel(auth_service, domain, "Uses")
+
+Rel(resource_service, sqs_pub, "Publish", "ResourcePublisher port")
+Rel(resource_service, kafka_pub, "Publish", "ResourcePublisher port", $tags="local")
+Rel(auth_service, cognito_adapter, "", "AuthProvider port")
+
+Rel(sqs_pub, provision_queue, "SendMessage")
+Rel(kafka_pub, kafka, "Produce", $tags="local")
+Rel(cognito_adapter, cognito, "AWS SDK")
+Rel(idem_store, redis, "RESP")
+
+Rel(bootstrap, config, "Loads")
+Rel(config, ssm, "GetParameter")
+Rel(telemetry, otel, "OTLP; /metrics scraped")
+
+SHOW_LEGEND()
+@enduml

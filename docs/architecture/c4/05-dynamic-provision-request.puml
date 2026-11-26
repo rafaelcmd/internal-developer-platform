@@ -1,0 +1,37 @@
+@startuml 05-dynamic-provision-request
+' C4 Dynamic: one provision request from the developer to the workers, as the
+' state machine in infra/live/provisioner/dev/state_machine.tf runs it.
+!include <C4/C4_Dynamic>
+
+title Dynamic: a provision request end to end
+
+LAYOUT_TOP_DOWN()
+
+Person(developer, "Developer")
+Container(edge, "Edge", "API Gateway, WAF")
+Container(api, "API", "Go")
+ContainerQueue(provision_queue, "Provisioning Queue", "SQS")
+Container(provisioner, "Provisioner", "Go")
+Container(state_machine, "Scaffold State Machine", "Step Functions")
+ContainerDb(request_table, "Request-State Table", "DynamoDB")
+Container(scaffolder_state, "Scaffolder: state worker", ".NET 10")
+Container(scaffolder_github, "Scaffolder: github worker", ".NET 10")
+Container(infra_aws, "AWS Infra Worker", "Go")
+System_Ext(github, "GitHub")
+
+Rel(developer, edge, "POST /v1/provision with application + resources", "HTTPS")
+Rel(edge, api, "Authorized request", "VPC Link")
+Rel(api, provision_queue, "Publish request with new request_id; respond 202")
+Rel(provisioner, provision_queue, "Receive message")
+Rel(provisioner, state_machine, "StartExecution(name = request_id)")
+Rel(state_machine, request_table, "RecordRequestAccepted: Status=RUNNING")
+Rel(state_machine, scaffolder_state, "ReserveName (callback via state queue)")
+Rel(state_machine, scaffolder_github, "Parallel branch 1: CreateRepository (callback via github queue)")
+Rel(scaffolder_github, github, "Create repository")
+Rel(state_machine, infra_aws, "Parallel branch 2: ProvisionInfra, when resources are requested (callback via infra queue)")
+Rel(state_machine, request_table, "RecordRequestSucceeded, or RecordRequestFailed from any Catch")
+
+caption With scaffold_enabled = false (dev today), ReserveName and CreateRepository are Pass states and only the ProvisionInfra branch reaches a worker.
+
+SHOW_LEGEND()
+@enduml

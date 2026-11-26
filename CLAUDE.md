@@ -40,6 +40,26 @@ success for resources nothing created. In dev, `scaffold_enabled = false` turns 
 states into Pass states, so an execution runs API → provisioner → state machine → AWS infra worker
 without the scaffolder.
 
+## Architecture diagrams
+
+The C4 diagrams in `docs/architecture/c4/` are the picture of the architecture above, and
+`README.md` embeds their PNGs. **Every architecture change updates them in the same commit**:
+
+- Adding, removing or renaming a service, worker, queue, table, state machine state or
+  external system; changing who calls whom, over what transport; moving a workload; or
+  changing a component's status (planned, under construction, built).
+- Edit the `.puml` source, never only the PNG. Which file changes depends on the level:
+  `01-system-context` (people and external systems), `02-container` (deployables and data
+  stores), `03-component-api` / `04-component-provisioner` (a service's internals),
+  `05-dynamic-provision-request` (the request flow and state machine order),
+  `06-deployment` (where things run). A new service with real internals gets its own
+  `0N-component-<service>.puml` and a section in `README.md`.
+- Re-render with `docs/architecture/c4/render.sh` (local `plantuml` or Docker) and commit
+  the regenerated PNGs with the source. A PNG that disagrees with its `.puml` is a stale
+  diagram.
+- Show unbuilt parts with the `planned` tag (dashed) and partly built ones with
+  `in_progress`, so the diagrams stay true about what exists.
+
 ## Conventions
 
 - Each service has its own `CLAUDE.md` with service-specific details — read it before working on that service.
