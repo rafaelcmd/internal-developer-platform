@@ -22,32 +22,52 @@ resources without sacrificing control or visibility. This IDP tackles that probl
 
 ## Architecture
 
-An event-driven system designed for resilience and independent scaling.
+An event-driven system designed for resilience and independent scaling. The
+diagrams below follow the [C4 model](https://c4model.com); their PlantUML sources
+live in [`docs/architecture/c4/`](docs/architecture/c4/) and are rendered with
+`docs/architecture/c4/render.sh`.
 
-```
-                         ┌──────────────────┐
-   Developer ──HTTP──▶   │       API        │   (Go 1.26)
-                         │  REST interface  │
-                         └────────┬─────────┘
-                                  │ publish
-                                  ▼
-                         ┌──────────────────┐
-                         │     AWS SQS      │   durable message queue
-                         └────────┬─────────┘
-                                  │ consume
-                                  ▼
-                         ┌────────────────┐
-                         │  Provisioner   │
-                         │   (Go 1.25)    │
-                         │ creates cloud  │
-                         │   resources    │
-                         └────────────────┘
-```
+**Message flow:** `API → SQS → Provisioner → Step Functions → task workers`
 
-**Message flow:** `API → SQS → Provisioner`
+Decoupling the write path (API) from the control plane (Provisioner) via SQS, and the
+control plane from the workers via Step Functions callbacks, means each service
+scales, deploys, and fails independently — a core tenet of reliable distributed systems.
 
-Decoupling the write path (API) from the worker (Provisioner) via SQS means each
-service scales, deploys, and fails independently — a core tenet of reliable distributed systems.
+### System context
+
+Who uses the platform and which external systems it depends on.
+
+![System context diagram](docs/architecture/c4/png/01-system-context.png)
+
+### Containers
+
+The deployable units and how a request moves between them. The API publishes one
+request carrying both the application and its cloud resources; the Provisioner
+starts one Step Functions execution per request, which sends the repository work to
+the Scaffolder and the infrastructure work to the per-cloud infra worker.
+
+![Container diagram](docs/architecture/c4/png/02-container.png)
+
+### Components
+
+The API is hexagonal (ports and adapters) with a single composition root:
+
+![API component diagram](docs/architecture/c4/png/03-component-api.png)
+
+The Provisioner is the control plane: it splits each request and starts its execution:
+
+![Provisioner component diagram](docs/architecture/c4/png/04-component-provisioner.png)
+
+### A provision request end to end
+
+![Dynamic diagram of a provision request](docs/architecture/c4/png/05-dynamic-provision-request.png)
+
+### Deployment
+
+Every workload runs on EKS Fargate in private subnets; AWS API calls go through VPC
+endpoints and only GitHub and Datadog traffic leaves through the NAT gateway.
+
+![Deployment diagram](docs/architecture/c4/png/06-deployment.png)
 
 ---
 
@@ -83,6 +103,8 @@ services/
   api/                Go REST API — accepts requests, publishes to SQS
   provisioner/        Go service — provisions cloud resources from SQS
 infra/                Terraform modules and live environments
+docs/adr/             Architecture decision records
+docs/architecture/c4/ C4 diagrams: PlantUML sources and rendered PNGs
 k8s/                  Kubernetes manifests
 k6/                   Load-testing scripts
 .github/workflows/    CI/CD pipelines — see .github/workflows/README.md

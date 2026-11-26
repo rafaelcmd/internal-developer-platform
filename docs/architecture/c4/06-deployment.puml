@@ -1,0 +1,71 @@
+@startuml 06-deployment
+' C4 Deployment: where each container runs in the dev environment.
+!include <C4/C4_Deployment>
+
+title Deployment: dev (AWS us-east-1)
+
+LAYOUT_TOP_DOWN()
+
+Person(developer, "Developer")
+System_Ext(github, "GitHub")
+System_Ext(datadog, "Datadog")
+
+Deployment_Node(aws, "AWS account", "us-east-1") {
+  Deployment_Node(edge_services, "Regional edge") {
+    Container(waf, "WAF Web ACL", "AWS WAF")
+    Container(apigw, "REST API", "API Gateway + VPC Link")
+    Container(cognito, "User Pool", "Cognito")
+  }
+
+  Deployment_Node(vpc, "VPC", "private subnets") {
+    Container(nlb, "API NLB", "Network Load Balancer")
+    Container(endpoints, "VPC Endpoints", "SQS, ECR, CloudWatch Logs, SSM, S3, Secrets Manager")
+    Container(nat, "NAT Gateway", "Egress for GitHub and Datadog")
+
+    Deployment_Node(eks, "EKS cluster", "Fargate profiles") {
+      Deployment_Node(ns_default, "namespace: default") {
+        Container(api, "API", "Go 1.26 pod")
+        ContainerDb(redis, "Redis", "pod")
+        Container(provisioner, "Provisioner", "Go 1.25 pod")
+        Container(scaffolder_state, "Scaffolder state worker", ".NET 10 pod")
+        Container(scaffolder_github, "Scaffolder github worker", ".NET 10 pod")
+        Container(infra_aws, "AWS Infra Worker", "Go 1.25 pod")
+      }
+      Deployment_Node(ns_obs, "namespace: observability") {
+        Container(otel, "OTel Collector", "pod")
+      }
+    }
+  }
+
+  Deployment_Node(managed, "Regional managed services") {
+    ContainerQueue(queues, "SQS queues", "provisioning, scaffolder state, scaffolder github, AWS infra; each with a DLQ")
+    Container(sfn, "Scaffold State Machine", "Step Functions")
+    ContainerDb(dynamo, "DynamoDB tables", "request state, scaffolder")
+    ContainerDb(secrets, "GitHub App key", "Secrets Manager + KMS")
+    Container(ssm, "Parameter Store", "SSM: cross-component contracts")
+    Container(ecr, "Container images", "ECR, shared repository")
+  }
+}
+
+Rel(developer, waf, "HTTPS")
+Rel(waf, apigw, "")
+Rel(apigw, cognito, "Authorizer")
+Rel(apigw, nlb, "VPC Link")
+Rel(nlb, api, "TargetGroupBinding")
+Rel(api, redis, "")
+Rel(eks, endpoints, "AWS API calls stay on the AWS network")
+Rel(endpoints, queues, "")
+Rel(endpoints, secrets, "")
+Rel(endpoints, ssm, "")
+Rel(endpoints, ecr, "Image pulls")
+Rel(sfn, queues, "Callback tasks")
+Rel(sfn, dynamo, "UpdateItem")
+Rel(scaffolder_github, nat, "")
+Rel(otel, nat, "")
+Rel(nat, github, "HTTPS")
+Rel(nat, datadog, "HTTPS")
+
+caption Each pod assumes its own IAM role through IRSA; no pod shares another's credentials.
+
+SHOW_LEGEND()
+@enduml

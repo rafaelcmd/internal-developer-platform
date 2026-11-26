@@ -1,0 +1,33 @@
+@startuml 01-system-context
+' C4 Level 1: who uses the platform and which external systems it depends on.
+!include <C4/C4_Context>
+
+title System Context: Internal Developer Platform
+
+AddElementTag("planned", $borderStyle=DashedLine(), $legendText="planned (not built yet)")
+AddRelTag("planned", $lineStyle=DashedLine(), $legendText="planned")
+
+Person(developer, "Developer", "Engineer on an application team who needs a new service and the cloud resources it depends on.")
+Person(platform_engineer, "Platform Engineer", "Operates the platform: ships it through GitHub Actions and watches it in Datadog.")
+
+System(idp, "Internal Developer Platform", "Accepts one provision request per application, scaffolds its GitHub repository from a golden-path template and provisions the cloud resources it needs.")
+
+System_Ext(github, "GitHub", "Hosts the scaffolded repositories, the golden-path templates and the platform's own CI/CD.")
+System_Ext(aws_target, "AWS", "Target cloud for requested AWS resources.")
+System_Ext(azure_target, "Azure", "Target cloud for requested Azure resources.", $tags="planned")
+System_Ext(gcp_target, "GCP", "Target cloud for requested GCP resources.", $tags="planned")
+System_Ext(datadog, "Datadog", "Receives the platform's traces, metrics and logs.")
+
+Rel(developer, idp, "Signs in and submits provision requests", "HTTPS / REST")
+Rel(platform_engineer, github, "Merges changes; runs the deploy workflows")
+Rel(github, idp, "Deploys services and Terraform components", "GitHub Actions, OIDC")
+Rel(platform_engineer, datadog, "Monitors requests end to end")
+
+Rel(idp, github, "Creates repositories and wires their CI/CD", "GitHub App, HTTPS")
+Rel(idp, aws_target, "Provisions requested resources", "Terraform (log-only today)", $tags="planned")
+Rel(idp, azure_target, "Provisions requested resources", "Terraform", $tags="planned")
+Rel(idp, gcp_target, "Provisions requested resources", "Terraform", $tags="planned")
+Rel(idp, datadog, "Ships telemetry", "OTLP via OTel Collector")
+
+SHOW_LEGEND()
+@enduml

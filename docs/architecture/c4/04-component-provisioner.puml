@@ -1,0 +1,43 @@
+@startuml 04-component-provisioner
+' C4 Level 3: the provisioner, the platform's control plane (services/provisioner/internal).
+!include <C4/C4_Component>
+
+title Component: Provisioner (services/provisioner)
+
+LAYOUT_TOP_DOWN()
+
+AddRelTag("local", $lineStyle=DashedLine(), $legendText="local mode only (KAFKA_BROKERS set)")
+
+ContainerQueue_Ext(provision_queue, "Provisioning Queue", "AWS SQS")
+ContainerQueue_Ext(kafka, "Kafka", "local dev only")
+Container_Ext(ssm, "Parameter Store", "AWS SSM", "Queue URL and state machine ARN.")
+Container_Ext(state_machine, "Scaffold State Machine", "AWS Step Functions")
+Container_Ext(otel, "OTel Collector", "OTLP")
+
+Container_Boundary(provisioner, "Provisioner") {
+  Component(main, "Entry Point", "cmd/consumer", "Picks the transport: Kafka when KAFKA_BROKERS is set, else SQS. Resolves the queue URL and state machine ARN at startup.")
+  Component(sqs_loop, "SQS Consume Loop", "internal/consumer/sqs.go", "Long-polls; deletes a message only after Dispatch succeeds.")
+  Component(kafka_loop, "Kafka Consume Loop", "internal/consumer/kafka.go", "Local dev; commits offsets. Starts no execution.")
+  Component(propagation, "Trace Propagation", "internal/consumer/propagation.go", "Extracts the API's W3C trace context so one request is one trace.")
+  Component(dispatch, "Dispatch", "internal/consumer/dispatch.go", "Splits the request, logs both halves, starts the execution.")
+  Component(contract, "Request Contract", "internal/provision", "Duplicate of the API's ProvisionRequest; Split() into ScaffoldWork and InfraWork.")
+  Component(starter, "StepFunctionsStarter", "internal/consumer/execution.go", "StartExecution named after request_id; ExecutionAlreadyExists is reported as AlreadyStarted.")
+  Component(telemetry, "Telemetry", "internal/telemetry", "OTLP traces, metrics (messages received/processed/failed) and logs.")
+}
+
+Rel(main, ssm, "GetParameter")
+Rel(main, sqs_loop, "Runs")
+Rel(main, kafka_loop, "Runs", $tags="local")
+Rel(sqs_loop, provision_queue, "ReceiveMessage / DeleteMessage")
+Rel(kafka_loop, kafka, "Consume", $tags="local")
+Rel(sqs_loop, propagation, "Uses")
+Rel(kafka_loop, propagation, "Uses", $tags="local")
+Rel(sqs_loop, dispatch, "Calls")
+Rel(kafka_loop, dispatch, "Calls", $tags="local")
+Rel(dispatch, contract, "Decodes and splits")
+Rel(dispatch, starter, "Start", "ExecutionStarter")
+Rel(starter, state_machine, "StartExecution, input = request message unchanged", "AWS SDK")
+Rel(telemetry, otel, "OTLP/gRPC")
+
+SHOW_LEGEND()
+@enduml

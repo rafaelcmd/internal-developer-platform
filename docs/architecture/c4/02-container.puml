@@ -1,0 +1,85 @@
+@startuml 02-container
+' C4 Level 2: the deployable units of the platform and how a request moves between them.
+!include <C4/C4_Container>
+
+title Container: Internal Developer Platform
+
+LAYOUT_TOP_DOWN()
+
+AddElementTag("planned", $borderStyle=DashedLine(), $legendText="planned (not built yet)")
+AddElementTag("in_progress", $borderStyle=BoldLine(), $legendText="under construction")
+AddRelTag("planned", $lineStyle=DashedLine(), $legendText="planned")
+AddRelTag("telemetry", $lineStyle=DottedLine(), $textColor="gray", $lineColor="gray", $legendText="telemetry")
+
+Person(developer, "Developer", "Requests an application and its cloud resources.")
+
+System_Ext(github, "GitHub", "Repositories and golden-path templates.")
+System_Ext(clouds, "Target clouds", "AWS today; Azure and GCP planned.")
+System_Ext(datadog, "Datadog", "Observability backend.")
+
+System_Boundary(idp, "Internal Developer Platform") {
+  Container(edge, "Edge", "API Gateway (REST), WAF, VPC Link, NLB", "Public entry point. Filters traffic and authorizes callers before anything reaches the cluster.")
+  Container(cognito, "User Pool", "AWS Cognito", "Developer identities; issues the tokens the edge authorizer checks.")
+
+  Container(api, "API", "Go 1.26, EKS Fargate", "Validates provision requests, mints request_id and publishes them to the queue.")
+  ContainerDb(redis, "Idempotency Store", "Redis, in-cluster", "Remembers X-Idempotency-Key responses.")
+  ContainerQueue(provision_queue, "Provisioning Queue", "AWS SQS + DLQ", "Durable hand-off between the API and the control plane.")
+
+  Container(provisioner, "Provisioner", "Go 1.25, EKS Fargate", "Control plane. Splits each request into repository and infrastructure work and starts one execution per request_id.")
+  Container(state_machine, "Scaffold State Machine", "AWS Step Functions", "Saga that runs the scaffold and infra branches in parallel through .waitForTaskToken callbacks.")
+  ContainerDb(request_table, "Request-State Table", "AWS DynamoDB", "One row per request: status, execution ARN, outcome. Written only by the state machine.")
+
+  ContainerQueue(state_queue, "Scaffolder State Tasks", "AWS SQS + DLQ", "ReserveName tasks.")
+  ContainerQueue(github_queue, "Scaffolder GitHub Tasks", "AWS SQS + DLQ", "CreateRepository tasks.")
+  Container(scaffolder_state, "Scaffolder: state worker", ".NET 10, EKS Fargate", "Reserves application names. Cannot read the GitHub App key.", $tags="in_progress")
+  Container(scaffolder_github, "Scaffolder: github worker", ".NET 10, EKS Fargate", "Creates repositories through the GitHub App.", $tags="in_progress")
+  ContainerDb(scaffolder_table, "Scaffolder Table", "AWS DynamoDB", "Name reservations and repository inventory.")
+  ContainerDb(app_key, "GitHub App Key", "Secrets Manager + KMS", "Readable only by the github worker's role.")
+
+  ContainerQueue(infra_queue, "AWS Infra Tasks", "AWS SQS + DLQ", "ProvisionInfra tasks.")
+  Container(infra_aws, "AWS Infra Worker", "Go 1.25, EKS Fargate", "Executes ProvisionInfra. Logs resources and reports Provisioned: false; no Terraform yet.")
+  Container(infra_other, "Azure / GCP Infra Workers", "Go", "One worker per cloud provider, each with its own queue and credentials.", $tags="planned")
+
+  Container(otel, "OTel Collector", "OpenTelemetry Collector, EKS Fargate", "Single telemetry seam; the only component that knows the backend.")
+}
+
+Rel(developer, edge, "POST /v1/provision, /v1/auth/*", "HTTPS")
+Rel(edge, cognito, "Authorizes token")
+Rel(edge, api, "Forwards request", "VPC Link -> NLB")
+Rel(api, cognito, "Sign up / sign in / confirm", "AWS SDK")
+Rel(api, redis, "Dedupes requests", "RESP")
+Rel(api, provision_queue, "Publishes ProvisionRequest", "SQS + W3C trace context")
+
+Rel(provisioner, provision_queue, "Consumes", "long poll")
+Rel(provisioner, state_machine, "StartExecution, named after request_id", "AWS SDK")
+
+Rel(state_machine, request_table, "RUNNING / SUCCEEDED / FAILED", "UpdateItem")
+Rel(state_machine, state_queue, "ReserveName", ".waitForTaskToken")
+Rel(state_machine, github_queue, "CreateRepository", ".waitForTaskToken")
+Rel(state_machine, infra_queue, "ProvisionInfra", ".waitForTaskToken")
+
+Rel(scaffolder_state, state_queue, "Consumes")
+Rel(scaffolder_state, scaffolder_table, "Conditional writes on request_id")
+Rel(scaffolder_github, github_queue, "Consumes")
+Rel(scaffolder_github, app_key, "Reads private key")
+Rel(scaffolder_github, scaffolder_table, "Records repository")
+Rel(scaffolder_github, github, "Creates repository", "GitHub App, HTTPS")
+
+Rel(infra_aws, infra_queue, "Consumes")
+Rel(infra_aws, clouds, "Provisions AWS resources", "Terraform", $tags="planned")
+Rel(infra_other, clouds, "Provisions Azure / GCP resources", "Terraform", $tags="planned")
+
+Rel_U(scaffolder_state, state_machine, "SendTaskSuccess / Failure")
+Rel_U(scaffolder_github, state_machine, "SendTaskSuccess / Failure")
+Rel_U(infra_aws, state_machine, "SendTaskSuccess")
+
+Rel(otel, datadog, "Exports traces, metrics, logs", "Datadog exporter", $tags="telemetry")
+
+Lay_R(scaffolder_state, scaffolder_github)
+Lay_R(scaffolder_github, infra_aws)
+Lay_R(infra_aws, infra_other)
+
+caption All services send OTLP traces, metrics and logs to the OTel Collector; those edges are omitted for readability.
+
+SHOW_LEGEND()
+@enduml
